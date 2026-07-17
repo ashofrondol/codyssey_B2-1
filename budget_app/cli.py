@@ -281,8 +281,9 @@ def cmd_export(args: argparse.Namespace) -> int:
 @handle_errors
 def cmd_import(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
-    imported, skipped, errors = ctx.io_service.import_csv(Path(args.from_))
-    print(f"[완료] imported={imported}, skipped={skipped}")
+    mode = "원자(전수 롤백)" if args.atomic else "부분 성공"
+    imported, skipped, errors = ctx.io_service.import_csv(Path(args.from_), atomic=args.atomic)
+    print(f"[완료] mode={mode}, imported={imported}, skipped={skipped}")
     if errors:
         print("[오류 라인 일부]")
         for e in errors:
@@ -396,6 +397,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_imp = sub.add_parser("import", help="CSV 가져오기")
     _add_data_dir(p_imp)
     p_imp.add_argument("--from", dest="from_", required=True, help="입력 CSV 경로")
+    p_imp.add_argument(
+        "--atomic",
+        action="store_true",
+        help="전수 롤백 모드 — 한 줄이라도 오류면 아무것도 저장하지 않음 (기본: 부분 성공)",
+    )
     p_imp.set_defaults(func=cmd_import)
 
     # backup (보너스)

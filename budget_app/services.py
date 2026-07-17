@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
 from .decorators import AppError, log_call, measure_time
-from .models import Budget, Transaction, ValidationError
+from .models import Budget, Category, Transaction, ValidationError
 from .repository import BudgetStore, CategoryStore, TransactionRepository
 
 
@@ -279,21 +279,34 @@ class ImportExportService:
                 count += 1
         return count
 
-    def import_csv(self, in_path: Path) -> Tuple[int, int, List[str]]:
+    def import_csv(self, in_path: Path, atomic: bool = False) -> Tuple[int, int, List[str]]:
         """CSV 거래 일괄 등록.
+
+        두 가지 실패 정책을 지원한다:
+
+        - atomic=False (기본, 부분 성공): 검증 실패한 행은 건너뛰고(skip) 나머지는
+          저장한다. 잘못된 몇 줄 때문에 전체 가져오기가 막히지 않는다.
+        - atomic=True (전수 롤백): 한 행이라도 검증에 실패하면 아무것도 저장하지
+          않고 AppError 를 던진다. "전부 반영" 또는 "전혀 반영 안 됨" 만 존재한다.
+
+        두 정책 모두 먼저 전체 행을 검증(준비 단계)한 뒤에만 파일에 쓴다(커밋
+        단계). 카테고리 자동 등록과 ID 발급도 커밋 단계에서 한 번에 수행하므로
+        원자 모드에서 커밋 전에 중단되면 카테고리/거래 어느 쪽도 남지 않는다.
 
         반환: (imported, skipped, errors)
             - imported: 저장된 건수
-            - skipped : 검증 실패로 건너뛴 건수
+            - skipped : 검증 실패로 건너뛴 건수 (원자 모드에서는 항상 0 — 실패 시 예외)
             - errors  : 라인별 오류 메시지 리스트 (앞쪽 일부)
         """
         in_path = Path(in_path)
         if not in_path.exists():
             raise FileNotFoundError(str(in_path))
 
-        imported = 0
         skipped = 0
         errors: List[str] = []
+        prepared: List[Transaction] = []          # 커밋 대상 거래
+        new_categories: List[str] = []            # 자동 등록 예정(순서 유지, 중복 제거)
+
         with open(in_path, "r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
             missing = [c for c in ("date", "type", "category", "amount") if c not in (reader.fieldnames or [])]
@@ -302,27 +315,51 @@ class ImportExportService:
                     f"CSV 헤더에 필수 컬럼이 없습니다: {missing}",
                     hint=f"필수 컬럼: {list(CSV_FIELDS)[:4]}",
                 )
+
+            # 파일을 한 번만 훑어 다음 ID 시작점을 잡고, 이후는 메모리에서 연속 발급.
+            next_num = self.txs.max_id_num()
+            known = {Category.normalize(n) for n in self.cats.list_names()}
+
             for lineno, row in enumerate(reader, start=2):  # 2행부터 데이터
                 try:
-                    category = (row.get("category") or "").strip()
-                    if not self.cats.exists(category):
-                        # 가져오기 시 미등록 카테고리는 자동 등록한다.
-                        self.cats.add(category)
-                    tx = Transaction(
-                        id=self.txs.next_id(),
-                        type=Transaction.validate_type(row["type"]),
-                        date=Transaction.validate_date(row["date"]),
-                        amount=Transaction.validate_amount(row["amount"]),
-                        category=category,
-                        memo=(row.get("memo") or "").strip(),
-                        tags=Transaction.parse_tags(row.get("tags")),
-                    )
-                    self.txs.append(tx)
-                    imported += 1
+                    category = Category.normalize(row.get("category") or "")
+                    type_ = Transaction.validate_type(row["type"])
+                    date = Transaction.validate_date(row["date"])
+                    amount = Transaction.validate_amount(row["amount"])
+                    memo = (row.get("memo") or "").strip()
+                    tags = Transaction.parse_tags(row.get("tags"))
                 except (ValidationError, AppError, KeyError) as exc:
+                    if atomic:
+                        # 전수 롤백: 준비 단계에서 즉시 중단, 파일은 손대지 않는다.
+                        raise AppError(
+                            f"원자적 가져오기 실패 — line {lineno}: {exc} (반영된 항목 없음)",
+                            hint="CSV 를 고쳐 다시 시도하거나, --atomic 없이 부분 가져오기를 사용하세요.",
+                        ) from exc
                     skipped += 1
                     if len(errors) < 5:
                         errors.append(f"line {lineno}: {exc}")
+                    continue
+
+                next_num += 1
+                prepared.append(
+                    Transaction(
+                        id=f"TX-{next_num:06d}",
+                        type=type_,
+                        date=date,
+                        amount=amount,
+                        category=category,
+                        memo=memo,
+                        tags=tags,
+                    )
+                )
+                if category not in known:
+                    known.add(category)
+                    new_categories.append(category)
+
+        # 커밋 단계 — 준비된 모든 항목을 한 번에 반영.
+        for name in new_categories:
+            self.cats.add(name)
+        imported = self.txs.append_many(prepared, atomic=atomic)
         return imported, skipped, errors
 
 

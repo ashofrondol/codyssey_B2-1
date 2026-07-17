@@ -1,0 +1,42 @@
+# ============================================================
+# dev-env-bootstrap (uv · Ruff · pytest) 스택 기반 설정
+#
+# 주의: budget_app 자체는 표준 라이브러리만 사용한다(런타임 의존성 0).
+#       아래 dev 의존성은 '테스트/린트 전용'이다.
+# ============================================================
+
+[project]
+name = "budget-app"
+version = "0.1.0"
+description = "파일 기반 가계부 콘솔 프로그램 (표준 라이브러리만 사용)"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+# 애플리케이션(빌드/설치 대상 아님) — 테스트는 소스 트리에서 직접 실행한다.
+[tool.uv]
+package = false
+
+# ---------- Ruff (린터 + 포매터) ----------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E/F: pyflakes+pycodestyle, I: isort, UP: pyupgrade, B: bugbear
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v"
+markers = [
+    "contract: 과제 명세/체크리스트가 요구하는 필수 계약 (구현 무관 통과해야 함)",
+    "optional: 구현체마다 다를 수 있는 확장 기능 (미지원 시 skip)",
+]
