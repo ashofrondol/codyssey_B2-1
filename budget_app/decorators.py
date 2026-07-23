@@ -70,10 +70,26 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
             print(f"[오류] {exc}")
             print("[힌트] 입력값을 다시 확인해 주세요.")
             return 2
+        except BrokenPipeError:
+            # 하류 파이프(`list | head`)가 먼저 닫힘. 여기서 print 하면 또 깨지므로
+            # 최상위(main)로 넘겨 조용히 처리하게 한다.
+            raise
         except FileNotFoundError as exc:
             print(f"[오류] 파일을 찾을 수 없습니다: {exc.filename or exc}")
             print("[힌트] 경로가 올바른지, 파일이 존재하는지 확인해 주세요.")
             return 3
+        except IsADirectoryError as exc:
+            print(f"[오류] 파일이 아니라 디렉터리입니다: {exc.filename or exc}")
+            print("[힌트] 파일 경로를 지정했는지 확인해 주세요.")
+            return 3
+        except PermissionError as exc:
+            print(f"[오류] 파일 접근 권한이 없습니다: {exc.filename or exc}")
+            print("[힌트] 읽기/쓰기 권한, 또는 다른 프로그램이 파일을 열고 있는지 확인해 주세요.")
+            return 3
+        except UnicodeDecodeError:
+            print("[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다).")
+            print("[힌트] CSV 를 UTF-8 로 다시 저장하세요 (엑셀: '다른 이름으로 저장 > CSV UTF-8').")
+            return 6
         except AppError as exc:
             print(f"[오류] {exc.message}")
             if exc.hint:
@@ -82,6 +98,11 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
         except KeyboardInterrupt:
             print("\n[중단] 사용자에 의해 종료되었습니다.")
             return 130
+        except OSError as exc:
+            # 디스크 가득 참(ENOSPC), 파일 잠금 등 위에서 못 잡은 입출력 오류.
+            print(f"[오류] 입출력 오류가 발생했습니다: {exc}")
+            print("[힌트] 디스크 여유 공간과 파일 경로/권한을 확인해 주세요.")
+            return 3
         except Exception as exc:  # noqa: BLE001 — 사용자에게 스택트레이스를 노출하지 않기 위함
             logger.debug("unhandled error", exc_info=True)
             print(f"[오류] 예기치 못한 오류가 발생했습니다: {exc}")

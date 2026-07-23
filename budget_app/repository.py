@@ -11,12 +11,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional
 
 from .models import Budget, Category, Transaction, ValidationError
+
+logger = logging.getLogger("budget_app.repository")
 
 
 DEFAULT_CATEGORIES = ("food", "transport", "rent", "salary", "etc")
@@ -53,17 +56,19 @@ class TransactionRepository:
     def stream(self) -> Iterator[Transaction]:
         """파일을 한 줄씩 읽으며 Transaction 객체로 yield 한다.
 
-        잘못된 줄은 조용히 건너뛴다(빈 줄/손상 줄 방어).
+        잘못된 줄은 건너뛰되, 조용히 버리지 않고 경고 로그로 남긴다
+        (데이터 유실을 사용자가 인지할 수 있도록). 빈 줄은 정상이므로 무시한다.
         """
         with open(self.path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for lineno, raw in enumerate(f, start=1):
+                line = raw.strip()
                 if not line:
                     continue
                 try:
                     data = json.loads(line)
                     yield Transaction.from_dict(data)
-                except (json.JSONDecodeError, ValidationError, KeyError):
+                except (json.JSONDecodeError, ValidationError, KeyError) as exc:
+                    logger.warning("%s:%d 손상된 줄을 건너뜁니다: %s", self.path.name, lineno, exc)
                     continue
 
     # ---------- ID 발급 ----------
@@ -194,13 +199,14 @@ class CategoryStore:
 
     def stream(self) -> Iterator[Category]:
         with open(self.path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for lineno, raw in enumerate(f, start=1):
+                line = raw.strip()
                 if not line:
                     continue
                 try:
                     yield Category.from_dict(json.loads(line))
-                except (json.JSONDecodeError, ValidationError, KeyError):
+                except (json.JSONDecodeError, ValidationError, KeyError) as exc:
+                    logger.warning("%s:%d 손상된 줄을 건너뜁니다: %s", self.path.name, lineno, exc)
                     continue
 
     def list_names(self) -> List[str]:
@@ -245,13 +251,14 @@ class BudgetStore:
 
     def stream(self) -> Iterator[Budget]:
         with open(self.path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for lineno, raw in enumerate(f, start=1):
+                line = raw.strip()
                 if not line:
                     continue
                 try:
                     yield Budget.from_dict(json.loads(line))
-                except (json.JSONDecodeError, ValidationError, KeyError):
+                except (json.JSONDecodeError, ValidationError, KeyError) as exc:
+                    logger.warning("%s:%d 손상된 줄을 건너뜁니다: %s", self.path.name, lineno, exc)
                     continue
 
     def get(self, month: str) -> Optional[Budget]:

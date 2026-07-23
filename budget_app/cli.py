@@ -9,7 +9,10 @@
 from __future__ import annotations
 
 import argparse
+import calendar
+import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -31,23 +34,81 @@ DEFAULT_DATA_DIR = "./data"
 
 # ---------- 대화형 입력 헬퍼 ----------
 
+# 잘못된 값이 끝없이 들어올 때(예: `yes bad | budget_app add`) 무한 루프에 빠지지
+# 않도록 재입력 횟수에 상한을 둔다.
+MAX_INPUT_RETRIES = 10
+
+
+class InputAborted(AppError):
+    """대화형 입력이 EOF(Ctrl+D)/스트림 종료로 중단됨.
+
+    handle_errors 가 AppError 로 처리하므로 스택트레이스 없이 깔끔히 종료된다.
+    이 예외가 없으면 파이프로 입력을 주다가 EOF 가 나는 순간 `_ask` 가 빈
+    문자열을 돌려주고, validator 가 이를 거부하며 while 루프가 영원히 돈다.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "입력이 중단되었습니다 (EOF).",
+            hint="대화형 명령은 필요한 값을 표준입력으로 끝까지 제공해야 합니다.",
+        )
+
 
 def _ask(prompt: str) -> str:
+    """대화형 한 줄 입력. EOF 는 무한 대기/무한 루프 대신 즉시 중단으로 처리한다."""
     try:
         return input(prompt)
-    except EOFError:
-        return ""
+    except EOFError as exc:
+        raise InputAborted() from exc
 
 
-def _ask_until(prompt: str, validator) -> str:
-    """validator(s) 가 정상값을 반환할 때까지 재입력을 요구한다."""
-    while True:
+def _ask_until(prompt: str, validator):
+    """validator(raw) 가 정상값을 반환할 때까지 재입력을 요구한다.
+
+    - EOF → InputAborted 로 즉시 종료(무한 루프 방지).
+    - 유효하지 않은 값이 계속 들어오면 MAX_INPUT_RETRIES 회에서 중단한다.
+    """
+    for _ in range(MAX_INPUT_RETRIES):
         raw = _ask(prompt)
         try:
             return validator(raw)
         except ValidationError as exc:
             print(f"[오류] {exc}")
             print("[힌트] 다시 입력해 주세요.")
+    raise AppError(
+        "재입력 횟수를 초과했습니다.",
+        hint="올바른 형식으로 값을 입력한 뒤 다시 시도해 주세요.",
+    )
+
+
+def _make_category_validator(cats):
+    """등록된 카테고리만 통과시키는 validator (미등록이면 ValidationError → 재입력)."""
+
+    def _validate(raw: str) -> str:
+        name = (raw or "").strip()
+        if cats.exists(name):
+            return name
+        available = ", ".join(cats.list_names())
+        raise ValidationError(f"등록되지 않은 카테고리입니다: {name} (사용 가능: {available})")
+
+    return _validate
+
+
+# ---------- 기간 헬퍼 ----------
+
+
+def _month_bounds(month: str) -> tuple[str, str]:
+    """'YYYY-MM' → ('YYYY-MM-01', 'YYYY-MM-<그 달의 말일>').
+
+    이전 코드는 모든 달을 31일로 가정해 2월/30일 달에서 검증이 실패했다.
+    calendar 로 실제 말일을 구해 그 문제를 없앤다. 형식 오류는 AppError.
+    """
+    try:
+        dt = datetime.strptime((month or "").strip(), "%Y-%m")
+    except ValueError as exc:
+        raise AppError("--month 형식이 올바르지 않습니다 (YYYY-MM).") from exc
+    last_day = calendar.monthrange(dt.year, dt.month)[1]
+    return f"{dt:%Y-%m}-01", f"{dt:%Y-%m}-{last_day:02d}"
 
 
 # ---------- 출력 포맷 ----------
@@ -99,14 +160,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     print("[안내] 거래 추가 - 대화형 입력입니다.")
     date = _ask_until("날짜(YYYY-MM-DD): ", Transaction.validate_date)
     type_ = _ask_until("타입(income/expense): ", Transaction.validate_type)
-
-    while True:
-        category = _ask("카테고리: ").strip()
-        if ctx.cats.exists(category):
-            break
-        print(f"[오류] 등록되지 않은 카테고리입니다: {category}")
-        print(f"[힌트] 사용 가능: {', '.join(ctx.cats.list_names())}")
-
+    category = _ask_until("카테고리: ", _make_category_validator(ctx.cats))
     amount = _ask_until("금액(양수): ", Transaction.validate_amount)
     memo = _ask("메모(선택): ").strip()
     tags_raw = _ask("태그(쉼표로 구분, 없으면 엔터): ").strip()
@@ -251,16 +305,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     date_from = args.from_
     date_to = args.to
     if args.month:
-        month = args.month
-        # YYYY-MM 검증
-        from datetime import datetime as _dt
-        try:
-            _dt.strptime(month, "%Y-%m")
-        except ValueError as exc:
-            raise AppError("--month 형식이 올바르지 않습니다 (YYYY-MM).") from exc
-        date_from = f"{month}-01"
-        # 월의 마지막은 31로 잡아도 문자열 비교상 문제 없음
-        date_to = f"{month}-31"
+        date_from, date_to = _month_bounds(args.month)
     elif not (date_from and date_to):
         raise AppError(
             "--month 또는 --from/--to 중 하나는 필수입니다.",
@@ -412,10 +457,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _silence_broken_pipe() -> None:
+    """하류 파이프(`list | head`)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,
+    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다
+    (파이썬 공식 권장 레시피)."""
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+    except OSError:
+        pass
+
+
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        parser = build_parser()
+        args = parser.parse_args(argv)
+        return args.func(args)
+    except BrokenPipeError:
+        # 예: `budget_app list | head` — head 가 먼저 닫음. 오류가 아니므로 조용히 종료.
+        _silence_broken_pipe()
+        return 0
 
 
 if __name__ == "__main__":
