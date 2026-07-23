@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .decorators import AppError, handle_errors
-from .models import Transaction, ValidationError
+from .models import VALID_TYPES, Budget, Transaction, ValidationError
 from .repository import BudgetStore, CategoryStore, TransactionRepository
 from .services import (
     BudgetService,
@@ -104,9 +104,10 @@ def _month_bounds(month: str) -> tuple[str, str]:
     calendar 로 실제 말일을 구해 그 문제를 없앤다. 형식 오류는 AppError.
     """
     try:
-        dt = datetime.strptime((month or "").strip(), "%Y-%m")
-    except ValueError as exc:
+        normalized = Budget.validate_month(month)  # '유효한 월' 규칙은 한 곳(모델)에만 둔다.
+    except ValidationError as exc:
         raise AppError("--month 형식이 올바르지 않습니다 (YYYY-MM).") from exc
+    dt = datetime.strptime(normalized, "%Y-%m")
     last_day = calendar.monthrange(dt.year, dt.month)[1]
     return f"{dt:%Y-%m}-01", f"{dt:%Y-%m}-{last_day:02d}"
 
@@ -185,7 +186,7 @@ def cmd_search(args: argparse.Namespace) -> int:
         date_from=Transaction.validate_date(args.from_) if args.from_ else None,
         date_to=Transaction.validate_date(args.to) if args.to else None,
         category=args.category,
-        type=Transaction.validate_type(args.type) if args.type else None,
+        type=args.type,  # argparse choices 가 이미 값을 제한하므로 재검증 불필요.
         query=args.q,
         tag=args.tag,
     )
@@ -374,7 +375,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--from", dest="from_", help="시작일 YYYY-MM-DD")
     p_search.add_argument("--to", dest="to", help="종료일 YYYY-MM-DD")
     p_search.add_argument("--category", help="카테고리")
-    p_search.add_argument("--type", choices=["income", "expense"], help="타입")
+    p_search.add_argument("--type", choices=list(VALID_TYPES), help="타입")
     p_search.add_argument("--q", help="메모 키워드 부분 일치")
     p_search.add_argument("--tag", help="태그 정확 일치")
     p_search.set_defaults(func=cmd_search)
@@ -416,7 +417,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_data_dir(p_upd)
     p_upd.add_argument("--id", required=True, help="수정 대상 거래 id")
     p_upd.add_argument("--date", help="YYYY-MM-DD")
-    p_upd.add_argument("--type", choices=["income", "expense"])
+    p_upd.add_argument("--type", choices=list(VALID_TYPES))
     p_upd.add_argument("--category")
     p_upd.add_argument("--amount", type=int)
     p_upd.add_argument("--memo")

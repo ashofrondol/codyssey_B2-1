@@ -14,6 +14,21 @@ class ValidationError(ValueError):
     """입력 검증 오류 — CLI 단에서 사용자 친화 메시지로 변환된다."""
 
 
+def validate_amount(value: Any) -> int:
+    """금액을 양의 정수로 검증·정규화한다.
+
+    Transaction·Budget 공용 규칙이므로 특정 엔티티에 묶지 않고 모듈 함수로 둔다
+    (한쪽 클래스가 다른 클래스의 static 메서드로 손을 뻗는 결합을 없앤다).
+    """
+    try:
+        n = int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("금액은 정수여야 합니다.") from exc
+    if n <= 0:
+        raise ValidationError("금액은 양의 정수여야 합니다 (0 또는 음수 불가).")
+    return n
+
+
 @dataclass
 class Transaction:
     """단일 거래 내역.
@@ -36,6 +51,17 @@ class Transaction:
     memo: str = ""
     tags: List[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # 생성자 자체가 불변식을 강제하는 유일한 지점이다. 서비스/CLI/from_dict/직접
+        # 호출 등 어느 경로로 만들어지든 이 시점에 항상 검증·정규화가 끝나 있다.
+        self.id = str(self.id)
+        self.type = self.validate_type(self.type)
+        self.date = self.validate_date(self.date)
+        self.amount = self.validate_amount(self.amount)
+        self.category = str(self.category).strip()
+        self.memo = str(self.memo or "").strip()
+        self.tags = self.parse_tags(self.tags)
+
     @staticmethod
     def validate_type(value: str) -> str:
         v = (value or "").strip().lower()
@@ -54,13 +80,9 @@ class Transaction:
 
     @staticmethod
     def validate_amount(value: Any) -> int:
-        try:
-            n = int(str(value).strip())
-        except (TypeError, ValueError) as exc:
-            raise ValidationError("금액은 정수여야 합니다.") from exc
-        if n <= 0:
-            raise ValidationError("금액은 양의 정수여야 합니다 (0 또는 음수 불가).")
-        return n
+        # 공용 규칙은 모듈 함수에 있다(Budget 도 같은 규칙을 쓴다). CLI 의 _ask_until
+        # 이 이 staticmethod 를 callable 로 넘겨 쓰므로 얇은 위임으로 남겨 둔다.
+        return validate_amount(value)
 
     @staticmethod
     def parse_tags(value: Any) -> List[str]:
@@ -77,17 +99,16 @@ class Transaction:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Transaction":
-        tags = data.get("tags") or []
-        if isinstance(tags, str):
-            tags = cls.parse_tags(tags)
+        # 필수 키는 하드 접근(누락 시 KeyError → stream 이 손상 줄로 skip).
+        # 검증·정규화는 __post_init__ 이 일괄 수행하므로 여기서는 형태만 넘긴다.
         return cls(
-            id=str(data["id"]),
-            type=cls.validate_type(data["type"]),
-            date=cls.validate_date(data["date"]),
-            amount=cls.validate_amount(data["amount"]),
-            category=str(data["category"]).strip(),
-            memo=str(data.get("memo") or ""),
-            tags=list(tags),
+            id=data["id"],
+            type=data["type"],
+            date=data["date"],
+            amount=data["amount"],
+            category=data["category"],
+            memo=data.get("memo"),
+            tags=data.get("tags"),
         )
 
 
@@ -97,6 +118,10 @@ class Budget:
 
     month: str
     amount: int
+
+    def __post_init__(self) -> None:
+        self.month = self.validate_month(self.month)
+        self.amount = validate_amount(self.amount)  # 모듈 공용 규칙
 
     @staticmethod
     def validate_month(value: str) -> str:
@@ -112,10 +137,8 @@ class Budget:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Budget":
-        return cls(
-            month=cls.validate_month(data["month"]),
-            amount=Transaction.validate_amount(data["amount"]),
-        )
+        # 검증은 __post_init__ 이 수행한다(Transaction 참조 제거).
+        return cls(month=data["month"], amount=data["amount"])
 
 
 @dataclass
@@ -123,6 +146,9 @@ class Category:
     """카테고리. 이름은 고유하게 관리된다."""
 
     name: str
+
+    def __post_init__(self) -> None:
+        self.name = self.normalize(self.name)
 
     @staticmethod
     def normalize(value: str) -> str:
@@ -136,4 +162,5 @@ class Category:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Category":
-        return cls(name=cls.normalize(data["name"]))
+        # 정규화는 __post_init__ 이 수행한다(빈 값이면 ValidationError → stream 이 skip).
+        return cls(name=data["name"])

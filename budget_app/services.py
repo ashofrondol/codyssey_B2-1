@@ -71,14 +71,16 @@ class TransactionService:
                 f"등록되지 않은 카테고리입니다: {category}",
                 hint="`category add` 로 먼저 등록하거나 `category list` 로 목록을 확인하세요.",
             )
+        # 검증·정규화는 Transaction.__post_init__ 이 일괄 수행한다(생성자가 유일한
+        # 강제 지점). 여기서는 원값을 그대로 넘긴다.
         tx = Transaction(
             id=self.txs.next_id(),
-            type=Transaction.validate_type(type_),
-            date=Transaction.validate_date(date),
-            amount=Transaction.validate_amount(amount),
-            category=category.strip(),
-            memo=(memo or "").strip(),
-            tags=Transaction.parse_tags(tags),
+            type=type_,
+            date=date,
+            amount=amount,
+            category=category,
+            memo=memo,
+            tags=tags,
         )
         self.txs.append(tx)
         return tx

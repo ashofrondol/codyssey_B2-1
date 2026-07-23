@@ -270,7 +270,8 @@ class BudgetStore:
         return result
 
     def set(self, month: str, amount: int) -> Budget:
-        b = Budget(month=Budget.validate_month(month), amount=Transaction.validate_amount(amount))
+        # 검증은 Budget.__post_init__ 이 수행한다(Transaction 참조 제거).
+        b = Budget(month=month, amount=amount)
         # month 별 단일 값 유지 — 기존 항목은 제거 후 새 값 추가
         rows: List[dict] = []
         for existing in self.stream():
