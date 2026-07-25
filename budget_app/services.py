@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
+from . import config
 from .decorators import AppError, log_call, measure_time
 from .models import Budget, Category, Transaction, ValidationError
 from .repository import BudgetStore, CategoryStore, TransactionRepository
@@ -68,8 +69,8 @@ class TransactionService:
         # 카테고리는 등록되어 있어야 한다.
         if not self.cats.exists(category):
             raise AppError(
-                f"등록되지 않은 카테고리입니다: {category}",
-                hint="`category add` 로 먼저 등록하거나 `category list` 로 목록을 확인하세요.",
+                config.ERR_CATEGORY_NOT_REGISTERED.format(name=category),
+                hint=config.HINT_CATEGORY_ADD_OR_LIST,
             )
         # 검증·정규화는 Transaction.__post_init__ 이 일괄 수행한다(생성자가 유일한
         # 강제 지점). 여기서는 원값을 그대로 넘긴다.
@@ -91,14 +92,14 @@ class TransactionService:
         if "category" in changes and changes["category"] is not None:
             if not self.cats.exists(str(changes["category"])):
                 raise AppError(
-                    f"등록되지 않은 카테고리입니다: {changes['category']}",
-                    hint="`category add` 로 먼저 등록하세요.",
+                    config.ERR_CATEGORY_NOT_REGISTERED.format(name=changes["category"]),
+                    hint=config.HINT_CATEGORY_ADD,
                 )
         updated = self.txs.update(tx_id, {k: v for k, v in changes.items() if v is not None})
         if updated is None:
             raise AppError(
-                f"해당 id 의 거래를 찾을 수 없습니다: {tx_id}",
-                hint="`list` 로 id 를 확인하세요.",
+                config.ERR_TX_NOT_FOUND.format(tx_id=tx_id),
+                hint=config.HINT_LIST_ID,
             )
         return updated
 
@@ -106,8 +107,8 @@ class TransactionService:
     def delete(self, tx_id: str) -> None:
         if not self.txs.delete(tx_id):
             raise AppError(
-                f"해당 id 의 거래를 찾을 수 없습니다: {tx_id}",
-                hint="`list` 로 id 를 확인하세요.",
+                config.ERR_TX_NOT_FOUND.format(tx_id=tx_id),
+                hint=config.HINT_LIST_ID,
             )
 
     def stream_sorted(self, flt: Optional[SearchFilter] = None) -> Iterator[Transaction]:
@@ -136,7 +137,7 @@ class BudgetService:
         return self.budgets.set(month, amount)
 
     @measure_time
-    def monthly_summary(self, month: str, top_n: int = 5) -> dict:
+    def monthly_summary(self, month: str, top_n: int = config.DEFAULT_TOP_N) -> dict:
         """월별 요약 계산.
 
         반환:
@@ -216,33 +217,30 @@ class CategoryService:
         """
         if not self.cats.exists(name):
             raise AppError(
-                f"존재하지 않는 카테고리입니다: {name}",
-                hint="`category list` 로 목록을 확인하세요.",
+                config.ERR_CATEGORY_NOT_EXIST.format(name=name),
+                hint=config.HINT_CATEGORY_LIST,
             )
         in_use = self.txs.category_in_use(name)
         reassigned = 0
         if in_use:
             if not replace_with:
                 raise AppError(
-                    f"카테고리 '{name}' 는 거래에서 사용 중입니다.",
-                    hint="`--replace-with <카테고리>` 로 대체 카테고리를 지정하세요.",
+                    config.ERR_CATEGORY_IN_USE.format(name=name),
+                    hint=config.HINT_REPLACE_WITH,
                 )
             if not self.cats.exists(replace_with):
                 raise AppError(
-                    f"대체 카테고리가 등록되어 있지 않습니다: {replace_with}",
-                    hint="먼저 `category add` 로 등록하세요.",
+                    config.ERR_REPLACE_NOT_REGISTERED.format(name=replace_with),
+                    hint=config.HINT_ADD_FIRST,
                 )
             if replace_with == name:
-                raise AppError("대체 카테고리는 자기 자신일 수 없습니다.")
+                raise AppError(config.ERR_REPLACE_SELF)
             reassigned = self.txs.reassign_category(name, replace_with)
         self.cats.remove(name)
         return reassigned
 
 
 # ---------- import / export ----------
-
-
-CSV_FIELDS = ("date", "type", "category", "amount", "memo", "tags")
 
 
 class ImportExportService:
@@ -263,7 +261,7 @@ class ImportExportService:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         count = 0
         with open(out_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=list(CSV_FIELDS))
+            writer = csv.DictWriter(f, fieldnames=list(config.CSV_FIELDS))
             writer.writeheader()
             for tx in self.txs.stream():
                 if not flt.matches(tx):
@@ -311,11 +309,11 @@ class ImportExportService:
 
         with open(in_path, "r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
-            missing = [c for c in ("date", "type", "category", "amount") if c not in (reader.fieldnames or [])]
+            missing = [c for c in config.CSV_REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
             if missing:
                 raise AppError(
-                    f"CSV 헤더에 필수 컬럼이 없습니다: {missing}",
-                    hint=f"필수 컬럼: {list(CSV_FIELDS)[:4]}",
+                    config.ERR_CSV_MISSING.format(missing=missing),
+                    hint=config.HINT_CSV_REQUIRED.format(columns=list(config.CSV_REQUIRED_COLUMNS)),
                 )
 
             # 파일을 한 번만 훑어 다음 ID 시작점을 잡고, 이후는 메모리에서 연속 발급.
@@ -334,18 +332,18 @@ class ImportExportService:
                     if atomic:
                         # 전수 롤백: 준비 단계에서 즉시 중단, 파일은 손대지 않는다.
                         raise AppError(
-                            f"원자적 가져오기 실패 — line {lineno}: {exc} (반영된 항목 없음)",
-                            hint="CSV 를 고쳐 다시 시도하거나, --atomic 없이 부분 가져오기를 사용하세요.",
+                            config.ERR_ATOMIC_IMPORT_FAILED.format(lineno=lineno, exc=exc),
+                            hint=config.HINT_ATOMIC_IMPORT,
                         ) from exc
                     skipped += 1
-                    if len(errors) < 5:
-                        errors.append(f"line {lineno}: {exc}")
+                    if len(errors) < config.MAX_IMPORT_ERRORS:
+                        errors.append(config.FMT_IMPORT_ERROR.format(lineno=lineno, exc=exc))
                     continue
 
                 next_num += 1
                 prepared.append(
                     Transaction(
-                        id=f"TX-{next_num:06d}",
+                        id=config.TX_ID_FORMAT.format(next_num),
                         type=type_,
                         date=date,
                         amount=amount,
@@ -373,8 +371,8 @@ def backup_data_dir(data_dir: Path) -> Path:
     src = Path(data_dir)
     if not src.exists():
         raise FileNotFoundError(str(src))
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dest = src.parent / f"backup_{ts}"
+    ts = datetime.now().strftime(config.BACKUP_TS_FORMAT)
+    dest = src.parent / f"{config.BACKUP_DIR_PREFIX}{ts}"
     dest.mkdir(parents=True, exist_ok=False)
     for p in src.glob("*.jsonl"):
         dest_file = dest / p.name

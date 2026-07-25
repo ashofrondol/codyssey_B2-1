@@ -7,10 +7,11 @@ import logging
 import time
 from typing import Any, Callable
 
+from . import config
 from .models import ValidationError
 
 
-logger = logging.getLogger("budget_app")
+logger = logging.getLogger(config.LOGGER_NAME)
 
 
 class AppError(Exception):
@@ -30,9 +31,9 @@ def log_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        logger.debug("call %s", func.__name__)
+        logger.debug(config.LOG_CALL, func.__name__)
         result = func(*args, **kwargs)
-        logger.debug("done %s", func.__name__)
+        logger.debug(config.LOG_DONE, func.__name__)
         return result
 
     return wrapper
@@ -48,7 +49,7 @@ def measure_time(func: Callable[..., Any]) -> Callable[..., Any]:
             return func(*args, **kwargs)
         finally:
             elapsed = (time.perf_counter() - start) * 1000
-            logger.debug("%s took %.2fms", func.__name__, elapsed)
+            logger.debug(config.LOG_TOOK, func.__name__, elapsed)
 
     return wrapper
 
@@ -65,48 +66,48 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> int:
         try:
-            return func(*args, **kwargs) or 0
+            return func(*args, **kwargs) or config.EXIT_OK
         except ValidationError as exc:
-            print(f"[오류] {exc}")
-            print("[힌트] 입력값을 다시 확인해 주세요.")
-            return 2
+            print(config.MSG_ERROR_LINE.format(msg=exc))
+            print(config.HINT_VALIDATION)
+            return config.EXIT_VALIDATION
         except BrokenPipeError:
             # 하류 파이프(`list | head`)가 먼저 닫힘. 여기서 print 하면 또 깨지므로
             # 최상위(main)로 넘겨 조용히 처리하게 한다.
             raise
         except FileNotFoundError as exc:
-            print(f"[오류] 파일을 찾을 수 없습니다: {exc.filename or exc}")
-            print("[힌트] 경로가 올바른지, 파일이 존재하는지 확인해 주세요.")
-            return 3
+            print(config.MSG_ERR_FILE_NOT_FOUND.format(name=exc.filename or exc))
+            print(config.HINT_FILE_NOT_FOUND)
+            return config.EXIT_IO
         except IsADirectoryError as exc:
-            print(f"[오류] 파일이 아니라 디렉터리입니다: {exc.filename or exc}")
-            print("[힌트] 파일 경로를 지정했는지 확인해 주세요.")
-            return 3
+            print(config.MSG_ERR_IS_A_DIR.format(name=exc.filename or exc))
+            print(config.HINT_IS_A_DIR)
+            return config.EXIT_IO
         except PermissionError as exc:
-            print(f"[오류] 파일 접근 권한이 없습니다: {exc.filename or exc}")
-            print("[힌트] 읽기/쓰기 권한, 또는 다른 프로그램이 파일을 열고 있는지 확인해 주세요.")
-            return 3
+            print(config.MSG_ERR_PERMISSION.format(name=exc.filename or exc))
+            print(config.HINT_PERMISSION)
+            return config.EXIT_IO
         except UnicodeDecodeError:
-            print("[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다).")
-            print("[힌트] CSV 를 UTF-8 로 다시 저장하세요 (엑셀: '다른 이름으로 저장 > CSV UTF-8').")
-            return 6
+            print(config.MSG_ERR_ENCODING)
+            print(config.HINT_ENCODING)
+            return config.EXIT_ENCODING
         except AppError as exc:
-            print(f"[오류] {exc.message}")
+            print(config.MSG_ERROR_LINE.format(msg=exc.message))
             if exc.hint:
-                print(f"[힌트] {exc.hint}")
-            return 4
+                print(config.MSG_HINT_LINE.format(msg=exc.hint))
+            return config.EXIT_APP
         except KeyboardInterrupt:
-            print("\n[중단] 사용자에 의해 종료되었습니다.")
-            return 130
+            print(config.MSG_INTERRUPTED)
+            return config.EXIT_INTERRUPT
         except OSError as exc:
             # 디스크 가득 참(ENOSPC), 파일 잠금 등 위에서 못 잡은 입출력 오류.
-            print(f"[오류] 입출력 오류가 발생했습니다: {exc}")
-            print("[힌트] 디스크 여유 공간과 파일 경로/권한을 확인해 주세요.")
-            return 3
+            print(config.MSG_ERR_IO.format(error=exc))
+            print(config.HINT_IO)
+            return config.EXIT_IO
         except Exception as exc:  # noqa: BLE001 — 사용자에게 스택트레이스를 노출하지 않기 위함
-            logger.debug("unhandled error", exc_info=True)
-            print(f"[오류] 예기치 못한 오류가 발생했습니다: {exc}")
-            print("[힌트] 동일 증상이 반복되면 데이터 파일과 명령을 확인해 주세요.")
-            return 1
+            logger.debug(config.LOG_UNHANDLED, exc_info=True)
+            print(config.MSG_ERR_UNEXPECTED.format(error=exc))
+            print(config.HINT_UNEXPECTED)
+            return config.EXIT_ERROR
 
     return wrapper

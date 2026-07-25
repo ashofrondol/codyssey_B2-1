@@ -16,8 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
+from . import config
 from .decorators import AppError, handle_errors
-from .models import VALID_TYPES, Budget, Transaction, ValidationError
+from .models import Budget, Transaction, ValidationError
 from .repository import BudgetStore, CategoryStore, TransactionRepository
 from .services import (
     BudgetService,
@@ -29,14 +30,7 @@ from .services import (
 )
 
 
-DEFAULT_DATA_DIR = "./data"
-
-
 # ---------- 대화형 입력 헬퍼 ----------
-
-# 잘못된 값이 끝없이 들어올 때(예: `yes bad | budget_app add`) 무한 루프에 빠지지
-# 않도록 재입력 횟수에 상한을 둔다.
-MAX_INPUT_RETRIES = 10
 
 
 class InputAborted(AppError):
@@ -49,8 +43,8 @@ class InputAborted(AppError):
 
     def __init__(self) -> None:
         super().__init__(
-            "입력이 중단되었습니다 (EOF).",
-            hint="대화형 명령은 필요한 값을 표준입력으로 끝까지 제공해야 합니다.",
+            config.ERR_INPUT_ABORTED,
+            hint=config.HINT_INPUT_ABORTED,
         )
 
 
@@ -68,16 +62,16 @@ def _ask_until(prompt: str, validator):
     - EOF → InputAborted 로 즉시 종료(무한 루프 방지).
     - 유효하지 않은 값이 계속 들어오면 MAX_INPUT_RETRIES 회에서 중단한다.
     """
-    for _ in range(MAX_INPUT_RETRIES):
+    for _ in range(config.MAX_INPUT_RETRIES):
         raw = _ask(prompt)
         try:
             return validator(raw)
         except ValidationError as exc:
-            print(f"[오류] {exc}")
-            print("[힌트] 다시 입력해 주세요.")
+            print(config.MSG_ERROR_LINE.format(msg=exc))
+            print(config.MSG_HINT_RETRY)
     raise AppError(
-        "재입력 횟수를 초과했습니다.",
-        hint="올바른 형식으로 값을 입력한 뒤 다시 시도해 주세요.",
+        config.ERR_MAX_RETRIES,
+        hint=config.HINT_MAX_RETRIES,
     )
 
 
@@ -89,7 +83,9 @@ def _make_category_validator(cats):
         if cats.exists(name):
             return name
         available = ", ".join(cats.list_names())
-        raise ValidationError(f"등록되지 않은 카테고리입니다: {name} (사용 가능: {available})")
+        raise ValidationError(
+            config.ERR_CATEGORY_NOT_REGISTERED_AVAILABLE.format(name=name, available=available)
+        )
 
     return _validate
 
@@ -106,8 +102,8 @@ def _month_bounds(month: str) -> tuple[str, str]:
     try:
         normalized = Budget.validate_month(month)  # '유효한 월' 규칙은 한 곳(모델)에만 둔다.
     except ValidationError as exc:
-        raise AppError("--month 형식이 올바르지 않습니다 (YYYY-MM).") from exc
-    dt = datetime.strptime(normalized, "%Y-%m")
+        raise AppError(config.ERR_MONTH_ARG_INVALID) from exc
+    dt = datetime.strptime(normalized, config.MONTH_FORMAT)
     last_day = calendar.monthrange(dt.year, dt.month)[1]
     return f"{dt:%Y-%m}-01", f"{dt:%Y-%m}-{last_day:02d}"
 
@@ -117,7 +113,9 @@ def _month_bounds(month: str) -> tuple[str, str]:
 
 def _fmt_tx_line(tx: Transaction) -> str:
     memo = tx.memo or ""
-    return f"{tx.id} | {tx.date} | {tx.type:<7} | {tx.category} | {tx.amount} | {memo}"
+    return config.FMT_TX_LINE.format(
+        id=tx.id, date=tx.date, type=tx.type, category=tx.category, amount=tx.amount, memo=memo
+    )
 
 
 def _print_tx_table(rows, limit: Optional[int] = None) -> int:
@@ -128,7 +126,7 @@ def _print_tx_table(rows, limit: Optional[int] = None) -> int:
         print(_fmt_tx_line(tx))
         count += 1
     if count == 0:
-        print("(데이터 없음)")
+        print(config.MSG_NO_DATA)
     return count
 
 
@@ -156,19 +154,19 @@ class AppContext:
 def cmd_add(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
     if not ctx.cats.list_names():
-        print("[안내] 등록된 카테고리가 없습니다. 먼저 `category add` 로 추가하세요.")
-        return 5
-    print("[안내] 거래 추가 - 대화형 입력입니다.")
-    date = _ask_until("날짜(YYYY-MM-DD): ", Transaction.validate_date)
-    type_ = _ask_until("타입(income/expense): ", Transaction.validate_type)
-    category = _ask_until("카테고리: ", _make_category_validator(ctx.cats))
-    amount = _ask_until("금액(양수): ", Transaction.validate_amount)
-    memo = _ask("메모(선택): ").strip()
-    tags_raw = _ask("태그(쉼표로 구분, 없으면 엔터): ").strip()
+        print(config.MSG_NO_CATEGORIES)
+        return config.EXIT_NO_CATEGORY
+    print(config.MSG_ADD_INTERACTIVE)
+    date = _ask_until(config.PROMPT_DATE, Transaction.validate_date)
+    type_ = _ask_until(config.PROMPT_TYPE, Transaction.validate_type)
+    category = _ask_until(config.PROMPT_CATEGORY, _make_category_validator(ctx.cats))
+    amount = _ask_until(config.PROMPT_AMOUNT, Transaction.validate_amount)
+    memo = _ask(config.PROMPT_MEMO).strip()
+    tags_raw = _ask(config.PROMPT_TAGS).strip()
     tags = Transaction.parse_tags(tags_raw)
 
     tx = ctx.tx_service.add(date=date, type_=type_, category=category, amount=amount, memo=memo, tags=tags)
-    print(f"[저장 완료] id={tx.id}")
+    print(config.MSG_SAVED_TX.format(id=tx.id))
     return 0
 
 
@@ -199,26 +197,26 @@ def cmd_summary(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
     result = ctx.budget_service.monthly_summary(args.month, top_n=args.top)
     if not result["has_data"] and result["budget"] is None:
-        print(f"{result['month']}: 데이터 없음")
+        print(config.MSG_SUMMARY_NO_DATA.format(month=result["month"]))
         return 0
 
-    print(f"총 수입: {result['income']}원")
-    print(f"총 지출: {result['expense']}원")
-    print(f"잔액: {result['balance']}원")
+    print(config.MSG_SUMMARY_INCOME.format(income=result["income"]))
+    print(config.MSG_SUMMARY_EXPENSE.format(expense=result["expense"]))
+    print(config.MSG_SUMMARY_BALANCE.format(balance=result["balance"]))
 
     budget = result["budget"]
     if budget is not None:
         usage = result["usage_pct"]
-        usage_str = f"{usage}%" if usage is not None else "N/A"
-        print(f"예산: {budget.amount}원 (사용률 {usage_str})")
+        usage_str = config.FMT_USAGE_PCT.format(usage=usage) if usage is not None else config.MSG_USAGE_NA
+        print(config.MSG_SUMMARY_BUDGET.format(amount=budget.amount, usage=usage_str))
         if result["over_budget"]:
-            print("[경고] 예산을 초과했습니다!")
+            print(config.MSG_OVER_BUDGET)
 
     if result["top_expense"]:
         n = len(result["top_expense"])
-        print(f"\n지출 TOP {n}")
+        print(config.MSG_TOP_EXPENSE_HEADER.format(n=n))
         for i, (cat, amt) in enumerate(result["top_expense"], start=1):
-            print(f"{i}) {cat} {amt}원")
+            print(config.FMT_TOP_EXPENSE_ITEM.format(rank=i, category=cat, amount=amt))
     return 0
 
 
@@ -227,9 +225,9 @@ def cmd_budget(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
     if args.budget_cmd == "set":
         b = ctx.budget_service.set_budget(args.month, args.amount)
-        print(f"[저장 완료] {b.month} 예산 {b.amount}원")
+        print(config.MSG_SAVED_BUDGET.format(month=b.month, amount=b.amount))
         return 0
-    raise AppError("알 수 없는 budget 하위 명령입니다.", hint="`budget set --month YYYY-MM --amount 금액`")
+    raise AppError(config.ERR_UNKNOWN_BUDGET_CMD, hint=config.HINT_BUDGET_USAGE)
 
 
 @handle_errors
@@ -237,31 +235,35 @@ def cmd_category(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
     sub = args.cat_cmd
     if sub == "add":
-        name = (args.name or _ask("카테고리명: ")).strip()
+        name = (args.name or _ask(config.PROMPT_CATEGORY_NAME)).strip()
         if ctx.cat_service.add(name):
-            print(f"[저장 완료] category={name}")
+            print(config.MSG_SAVED_CATEGORY.format(name=name))
         else:
-            print(f"[안내] 이미 존재하는 카테고리입니다: {name}")
+            print(config.MSG_CATEGORY_EXISTS.format(name=name))
         return 0
     if sub == "list":
         names = ctx.cat_service.list_names()
         if not names:
-            print("(등록된 카테고리 없음)")
+            print(config.MSG_NO_CATEGORIES_LISTED)
             return 0
         for n in names:
-            print(f"- {n}")
+            print(config.FMT_CATEGORY_ITEM.format(name=n))
         return 0
     if sub == "remove":
         name = (args.name or "").strip()
         if not name:
-            raise AppError("--name 이 필요합니다.", hint="`category remove --name <카테고리>`")
+            raise AppError(config.ERR_NAME_REQUIRED, hint=config.HINT_CATEGORY_REMOVE)
         reassigned = ctx.cat_service.remove(name, replace_with=args.replace_with)
         if reassigned:
-            print(f"[완료] '{name}' 삭제, {reassigned}건을 '{args.replace_with}' 로 재지정했습니다.")
+            print(
+                config.MSG_CATEGORY_REMOVED_REASSIGNED.format(
+                    name=name, count=reassigned, replace_with=args.replace_with
+                )
+            )
         else:
-            print(f"[완료] '{name}' 삭제")
+            print(config.MSG_CATEGORY_REMOVED.format(name=name))
         return 0
-    raise AppError("알 수 없는 category 하위 명령입니다.", hint="add | list | remove")
+    raise AppError(config.ERR_UNKNOWN_CATEGORY_CMD, hint=config.HINT_CATEGORY_SUBCMD)
 
 
 @handle_errors
@@ -282,11 +284,11 @@ def cmd_update(args: argparse.Namespace) -> int:
         changes["tags"] = Transaction.parse_tags(args.tags)
     if not changes:
         raise AppError(
-            "수정할 필드가 없습니다.",
-            hint="--date/--type/--category/--amount/--memo/--tags 중 하나 이상 지정하세요.",
+            config.ERR_NO_UPDATE_FIELDS,
+            hint=config.HINT_UPDATE_FIELDS,
         )
     updated = ctx.tx_service.update(args.id, changes)
-    print(f"[수정 완료] id={updated.id}")
+    print(config.MSG_UPDATED_TX.format(id=updated.id))
     print(_fmt_tx_line(updated))
     return 0
 
@@ -295,7 +297,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 def cmd_delete(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
     ctx.tx_service.delete(args.id)
-    print(f"[삭제 완료] id={args.id}")
+    print(config.MSG_DELETED_TX.format(id=args.id))
     return 0
 
 
@@ -309,8 +311,8 @@ def cmd_export(args: argparse.Namespace) -> int:
         date_from, date_to = _month_bounds(args.month)
     elif not (date_from and date_to):
         raise AppError(
-            "--month 또는 --from/--to 중 하나는 필수입니다.",
-            hint="예: `export --out a.csv --month 2024-01`",
+            config.ERR_EXPORT_PERIOD_REQUIRED,
+            hint=config.HINT_EXPORT_PERIOD,
         )
 
     if date_from:
@@ -320,27 +322,27 @@ def cmd_export(args: argparse.Namespace) -> int:
 
     flt = SearchFilter(date_from=date_from, date_to=date_to)
     count = ctx.io_service.export_csv(Path(args.out), flt)
-    print(f"[완료] {args.out} ({count} records)")
+    print(config.MSG_EXPORT_DONE.format(out=args.out, count=count))
     return 0
 
 
 @handle_errors
 def cmd_import(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
-    mode = "원자(전수 롤백)" if args.atomic else "부분 성공"
+    mode = config.MODE_ATOMIC if args.atomic else config.MODE_PARTIAL
     imported, skipped, errors = ctx.io_service.import_csv(Path(args.from_), atomic=args.atomic)
-    print(f"[완료] mode={mode}, imported={imported}, skipped={skipped}")
+    print(config.MSG_IMPORT_DONE.format(mode=mode, imported=imported, skipped=skipped))
     if errors:
-        print("[오류 라인 일부]")
+        print(config.MSG_IMPORT_ERROR_HEADER)
         for e in errors:
-            print(f"  - {e}")
+            print(config.FMT_IMPORT_ERROR_ITEM.format(error=e))
     return 0
 
 
 @handle_errors
 def cmd_backup(args: argparse.Namespace) -> int:
     dest = backup_data_dir(Path(args.data_dir))
-    print(f"[백업 완료] {dest}")
+    print(config.MSG_BACKUP_DONE.format(dest=dest))
     return 0
 
 
@@ -348,13 +350,13 @@ def cmd_backup(args: argparse.Namespace) -> int:
 
 
 def _add_data_dir(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--data-dir", dest="data_dir", default=DEFAULT_DATA_DIR, help="데이터 저장 폴더 (기본: ./data)")
+    p.add_argument("--data-dir", dest="data_dir", default=config.DEFAULT_DATA_DIR, help="데이터 저장 폴더 (기본: ./data)")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="budget_app",
-        description="파일 기반 가계부 콘솔 프로그램",
+        prog=config.PROG_NAME,
+        description=config.PROG_DESCRIPTION,
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -366,7 +368,7 @@ def build_parser() -> argparse.ArgumentParser:
     # list
     p_list = sub.add_parser("list", help="최신순 거래 목록")
     _add_data_dir(p_list)
-    p_list.add_argument("--limit", type=int, default=20, help="표시 건수 (기본 20)")
+    p_list.add_argument("--limit", type=int, default=config.DEFAULT_LIST_LIMIT, help="표시 건수 (기본 20)")
     p_list.set_defaults(func=cmd_list)
 
     # search
@@ -375,7 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--from", dest="from_", help="시작일 YYYY-MM-DD")
     p_search.add_argument("--to", dest="to", help="종료일 YYYY-MM-DD")
     p_search.add_argument("--category", help="카테고리")
-    p_search.add_argument("--type", choices=list(VALID_TYPES), help="타입")
+    p_search.add_argument("--type", choices=list(config.VALID_TYPES), help="타입")
     p_search.add_argument("--q", help="메모 키워드 부분 일치")
     p_search.add_argument("--tag", help="태그 정확 일치")
     p_search.set_defaults(func=cmd_search)
@@ -384,7 +386,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sum = sub.add_parser("summary", help="월별 요약")
     _add_data_dir(p_sum)
     p_sum.add_argument("--month", required=True, help="대상 월 YYYY-MM")
-    p_sum.add_argument("--top", type=int, default=5, help="지출 TOP N (기본 5)")
+    p_sum.add_argument("--top", type=int, default=config.DEFAULT_TOP_N, help="지출 TOP N (기본 5)")
     p_sum.set_defaults(func=cmd_summary)
 
     # budget
@@ -417,7 +419,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_data_dir(p_upd)
     p_upd.add_argument("--id", required=True, help="수정 대상 거래 id")
     p_upd.add_argument("--date", help="YYYY-MM-DD")
-    p_upd.add_argument("--type", choices=list(VALID_TYPES))
+    p_upd.add_argument("--type", choices=list(config.VALID_TYPES))
     p_upd.add_argument("--category")
     p_upd.add_argument("--amount", type=int)
     p_upd.add_argument("--memo")

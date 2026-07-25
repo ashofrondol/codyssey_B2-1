@@ -6,8 +6,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import date as _date, datetime
 from typing import Any, List, Optional
 
-
-VALID_TYPES = ("income", "expense")
+from . import config
 
 
 class ValidationError(ValueError):
@@ -23,9 +22,9 @@ def validate_amount(value: Any) -> int:
     try:
         n = int(str(value).strip())
     except (TypeError, ValueError) as exc:
-        raise ValidationError("금액은 정수여야 합니다.") from exc
+        raise ValidationError(config.ERR_AMOUNT_NOT_INT) from exc
     if n <= 0:
-        raise ValidationError("금액은 양의 정수여야 합니다 (0 또는 음수 불가).")
+        raise ValidationError(config.ERR_AMOUNT_NOT_POSITIVE)
     return n
 
 
@@ -65,17 +64,17 @@ class Transaction:
     @staticmethod
     def validate_type(value: str) -> str:
         v = (value or "").strip().lower()
-        if v not in VALID_TYPES:
-            raise ValidationError(f"type 은 {VALID_TYPES} 중 하나여야 합니다.")
+        if v not in config.VALID_TYPES:
+            raise ValidationError(config.ERR_TYPE_INVALID.format(types=config.VALID_TYPES))
         return v
 
     @staticmethod
     def validate_date(value: str) -> str:
         v = (value or "").strip()
         try:
-            datetime.strptime(v, "%Y-%m-%d")
+            datetime.strptime(v, config.DATE_FORMAT)
         except ValueError as exc:
-            raise ValidationError("날짜 형식이 올바르지 않습니다 (YYYY-MM-DD).") from exc
+            raise ValidationError(config.ERR_DATE_INVALID) from exc
         return v
 
     @staticmethod
@@ -127,9 +126,9 @@ class Budget:
     def validate_month(value: str) -> str:
         v = (value or "").strip()
         try:
-            datetime.strptime(v, "%Y-%m")
+            datetime.strptime(v, config.MONTH_FORMAT)
         except ValueError as exc:
-            raise ValidationError("월 형식이 올바르지 않습니다 (YYYY-MM).") from exc
+            raise ValidationError(config.ERR_MONTH_INVALID) from exc
         return v
 
     def to_dict(self) -> dict:
@@ -154,7 +153,7 @@ class Category:
     def normalize(value: str) -> str:
         v = (value or "").strip()
         if not v:
-            raise ValidationError("카테고리명은 비어있을 수 없습니다.")
+            raise ValidationError(config.ERR_CATEGORY_EMPTY)
         return v
 
     def to_dict(self) -> dict:

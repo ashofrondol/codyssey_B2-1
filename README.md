@@ -1,6 +1,6 @@
 # budget_app — 파일 기반 가계부 콘솔 프로그램
 
-Python 표준 라이브러리만으로 만든 콘솔 가계부입니다. JSONL 영구 저장, 제너레이터 스트리밍, 데코레이터 분리, 타입 힌트, 모듈화 구조를 갖췄습니다.
+Python 표준 라이브러리만으로 만든 콘솔 가계부입니다. JSONL 영구 저장, 제너레이터 스트리밍, 데코레이터 분리, 생성자 불변식 검증, 설정·문자열 중앙화(config), 타입 힌트, 모듈화 구조를 갖췄습니다.
 
 ## 1. 실행 환경
 
@@ -266,8 +266,9 @@ budget_app/
 ├── cli.py             # CLI 계층 — argparse, 대화형 입력, 출력 포맷
 ├── services.py        # 서비스 계층 — 검색/요약/예산/CSV I/O 비즈니스 로직
 ├── repository.py      # 저장소 계층 — JSONL 파일 입출력 (스트리밍 + 원자적 교체)
-├── models.py          # 모델 — Transaction / Budget / Category dataclass + 검증
-└── decorators.py      # 공통 관심사 — 로그 / 시간 측정 / 예외 처리
+├── models.py          # 모델 — Transaction / Budget / Category dataclass + 생성자 불변식 검증
+├── decorators.py      # 공통 관심사 — 로그 / 시간 측정 / 예외 처리
+└── config.py          # 설정 — 상수 + 출력 문자열 중앙화(단일 출처)
 ```
 
 ### 설계 포인트
@@ -275,8 +276,9 @@ budget_app/
 - **제너레이터 스트리밍**: `TransactionRepository.stream()` 등 모든 읽기는 `yield` 기반입니다. 파일을 `json.load()` 로 한 번에 올리지 않으므로 거래가 수십만 건이어도 메모리에 모두 올라가지 않습니다.
 - **원자적 쓰기**: `update`/`delete` 는 임시 파일에 전부 쓴 뒤 `os.replace()` 로 교체합니다. 쓰는 도중 프로세스가 죽어도 원본 파일이 깨지지 않습니다.
 - **데코레이터로 공통 관심사 분리**: `@handle_errors` 가 모든 CLI 핸들러를 감싸서 스택트레이스 대신 `[오류]` / `[힌트]` 메시지를 출력하고 적절한 종료 코드를 반환합니다. `@log_call`, `@measure_time` 은 디버깅용으로 서비스 계층에 적용되어 있습니다.
-- **타입 힌트**: 모든 함수의 입력/출력에 타입을 명시했습니다. `Transaction.from_dict` 처럼 외부 데이터를 받는 지점에서 `ValidationError` 로 계약 위반을 일찍 잡습니다.
-- **dataclass 모델**: `Transaction`, `Budget`, `Category` 가 dataclass 로 정의되어 있고, 각 클래스에 `validate_*` 클래스/스태틱 메서드가 모여 있어 검증 규칙이 한 곳에 응집됩니다.
+- **타입 힌트**: 모든 함수의 입력/출력에 타입을 명시했습니다. `Transaction.from_dict` 처럼 외부 데이터를 받는 지점은 생성자를 거치므로 `ValidationError` 로 계약 위반을 일찍 잡습니다.
+- **생성자 불변식 검증**: `Transaction`, `Budget`, `Category` dataclass 는 `__post_init__` 에서 필드를 검증·정규화합니다. 즉 **생성자가 유일한 강제 지점**이라, 서비스/CLI/`from_dict`/직접 호출 등 어떤 경로로 만들어져도 잘못된 객체가 존재할 수 없습니다. 개별 규칙은 `validate_type`/`validate_date`/`validate_month`(각 모델)와 `Category.normalize`, 공용 규칙은 모듈 함수 `validate_amount` 로 단일 정의됩니다.
+- **설정·문자열 중앙화**: 모든 값 상수(카테고리·파일명·형식·한도·종료 코드)와 사용자 노출 문자열(프롬프트·메시지·오류/힌트·로그)을 `config.py` 한 곳에 모았습니다. 다른 모듈은 `config.X` 로 참조하므로 문구·정책 변경이 한 파일에서 끝납니다.
 
 ## 11. 종료 코드
 
@@ -285,9 +287,10 @@ budget_app/
 | `0` | 정상 종료 |
 | `1` | 예기치 못한 오류 |
 | `2` | 입력 검증 실패 (`ValidationError`) |
-| `3` | 파일을 찾을 수 없음 |
+| `3` | 파일 입출력 오류 (없음 / 디렉터리 / 권한 / 일반 I/O) |
 | `4` | 애플리케이션 오류 (예: 없는 id, 미등록 카테고리, `--atomic` import 전수 롤백) |
 | `5` | 카테고리 미등록 상태에서 add 시도 |
+| `6` | 파일 인코딩 오류 (UTF-8 아님) |
 | `130` | 사용자 Ctrl+C 중단 |
 
 ## 12. 보너스 — 백업

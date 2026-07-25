@@ -17,12 +17,10 @@ import re
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional
 
+from . import config
 from .models import Budget, Category, Transaction, ValidationError
 
-logger = logging.getLogger("budget_app.repository")
-
-
-DEFAULT_CATEGORIES = ("food", "transport", "rent", "salary", "etc")
+logger = logging.getLogger(config.LOGGER_NAME_REPOSITORY)
 
 
 def _ensure_parent(path: Path) -> None:
@@ -42,8 +40,8 @@ def _atomic_write_jsonl(path: Path, rows: Iterable[dict]) -> None:
 class TransactionRepository:
     """transactions.jsonl 의 CRUD + 스트리밍 조회를 담당한다."""
 
-    FILE_NAME = "transactions.jsonl"
-    ID_PATTERN = re.compile(r"^TX-(\d+)$")
+    FILE_NAME = config.TX_FILE_NAME
+    ID_PATTERN = re.compile(config.TX_ID_PATTERN)
 
     def __init__(self, data_dir: Path):
         self.path = Path(data_dir) / self.FILE_NAME
@@ -68,7 +66,7 @@ class TransactionRepository:
                     data = json.loads(line)
                     yield Transaction.from_dict(data)
                 except (json.JSONDecodeError, ValidationError, KeyError) as exc:
-                    logger.warning("%s:%d 손상된 줄을 건너뜁니다: %s", self.path.name, lineno, exc)
+                    logger.warning(config.LOG_CORRUPT_LINE, self.path.name, lineno, exc)
                     continue
 
     # ---------- ID 발급 ----------
@@ -90,7 +88,7 @@ class TransactionRepository:
 
     def next_id(self) -> str:
         """기존 최대 번호 + 1 로 'TX-000001' 형식 ID 생성."""
-        return f"TX-{self.max_id_num() + 1:06d}"
+        return config.TX_ID_FORMAT.format(self.max_id_num() + 1)
 
     # ---------- 쓰기 ----------
 
@@ -177,7 +175,7 @@ class TransactionRepository:
 class CategoryStore:
     """categories.jsonl — 카테고리 이름 집합 관리."""
 
-    FILE_NAME = "categories.jsonl"
+    FILE_NAME = config.CATEGORY_FILE_NAME
 
     def __init__(self, data_dir: Path, seed_defaults: bool = True):
         self.path = Path(data_dir) / self.FILE_NAME
@@ -187,7 +185,7 @@ class CategoryStore:
             self.path.touch()
         # 빈 파일이고 seed 가 켜져 있으면 기본 카테고리 자동 생성
         if seed_defaults and self._is_empty():
-            for name in DEFAULT_CATEGORIES:
+            for name in config.DEFAULT_CATEGORIES:
                 self._append(Category(name=name))
 
     def _is_empty(self) -> bool:
@@ -206,7 +204,7 @@ class CategoryStore:
                 try:
                     yield Category.from_dict(json.loads(line))
                 except (json.JSONDecodeError, ValidationError, KeyError) as exc:
-                    logger.warning("%s:%d 손상된 줄을 건너뜁니다: %s", self.path.name, lineno, exc)
+                    logger.warning(config.LOG_CORRUPT_LINE, self.path.name, lineno, exc)
                     continue
 
     def list_names(self) -> List[str]:
@@ -241,7 +239,7 @@ class CategoryStore:
 class BudgetStore:
     """budgets.jsonl — 월별 예산 저장. 같은 월은 덮어쓴다."""
 
-    FILE_NAME = "budgets.jsonl"
+    FILE_NAME = config.BUDGET_FILE_NAME
 
     def __init__(self, data_dir: Path):
         self.path = Path(data_dir) / self.FILE_NAME
@@ -258,7 +256,7 @@ class BudgetStore:
                 try:
                     yield Budget.from_dict(json.loads(line))
                 except (json.JSONDecodeError, ValidationError, KeyError) as exc:
-                    logger.warning("%s:%d 손상된 줄을 건너뜁니다: %s", self.path.name, lineno, exc)
+                    logger.warning(config.LOG_CORRUPT_LINE, self.path.name, lineno, exc)
                     continue
 
     def get(self, month: str) -> Optional[Budget]:
