@@ -1,7 +1,4 @@
 date,type,category,amount,memo,tags
-2024-01-15,expense,food,15000,점심,meal
-2024-01-14,income,salary,3000000,월급,
-2024-01-20,expense,rent,150000,공과금,
-2024-01-22,expense,food,35000,회식,
-2024-01-15,income,salary,100,,
-2024-01-15,income,salary,100,,
+0101-01-01,income,rent,10,hello motehr fucker,"hel,lo,m o ther,fu,cker"
+0101-01-01,income,rent,10,10,hello mother fucker
+0101-01-01,expense,etc,1010101010,1010101010,101010101010

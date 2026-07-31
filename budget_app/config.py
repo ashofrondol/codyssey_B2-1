@@ -49,6 +49,9 @@ LOGGER_NAME_REPOSITORY = "budget_app.repository"
 PROG_NAME = "budget_app"
 PROG_DESCRIPTION = "파일 기반 가계부 콘솔 프로그램"
 
+# 디버그 스위치 — `--debug` 플래그와 동등한 환경변수 이름
+DEBUG_ENV_VAR = "BUDGET_APP_DEBUG"
+
 # 종료 코드
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -63,6 +66,10 @@ EXIT_INTERRUPT = 130
 # ============================================================
 # 로그 메시지 (%-스타일 — logging 에 그대로 전달)
 # ============================================================
+
+# 핸들러 포맷 — 평상시엔 짧게, --debug 에선 어디서 나온 로그인지까지.
+LOG_FORMAT = "[%(levelname)s] %(message)s"
+LOG_FORMAT_DEBUG = "[%(levelname)s] %(asctime)s %(name)s:%(lineno)d %(message)s"
 
 LOG_CALL = "call %s"
 LOG_DONE = "done %s"
@@ -218,4 +225,4 @@ MSG_INTERRUPTED = "\n[중단] 사용자에 의해 종료되었습니다."
 MSG_ERR_IO = "[오류] 입출력 오류가 발생했습니다: {error}"
 HINT_IO = "[힌트] 디스크 여유 공간과 파일 경로/권한을 확인해 주세요."
 MSG_ERR_UNEXPECTED = "[오류] 예기치 못한 오류가 발생했습니다: {error}"
-HINT_UNEXPECTED = "[힌트] 동일 증상이 반복되면 데이터 파일과 명령을 확인해 주세요."
+HINT_UNEXPECTED = "[힌트] `--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다."

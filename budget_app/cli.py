@@ -4,6 +4,8 @@
 - 모든 옵션은 리눅스 표준 '-' 로 통일 (argparse 기본).
 - 핸들러는 @handle_errors 로 감싸 스택트레이스 대신 사용자 친화 메시지를 출력한다.
 - add 등은 대화형 입력을 기본으로, 옵션 인자는 search/list/summary/export/import/delete/update 에서 사용한다.
+- 출력 채널: 명령의 *결과*는 `print()`(stdout), *진단*([오류]/[힌트]/실패 안내)은
+  `output.err()`(stderr). 근거와 정책은 output.py 참고.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from . import config
+from . import config, output
 from .decorators import AppError, handle_errors
 from .models import Budget, Transaction, ValidationError
 from .repository import BudgetStore, CategoryStore, TransactionRepository
@@ -67,8 +69,9 @@ def _ask_until(prompt: str, validator):
         try:
             return validator(raw)
         except ValidationError as exc:
-            print(config.MSG_ERROR_LINE.format(msg=exc))
-            print(config.MSG_HINT_RETRY)
+            # 재입력 안내는 결과가 아니라 진단이므로 stderr 로 보낸다.
+            output.err(config.MSG_ERROR_LINE.format(msg=exc))
+            output.err(config.MSG_HINT_RETRY)
     raise AppError(
         config.ERR_MAX_RETRIES,
         hint=config.HINT_MAX_RETRIES,
@@ -154,7 +157,8 @@ class AppContext:
 def cmd_add(args: argparse.Namespace) -> int:
     ctx = AppContext(args.data_dir)
     if not ctx.cats.list_names():
-        print(config.MSG_NO_CATEGORIES)
+        # 0 이 아닌 종료 코드로 끝나는 실패 경로 → 진단 채널(stderr).
+        output.err(config.MSG_NO_CATEGORIES)
         return config.EXIT_NO_CATEGORY
     print(config.MSG_ADD_INTERACTIVE)
     date = _ask_until(config.PROMPT_DATE, Transaction.validate_date)
@@ -333,9 +337,10 @@ def cmd_import(args: argparse.Namespace) -> int:
     imported, skipped, errors = ctx.io_service.import_csv(Path(args.from_), atomic=args.atomic)
     print(config.MSG_IMPORT_DONE.format(mode=mode, imported=imported, skipped=skipped))
     if errors:
-        print(config.MSG_IMPORT_ERROR_HEADER)
+        # 요약 한 줄은 결과(stdout), 건너뛴 줄의 사유는 진단(stderr)이다.
+        output.err(config.MSG_IMPORT_ERROR_HEADER)
         for e in errors:
-            print(config.FMT_IMPORT_ERROR_ITEM.format(error=e))
+            output.err(config.FMT_IMPORT_ERROR_ITEM.format(error=e))
     return 0
 
 
@@ -349,8 +354,24 @@ def cmd_backup(args: argparse.Namespace) -> int:
 # ---------- argparse 빌더 ----------
 
 
-def _add_data_dir(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--data-dir", dest="data_dir", default=config.DEFAULT_DATA_DIR, help="데이터 저장 폴더 (기본: ./data)")
+DEBUG_HELP = "디버그 로그 활성화 — 예기치 못한 오류의 스택트레이스를 stderr 로 출력"
+
+
+def _add_common_options(p: argparse.ArgumentParser) -> None:
+    """모든 하위 명령이 공유하는 옵션 — 데이터 폴더와 디버그 스위치.
+
+    `--debug` 는 최상위 파서에도 붙어 있어 `budget_app --debug list` 와
+    `budget_app list --debug` 가 모두 동작한다. 하위 파서 쪽 기본값을
+    `argparse.SUPPRESS` 로 둔 것이 핵심 — 기본값을 False 로 두면 하위 파서가
+    앞에서 켠 True 를 다시 False 로 덮어써 버린다.
+    """
+    p.add_argument(
+        "--data-dir",
+        dest="data_dir",
+        default=config.DEFAULT_DATA_DIR,
+        help="데이터 저장 폴더 (기본: ./data)",
+    )
+    p.add_argument("--debug", action="store_true", default=argparse.SUPPRESS, help=DEBUG_HELP)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -358,22 +379,24 @@ def build_parser() -> argparse.ArgumentParser:
         prog=config.PROG_NAME,
         description=config.PROG_DESCRIPTION,
     )
+    # 최상위에도 두어 하위 명령 앞/뒤 어느 위치에서도 켤 수 있게 한다.
+    parser.add_argument("--debug", action="store_true", help=DEBUG_HELP)
     sub = parser.add_subparsers(dest="command", required=True)
 
     # add
     p_add = sub.add_parser("add", help="거래 추가 (대화형)")
-    _add_data_dir(p_add)
+    _add_common_options(p_add)
     p_add.set_defaults(func=cmd_add)
 
     # list
     p_list = sub.add_parser("list", help="최신순 거래 목록")
-    _add_data_dir(p_list)
+    _add_common_options(p_list)
     p_list.add_argument("--limit", type=int, default=config.DEFAULT_LIST_LIMIT, help="표시 건수 (기본 20)")
     p_list.set_defaults(func=cmd_list)
 
     # search
     p_search = sub.add_parser("search", help="조건 검색")
-    _add_data_dir(p_search)
+    _add_common_options(p_search)
     p_search.add_argument("--from", dest="from_", help="시작일 YYYY-MM-DD")
     p_search.add_argument("--to", dest="to", help="종료일 YYYY-MM-DD")
     p_search.add_argument("--category", help="카테고리")
@@ -384,14 +407,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # summary
     p_sum = sub.add_parser("summary", help="월별 요약")
-    _add_data_dir(p_sum)
+    _add_common_options(p_sum)
     p_sum.add_argument("--month", required=True, help="대상 월 YYYY-MM")
     p_sum.add_argument("--top", type=int, default=config.DEFAULT_TOP_N, help="지출 TOP N (기본 5)")
     p_sum.set_defaults(func=cmd_summary)
 
     # budget
     p_bud = sub.add_parser("budget", help="예산 설정")
-    _add_data_dir(p_bud)
+    _add_common_options(p_bud)
     bud_sub = p_bud.add_subparsers(dest="budget_cmd", required=True)
     p_bset = bud_sub.add_parser("set", help="월 예산 설정")
     p_bset.add_argument("--month", required=True, help="대상 월 YYYY-MM")
@@ -402,7 +425,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # category
     p_cat = sub.add_parser("category", help="카테고리 관리")
-    _add_data_dir(p_cat)
+    _add_common_options(p_cat)
     cat_sub = p_cat.add_subparsers(dest="cat_cmd", required=True)
     p_cadd = cat_sub.add_parser("add", help="카테고리 추가")
     p_cadd.add_argument("--name", help="카테고리명 (생략 시 대화형)")
@@ -416,7 +439,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # update (옵션 방식 고정)
     p_upd = sub.add_parser("update", help="거래 수정 (옵션 방식)")
-    _add_data_dir(p_upd)
+    _add_common_options(p_upd)
     p_upd.add_argument("--id", required=True, help="수정 대상 거래 id")
     p_upd.add_argument("--date", help="YYYY-MM-DD")
     p_upd.add_argument("--type", choices=list(config.VALID_TYPES))
@@ -428,13 +451,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     # delete
     p_del = sub.add_parser("delete", help="거래 삭제")
-    _add_data_dir(p_del)
+    _add_common_options(p_del)
     p_del.add_argument("--id", required=True, help="삭제 대상 거래 id")
     p_del.set_defaults(func=cmd_delete)
 
     # export
     p_exp = sub.add_parser("export", help="CSV 내보내기")
-    _add_data_dir(p_exp)
+    _add_common_options(p_exp)
     p_exp.add_argument("--out", required=True, help="출력 CSV 경로")
     p_exp.add_argument("--month", help="대상 월 YYYY-MM")
     p_exp.add_argument("--from", dest="from_", help="시작일 YYYY-MM-DD")
@@ -443,7 +466,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # import
     p_imp = sub.add_parser("import", help="CSV 가져오기")
-    _add_data_dir(p_imp)
+    _add_common_options(p_imp)
     p_imp.add_argument("--from", dest="from_", required=True, help="입력 CSV 경로")
     p_imp.add_argument(
         "--atomic",
@@ -454,7 +477,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # backup (보너스)
     p_bak = sub.add_parser("backup", help="데이터 폴더 백업 (보너스)")
-    _add_data_dir(p_bak)
+    _add_common_options(p_bak)
     p_bak.set_defaults(func=cmd_backup)
 
     return parser
@@ -475,6 +498,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         parser = build_parser()
         args = parser.parse_args(argv)
+        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
+        # exc_info=True 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        output.setup_logging(getattr(args, "debug", False))
         return args.func(args)
     except BrokenPipeError:
         # 예: `budget_app list | head` — head 가 먼저 닫음. 오류가 아니므로 조용히 종료.

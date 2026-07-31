@@ -71,6 +71,8 @@ python -m budget_app list --data-dir ./mydata
 
 > `update` 는 **옵션 방식으로 고정**합니다. 대화형이 아니라 `--id` 와 변경할 필드 옵션으로만 동작합니다.
 
+공통 옵션: 모든 명령이 `--data-dir`(데이터 폴더)와 `--debug`(디버그 로그, [12장](#12-출력-스트림과-디버그-로그))를 받습니다.
+
 ## 5. 주요 명령 예시
 
 ### 거래 추가 (add) — 대화형
@@ -268,6 +270,7 @@ budget_app/
 ├── repository.py      # 저장소 계층 — JSONL 파일 입출력 (스트리밍 + 원자적 교체)
 ├── models.py          # 모델 — Transaction / Budget / Category dataclass + 생성자 불변식 검증
 ├── decorators.py      # 공통 관심사 — 로그 / 시간 측정 / 예외 처리
+├── output.py          # 출력 채널 — stdout(결과) / stderr(진단) / logging(개발자) 분리
 └── config.py          # 설정 — 상수 + 출력 문자열 중앙화(단일 출처)
 ```
 
@@ -275,7 +278,8 @@ budget_app/
 
 - **제너레이터 스트리밍**: `TransactionRepository.stream()` 등 모든 읽기는 `yield` 기반입니다. 파일을 `json.load()` 로 한 번에 올리지 않으므로 거래가 수십만 건이어도 메모리에 모두 올라가지 않습니다.
 - **원자적 쓰기**: `update`/`delete` 는 임시 파일에 전부 쓴 뒤 `os.replace()` 로 교체합니다. 쓰는 도중 프로세스가 죽어도 원본 파일이 깨지지 않습니다.
-- **데코레이터로 공통 관심사 분리**: `@handle_errors` 가 모든 CLI 핸들러를 감싸서 스택트레이스 대신 `[오류]` / `[힌트]` 메시지를 출력하고 적절한 종료 코드를 반환합니다. `@log_call`, `@measure_time` 은 디버깅용으로 서비스 계층에 적용되어 있습니다.
+- **데코레이터로 공통 관심사 분리**: `@handle_errors` 가 모든 CLI 핸들러를 감싸서 스택트레이스 대신 `[오류]` / `[힌트]` 메시지를 **stderr** 로 출력하고 적절한 종료 코드를 반환합니다. 잡는 예외는 *종료 신호 / 입력 오류 / 환경 상태 / 최후 방어선* 네 부류로 묶여 있고 `except` 순서가 그 분류를 그대로 따릅니다. `@log_call`, `@measure_time` 은 디버깅용으로 서비스 계층에 적용되어 있습니다.
+- **출력 채널 분리**: 명령의 *결과*만 stdout 으로, *진단*(오류/힌트/경고)은 stderr 로 나갑니다. 덕분에 `list > out.txt` 의 데이터 파일에 오류 문자열이 섞이지 않고, 파이프가 끊겨 stdout 이 깨진 상황에서도 오류는 사용자에게 전달됩니다. 정책과 근거는 `output.py` 한 곳에 있습니다.
 - **타입 힌트**: 모든 함수의 입력/출력에 타입을 명시했습니다. `Transaction.from_dict` 처럼 외부 데이터를 받는 지점은 생성자를 거치므로 `ValidationError` 로 계약 위반을 일찍 잡습니다.
 - **생성자 불변식 검증**: `Transaction`, `Budget`, `Category` dataclass 는 `__post_init__` 에서 필드를 검증·정규화합니다. 즉 **생성자가 유일한 강제 지점**이라, 서비스/CLI/`from_dict`/직접 호출 등 어떤 경로로 만들어져도 잘못된 객체가 존재할 수 없습니다. 개별 규칙은 `validate_type`/`validate_date`/`validate_month`(각 모델)와 `Category.normalize`, 공용 규칙은 모듈 함수 `validate_amount` 로 단일 정의됩니다.
 - **설정·문자열 중앙화**: 모든 값 상수(카테고리·파일명·형식·한도·종료 코드)와 사용자 노출 문자열(프롬프트·메시지·오류/힌트·로그)을 `config.py` 한 곳에 모았습니다. 다른 모듈은 `config.X` 로 참조하므로 문구·정책 변경이 한 파일에서 끝납니다.
@@ -293,7 +297,30 @@ budget_app/
 | `6` | 파일 인코딩 오류 (UTF-8 아님) |
 | `130` | 사용자 Ctrl+C 중단 |
 
-## 12. 보너스 — 백업
+## 12. 출력 스트림과 디버그 로그
+
+명령의 **결과**는 stdout, **진단**(`[오류]`/`[힌트]`/경고/재입력 안내)은 stderr 로 나갑니다. 둘을 셸에서 따로 다룰 수 있습니다.
+
+```bash
+python -m budget_app list > out.txt          # out.txt 에는 거래 목록만 (오류가 섞이지 않음)
+python -m budget_app import --from nope.csv 2>/dev/null   # 진단만 버리기 → 아무것도 안 보임
+python -m budget_app import --from nope.csv 1>/dev/null   # 결과만 버리기 → 오류만 보임
+python -m budget_app list | head -3          # 하류가 먼저 닫혀도 조용히 종료 (코드 0)
+```
+
+예기치 못한 오류의 스택트레이스는 기본적으로 **숨기고 로그로만 보존**합니다. 그 로그를 보려면 디버그를 켭니다.
+
+```bash
+python -m budget_app --debug summary --month 2024-01   # 하위 명령 앞
+python -m budget_app summary --month 2024-01 --debug   # 하위 명령 뒤 (둘 다 동작)
+BUDGET_APP_DEBUG=1 python -m budget_app summary --month 2024-01   # 환경변수로도 가능
+```
+
+디버그를 켜면 로그 레벨이 DEBUG 가 되어 `@log_call`·`@measure_time` 의 호출/시간 로그와 `handle_errors` 가 보존한 스택트레이스가 stderr 로 출력됩니다. 끈 상태에서는 WARNING 이상(예: 손상된 JSONL 줄 경고)만 나옵니다.
+
+> `category` / `budget` 처럼 하위 명령이 또 있는 경우, `--data-dir` 와 마찬가지로 `--debug` 도 그 하위 명령 **앞**에 써야 합니다: `python -m budget_app category --debug list`.
+
+## 13. 보너스 — 백업
 
 ```bash
 python -m budget_app backup
