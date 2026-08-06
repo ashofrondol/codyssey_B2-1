@@ -305,39 +305,47 @@ python -m budget_app import --from import.csv --atomic
 
 ## 10. 아키텍처
 
-4개 계층으로 책임을 분리했습니다. **파일 하나 = 책임 하나**가 원칙이라, 어떤 변경이든
-고칠 파일이 한눈에 정해집니다.
+4개 계층으로 책임을 분리했고, **계층을 폴더로 드러냈습니다**. **파일 하나 = 책임 하나**가
+원칙이라 어떤 변경이든 고칠 파일이 한눈에 정해집니다.
 
 ```
 budget_app/
-├── __main__.py        # 엔트리포인트 (python -m budget_app)
+├── __main__.py            # 엔트리포인트 (python -m budget_app)
 │
-│  ── CLI 계층 (사람과 만나는 곳) ──────────────────────────
-├── cli.py             # 핸들러 + 명령 레지스트리 + main (오케스트레이션만)
-├── parser.py          # argparse 문법 정의
-├── prompts.py         # 대화형 입력 (재입력 루프 / EOF 처리)
-├── presenter.py       # 도메인 → 화면 문자열 (출력하지 않고 반환만)
-├── output.py          # 출력 채널 — stdout(결과) / stderr(진단) / logging(개발자)
+│  ── 횡단 (어느 계층에도 속하지 않음) ──────────────────────
+├── config.py              # 값·정책 상수 (바꾸면 동작이 달라짐)
+├── messages.py            # 사용자 노출 문자열 (바꿔도 동작은 같음)
+├── errors.py              # 예외 어휘 (ValidationError / AppError) — import 0개
+├── decorators.py          # 관측 — 로그 / 시간 측정
 │
-│  ── 서비스 계층 (판단) ────────────────────────────────
-├── services.py        # 유스케이스와 정책 (open() 이 하나도 없음)
+├── domain/                # ── 도메인 계층 (I/O 를 전혀 모름) ──
+│   ├── models.py          #    엔티티 + 질의/결과 모델 + 생성자 불변식
+│   └── validators.py      #    필드 규칙의 단일 정의처
 │
-│  ── 저장소 계층 (파일) ────────────────────────────────
-├── repository.py      # JSONL 입출력 + ID 발급 + 백업 (스트리밍 + 원자적 교체)
-├── csv_io.py          # CSV 경계 어댑터 (외부 교환 포맷 ↔ 도메인)
+├── storage/               # ── 저장소 계층 (open() 은 전부 여기) ──
+│   ├── repository.py      #    JSONL 입출력 + ID 발급 + 백업 (스트리밍 + 원자적 교체)
+│   └── csv_io.py          #    CSV 경계 어댑터 (외부 교환 포맷 ↔ 도메인)
 │
-│  ── 도메인/횡단 ──────────────────────────────────────
-├── models.py          # 엔티티 + 질의/결과 모델 + 생성자 불변식
-├── validators.py      # 필드 규칙의 단일 정의처
-├── errors.py          # 예외 계층 (ValidationError / AppError)
-├── decorators.py      # 횡단 관심사 — 로그 / 시간 측정 (관측만)
-├── error_handler.py   # 예외 → 사용자 메시지 → 종료 코드 (CLI 표현 정책)
-├── config.py          # 값·정책 상수
-└── messages.py        # 사용자 노출 문자열
+├── services.py            # ── 서비스 계층 — 유스케이스와 정책 ──
+│
+└── cli/                   # ── CLI 계층 (사람과 만나는 곳) ──
+    ├── __init__.py        #    main 만 재수출
+    ├── app.py             #    핸들러 + 명령 레지스트리 + AppContext + main
+    ├── parser.py          #    argparse 문법 정의
+    ├── prompts.py         #    대화형 입력 (재입력 루프 / EOF 처리)
+    ├── presenter.py       #    도메인 → 화면 문자열 (출력하지 않고 반환만)
+    ├── output.py          #    출력 채널 — stdout(결과) / stderr(진단) / logging
+    └── error_handler.py   #    예외 → 사용자 메시지 → 종료 코드
 ```
 
-의존은 **아래로만** 흐릅니다. `services` 는 `open()` 을 호출하지 않고, `repository` 는
+의존은 **아래로만** 흐릅니다. `services` 는 `open()` 을 호출하지 않고, `storage` 는
 화면 문자열을 모르며, `presenter` 는 출력하지 않고 문자열을 돌려줍니다.
+
+**폴더 이름이 곧 계층입니다.** 평평하게 두면 알파벳순이 계층을 흩뜨려서
+(`csv_io.py` 와 `decorators.py` 가 나란히 보이는 식) 구조가 코드에는 있는데 파일
+트리에는 없는 상태가 됩니다. 횡단 4개만 폴더 없이 루트에 두어 "이들은 계층이 아니다"를
+위치로 표현했습니다 — `config` 와 `messages` 는 11개 모듈이, `errors` 는 7개가
+import 합니다.
 
 ### 설계 포인트
 

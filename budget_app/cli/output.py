@@ -36,7 +36,7 @@ import os
 import sys
 from typing import Iterable
 
-from . import config, messages
+from .. import config, messages
 
 
 def out(message: str = "") -> None:

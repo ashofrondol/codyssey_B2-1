@@ -25,8 +25,8 @@ import re
 from datetime import datetime
 from typing import Any, List
 
-from . import config, messages
-from .errors import ValidationError
+from .. import config, messages
+from ..errors import ValidationError
 
 _TX_ID_RE = re.compile(config.TX_ID_PATTERN)
 

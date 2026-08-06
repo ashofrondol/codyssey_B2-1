@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import Iterable, Iterator, List, Optional, Sequence
 
-from . import messages
-from .models import ImportReport, MonthlySummary, Transaction
+from .. import messages
+from ..domain.models import ImportReport, MonthlySummary, Transaction
 
 
 # ============================================================

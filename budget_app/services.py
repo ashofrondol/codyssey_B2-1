@@ -13,10 +13,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional
 
-from . import config, csv_io, messages, validators
+from . import config, messages
 from .decorators import log_call, measure_time
-from .errors import AppError, ValidationError
-from .models import (
+from .domain import validators
+from .domain.models import (
     Budget,
     ImportReport,
     MonthlySummary,
@@ -24,7 +24,9 @@ from .models import (
     Transaction,
     TransactionPatch,
 )
-from .repository import BudgetStore, CategoryStore, IdAllocator, TransactionRepository
+from .errors import AppError, ValidationError
+from .storage import csv_io
+from .storage.repository import BudgetStore, CategoryStore, IdAllocator, TransactionRepository
 
 
 class TransactionService:

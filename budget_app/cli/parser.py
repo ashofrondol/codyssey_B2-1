@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import argparse
 
-from . import config, messages
+from .. import config, messages
 
 DEBUG_HELP = "디버그 로그 활성화 — 예기치 못한 오류의 스택트레이스를 stderr 로 출력"
 

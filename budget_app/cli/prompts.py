@@ -15,9 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, List, Optional, TypeVar
 
-from . import config, messages, output, validators
-from .errors import AppError, ValidationError
-from .repository import CategoryStore
+from .. import config, messages
+from ..domain import validators
+from ..errors import AppError, ValidationError
+from ..storage.repository import CategoryStore
+from . import output
 
 T = TypeVar("T")
 

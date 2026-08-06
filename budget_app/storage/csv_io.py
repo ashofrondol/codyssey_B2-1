@@ -28,9 +28,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional
 
-from . import config, messages, validators
-from .errors import AppError
-from .models import Transaction
+from .. import config, messages
+from ..domain import validators
+from ..domain.models import Transaction
+from ..errors import AppError
 
 
 @dataclass(frozen=True)

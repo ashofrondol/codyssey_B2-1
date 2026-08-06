@@ -42,9 +42,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, Iterator, List, Optional, Set, Tuple, TypeVar
 
-from . import config, messages, validators
-from .errors import ValidationError
-from .models import Budget, Category, Transaction, TransactionPatch
+from .. import config, messages
+from ..domain import validators
+from ..domain.models import Budget, Category, Transaction, TransactionPatch
+from ..errors import ValidationError
 
 logger = logging.getLogger(config.LOGGER_NAME_REPOSITORY)
 
