@@ -160,8 +160,12 @@ python -m budget_app delete --id TX-000005
 ```bash
 python -m budget_app export --out export.csv --month 2024-01
 python -m budget_app export --out range.csv --from 2024-01-01 --to 2024-03-31
-python -m budget_app import --from import.csv            # 부분 성공(기본)
+python -m budget_app export --out plain.csv --month 2024-01 --no-id   # id 컬럼 제외(외부 도구용)
+
+python -m budget_app import --from import.csv            # 부분 성공 + 중복 skip (기본)
 python -m budget_app import --from import.csv --atomic   # 전수 롤백
+python -m budget_app import --from import.csv --on-duplicate new-id   # 중복도 새 id 로 추가
+python -m budget_app import --from import.csv --on-duplicate error    # 중복이면 중단
 ```
 
 `export` 는 `--month` 또는 `--from/--to` 중 하나가 **필수**입니다.
@@ -176,6 +180,7 @@ python -m budget_app import --from import.csv --atomic   # 전수 롤백
 
 | column | required | 설명 |
 | --- | --- | --- |
+| `id` | N | `TX-000001` 형식. **내보내기는 기본 포함**, 가져오기는 있으면 쓰고 없으면 새로 발급 |
 | `date` | Y | `YYYY-MM-DD` |
 | `type` | Y | `income` / `expense` |
 | `category` | Y | 등록된 카테고리 (가져오기 시 미등록이면 자동 등록) |
@@ -183,13 +188,33 @@ python -m budget_app import --from import.csv --atomic   # 전수 롤백
 | `memo` | N | 자유 문자열 |
 | `tags` | N | 쉼표(`,`) 구분 문자열 |
 
+### `id` 컬럼 — 왕복(round-trip) 안전성
+
+예전 스키마에는 `id` 가 없었습니다. 그래서 `export` 한 파일을 그대로 `import` 하면
+**같은 거래가 새 id 를 받아 한 번 더 저장**됐습니다. 내보낸 CSV 가 원본 거래를 식별할
+수단을 갖고 있지 않았기 때문입니다.
+
+`id` 는 **선택** 컬럼이라 기존 호환성이 유지됩니다.
+
+- `export` 는 기본으로 포함합니다 → 자기 파일을 다시 넣어도 중복이 생기지 않습니다.
+- `import` 는 id 가 있으면 그 id 를 복원하고, 없거나 비어 있으면 새로 발급합니다
+  → 필수 컬럼만 갖춘 외부 CSV(엑셀·타 가계부)는 예전 그대로 들어옵니다.
+- 외부 도구에 넘길 때 id 가 거슬리면 `export --no-id` 로 뺄 수 있습니다.
+
 ### CSV 예시
+
+```csv
+id,date,type,category,amount,memo,tags
+TX-000001,2024-01-15,expense,food,15000,점심,meal
+TX-000002,2024-01-14,income,salary,3000000,월급,
+TX-000003,2024-01-20,expense,rent,150000,공과금,
+```
+
+`id` 없이도 그대로 가져올 수 있습니다(이 경우 전부 새로 발급).
 
 ```csv
 date,type,category,amount,memo,tags
 2024-01-15,expense,food,15000,점심,meal
-2024-01-14,income,salary,3000000,월급,
-2024-01-20,expense,rent,150000,공과금,
 ```
 
 ## 7. 가져오기 실패 정책 — 부분 성공 vs 원자적(전수 롤백)
@@ -200,6 +225,26 @@ CSV `import` 는 일부 줄이 손상됐을 때의 처리 방식을 **옵션으�
 | --- | --- | --- | --- | --- |
 | 부분 성공 (기본) | *(없음)* | 그 줄만 건너뛰고(skip) 나머지는 저장 | 유효한 줄만 반영 | `0` |
 | 원자적(전수 롤백) | `--atomic` | 첫 오류에서 중단, **아무것도 저장하지 않음** | 변화 없음(원본 유지) | `4` |
+
+### 중복 정책 — 이미 있는 `id` 를 만났을 때
+
+`--on-duplicate` 로 고릅니다. 손상 여부와는 **독립된 축**입니다(`--atomic` 과 함께 쓸 수 있음).
+
+| 옵션 | 동작 | 쓰는 상황 |
+| --- | --- | --- |
+| `skip` (기본) | 건너뛰고 `duplicated` 로 집계 | 내보낸 파일을 다시 넣는 정상 왕복 |
+| `new-id` | 새 id 를 발급해 별도 거래로 추가 | 같은 내역을 의도적으로 복제 |
+| `error` | `AppError` 로 중단 (아무것도 저장 안 됨) | 중복이 있으면 안 되는 정산 데이터 |
+
+결과 요약에서 `skipped` 와 `duplicated` 를 나눠 보여 주는 이유는 **사용자가 해야 할 일이
+정반대**이기 때문입니다. `skipped` 는 데이터가 잘못돼 CSV 를 고쳐야 하고, `duplicated` 는
+이미 저장돼 있어서 아무것도 안 해도 됩니다. 한 숫자로 합치면 정상 왕복이 실패처럼 읽힙니다.
+
+```bash
+python -m budget_app export --out backup.csv --month 2024-01
+python -m budget_app import --from backup.csv
+# [완료] mode=부분 성공, imported=0, duplicated=3, skipped=0   ← 중복 생성 없음
+```
 
 ### 동작 방식(준비 → 커밋 2단계)
 
@@ -260,29 +305,53 @@ python -m budget_app import --from import.csv --atomic
 
 ## 10. 아키텍처
 
-4개 계층으로 책임을 분리했습니다.
+4개 계층으로 책임을 분리했습니다. **파일 하나 = 책임 하나**가 원칙이라, 어떤 변경이든
+고칠 파일이 한눈에 정해집니다.
 
 ```
 budget_app/
 ├── __main__.py        # 엔트리포인트 (python -m budget_app)
-├── cli.py             # CLI 계층 — argparse, 대화형 입력, 출력 포맷
-├── services.py        # 서비스 계층 — 검색/요약/예산/CSV I/O 비즈니스 로직
-├── repository.py      # 저장소 계층 — JSONL 파일 입출력 (스트리밍 + 원자적 교체)
-├── models.py          # 모델 — Transaction / Budget / Category dataclass + 생성자 불변식 검증
-├── decorators.py      # 공통 관심사 — 로그 / 시간 측정 / 예외 처리
-├── output.py          # 출력 채널 — stdout(결과) / stderr(진단) / logging(개발자) 분리
-└── config.py          # 설정 — 상수 + 출력 문자열 중앙화(단일 출처)
+│
+│  ── CLI 계층 (사람과 만나는 곳) ──────────────────────────
+├── cli.py             # 핸들러 + 명령 레지스트리 + main (오케스트레이션만)
+├── parser.py          # argparse 문법 정의
+├── prompts.py         # 대화형 입력 (재입력 루프 / EOF 처리)
+├── presenter.py       # 도메인 → 화면 문자열 (출력하지 않고 반환만)
+├── output.py          # 출력 채널 — stdout(결과) / stderr(진단) / logging(개발자)
+│
+│  ── 서비스 계층 (판단) ────────────────────────────────
+├── services.py        # 유스케이스와 정책 (open() 이 하나도 없음)
+│
+│  ── 저장소 계층 (파일) ────────────────────────────────
+├── repository.py      # JSONL 입출력 + ID 발급 + 백업 (스트리밍 + 원자적 교체)
+├── csv_io.py          # CSV 경계 어댑터 (외부 교환 포맷 ↔ 도메인)
+│
+│  ── 도메인/횡단 ──────────────────────────────────────
+├── models.py          # 엔티티 + 질의/결과 모델 + 생성자 불변식
+├── validators.py      # 필드 규칙의 단일 정의처
+├── errors.py          # 예외 계층 (ValidationError / AppError)
+├── decorators.py      # 횡단 관심사 — 로그 / 시간 측정 (관측만)
+├── error_handler.py   # 예외 → 사용자 메시지 → 종료 코드 (CLI 표현 정책)
+├── config.py          # 값·정책 상수
+└── messages.py        # 사용자 노출 문자열
 ```
+
+의존은 **아래로만** 흐릅니다. `services` 는 `open()` 을 호출하지 않고, `repository` 는
+화면 문자열을 모르며, `presenter` 는 출력하지 않고 문자열을 돌려줍니다.
 
 ### 설계 포인트
 
-- **제너레이터 스트리밍**: `TransactionRepository.stream()` 등 모든 읽기는 `yield` 기반입니다. 파일을 `json.load()` 로 한 번에 올리지 않으므로 거래가 수십만 건이어도 메모리에 모두 올라가지 않습니다.
-- **원자적 쓰기**: `update`/`delete` 는 임시 파일에 전부 쓴 뒤 `os.replace()` 로 교체합니다. 쓰는 도중 프로세스가 죽어도 원본 파일이 깨지지 않습니다.
+- **제너레이터 스트리밍**: `JsonlStore.stream()` 등 모든 읽기는 `yield` 기반입니다. 파일을 `json.load()` 로 한 번에 올리지 않으므로 거래가 수십만 건이어도 메모리에 모두 올라가지 않습니다.
+- **읽기 경로가 둘**: `iter_raw()` 는 **모든 줄을 원문과 함께** 주고, `stream()` 은 **검증을 통과한 객체만** 줍니다. 재작성(update/delete/재지정)은 `iter_raw()` 를 쓰므로 손상된 줄이 원문 그대로 보존됩니다. 하나로 합쳐 두면 무관한 거래를 지울 때 손상된 줄까지 디스크에서 사라집니다. ID 스캔도 `iter_raw()` 기반이라, 검증에 실패하는 줄에 들어 있던 id 도 "이미 쓰인 번호"로 인식되어 재발급 충돌이 생기지 않습니다.
+- **원자적 쓰기**: `update`/`delete` 는 임시 파일에 전부 쓴 뒤 `flush` + `fsync` 하고 `os.replace()` 로 교체합니다. 쓰는 도중 프로세스가 죽어도 원본 파일이 깨지지 않습니다. `os.replace` 가 보장하는 것은 "이름이 가리키는 대상이 순간적으로 바뀐다"이지 "내용이 디스크에 도달했다"가 아니라서 `fsync` 가 함께 필요합니다.
 - **데코레이터로 공통 관심사 분리**: `@handle_errors` 가 모든 CLI 핸들러를 감싸서 스택트레이스 대신 `[오류]` / `[힌트]` 메시지를 **stderr** 로 출력하고 적절한 종료 코드를 반환합니다. 잡는 예외는 *종료 신호 / 입력 오류 / 환경 상태 / 최후 방어선* 네 부류로 묶여 있고 `except` 순서가 그 분류를 그대로 따릅니다. `@log_call`, `@measure_time` 은 디버깅용으로 서비스 계층에 적용되어 있습니다.
-- **출력 채널 분리**: 명령의 *결과*만 stdout 으로, *진단*(오류/힌트/경고)은 stderr 로 나갑니다. 덕분에 `list > out.txt` 의 데이터 파일에 오류 문자열이 섞이지 않고, 파이프가 끊겨 stdout 이 깨진 상황에서도 오류는 사용자에게 전달됩니다. 정책과 근거는 `output.py` 한 곳에 있습니다.
-- **타입 힌트**: 모든 함수의 입력/출력에 타입을 명시했습니다. `Transaction.from_dict` 처럼 외부 데이터를 받는 지점은 생성자를 거치므로 `ValidationError` 로 계약 위반을 일찍 잡습니다.
-- **생성자 불변식 검증**: `Transaction`, `Budget`, `Category` dataclass 는 `__post_init__` 에서 필드를 검증·정규화합니다. 즉 **생성자가 유일한 강제 지점**이라, 서비스/CLI/`from_dict`/직접 호출 등 어떤 경로로 만들어져도 잘못된 객체가 존재할 수 없습니다. 개별 규칙은 `validate_type`/`validate_date`/`validate_month`(각 모델)와 `Category.normalize`, 공용 규칙은 모듈 함수 `validate_amount` 로 단일 정의됩니다.
-- **설정·문자열 중앙화**: 모든 값 상수(카테고리·파일명·형식·한도·종료 코드)와 사용자 노출 문자열(프롬프트·메시지·오류/힌트·로그)을 `config.py` 한 곳에 모았습니다. 다른 모듈은 `config.X` 로 참조하므로 문구·정책 변경이 한 파일에서 끝납니다.
+- **관측과 표현을 다른 파일에**: `@log_call`/`@measure_time`(관측)은 `decorators.py`, `@handle_errors`(예외를 화면 문구와 종료 코드로 바꾸는 표현 정책)는 `error_handler.py` 에 있습니다. 한 파일에 두면 서비스 계층이 `@log_call` 하나를 쓰려다 출력 모듈까지 끌고 들어와 `services → decorators → output` 이라는 역방향 의존이 생깁니다. 지금은 모든 화살표가 아래로만 향합니다.
+- **출력 채널 분리**: 명령의 *결과*만 stdout 으로, *진단*(오류/힌트/경고)은 stderr 로 나갑니다. 덕분에 `list > out.txt` 의 데이터 파일에 오류 문자열이 섞이지 않고, 파이프가 끊겨 stdout 이 깨진 상황에서도 오류는 사용자에게 전달됩니다. 두 채널 모두 `output.out()` / `output.err()` 라는 이름이 있어서, `grep 'output\.'` 한 번이면 프로그램이 밖으로 내보내는 모든 글자가 나옵니다.
+- **프레젠터는 출력하지 않는다**: `presenter` 는 문자열을 **반환**하고 채널 선택은 호출자가 합니다. 덕분에 화면 형식을 프로세스 없이 검증할 수 있고, 채널 결정이 `output` 한 곳에만 남습니다.
+- **타입 힌트**: 모든 함수의 입력/출력에 타입을 명시했습니다. 부분 수정은 문자열 키 dict 대신 `TransactionPatch` dataclass 로 받으므로 필드명을 잘못 쓰면 조용히 무시되지 않고 `TypeError` 로 즉시 드러납니다.
+- **생성자 불변식 검증**: `Transaction`, `Budget`, `Category` dataclass 는 `__post_init__` 에서 필드를 검증·정규화합니다. 즉 **생성자가 유일한 강제 지점**이라, 서비스/CLI/`from_dict`/직접 호출 등 어떤 경로로 만들어져도 잘못된 객체가 존재할 수 없습니다. 개별 규칙은 전부 `validators.py` 의 모듈 함수(`parse_date`/`parse_amount`/…)로 **규칙 하나 = 함수 하나**로 정의되고, 모델·CSV 어댑터·대화형 입력이 모두 같은 함수를 씁니다.
+- **파생값은 모델이 계산**: `MonthlySummary.usage_pct` / `over_budget` 처럼 계산으로 얻는 값은 `@property` 로 모델에 둡니다. 서비스는 집계만, 프레젠터는 표시만 담당합니다.
+- **설정·문자열 중앙화**: 값 상수(카테고리·파일명·형식·한도·종료 코드)는 `config.py`, 사용자 노출 문자열(프롬프트·메시지·오류/힌트·로그)은 `messages.py` 에 모았습니다. 나눈 이유는 **바꿨을 때 일어나는 일이 다르기 때문**입니다 — `config` 를 바꾸면 동작이 달라지고, `messages` 를 바꾸면 글자만 달라집니다. 덕분에 도메인 계층(`models`/`validators`)이 CLI 문구 변경에 묶이지 않습니다.
 
 ## 11. 종료 코드
 
