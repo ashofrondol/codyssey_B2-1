@@ -135,21 +135,17 @@ class TransactionRepository(JsonlStore[Transaction]):
         self._watermark.remember(tx.id.number)
         super().append(tx)
 
-    def append_many(self, txs: Iterable[Transaction], *, atomic: bool = False) -> int:
-        """여러 거래를 추가하고 추가된 건수를 반환한다.
+    def append_many(self, txs: Iterable[Transaction]) -> int:
+        """여러 거래를 파일 끝에 이어 쓰고 추가된 건수를 반환한다 — O(1) 경로.
 
-        - ``atomic=False``: 파일 끝에 이어 쓰기. 중간에 죽으면 일부만 기록될 수
-          있다(부분 성공 정책과 짝).
-        - ``atomic=True``: 기존 내용 + 신규 전부를 임시 파일에 쓴 뒤 교체한다.
-          '전부 반영' 또는 '전혀 반영 안 됨' 만 존재한다. 기존 손상 줄도 그대로
-          보존된다(``rewrite`` 가 원문을 유지하므로).
+        ``atomic=True`` 분기가 있었지만 ``UnitOfWork`` 도입 후 **원자적 커밋 수단이
+        둘**이 됐고, 이쪽은 아무도 쓰지 않게 됐다. 같은 일을 하는 길이 둘이면 어느
+        쪽이 정답인지 매번 판단해야 하고 한쪽만 고치는 사고가 난다.
+        여러 파일을 한 단위로 묶는 것은 ``UnitOfWork`` 의 일이다.
         """
         txs = list(txs)
         self.remember_ids(txs)
-        if not atomic:
-            return self.append_all(txs)
-        self.rewrite(lambda tx: tx, extra=txs)
-        return len(txs)
+        return self.append_all(txs)
 
     def delete(self, tx_id: object) -> bool:
         """삭제 성공 시 True, 대상 없으면 False."""

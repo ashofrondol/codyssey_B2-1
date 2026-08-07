@@ -41,7 +41,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import List, Optional, Tuple, Type
 
-from . import config
+from . import config, messages
 from .jsonl import commit_staged, stage_lines
 
 logger = logging.getLogger(config.LOGGER_NAME)
@@ -63,7 +63,6 @@ class UnitOfWork:
 
     def __init__(self) -> None:
         self._staged: List[Tuple[Path, Path]] = []
-        self._committed = False
 
     # ---------- 준비 ----------
 
@@ -75,11 +74,37 @@ class UnitOfWork:
     # ---------- 마무리 ----------
 
     def commit(self) -> None:
-        """준비된 것을 전부 반영한다 — rename 만 연달아 실행."""
-        for tmp, target in self._staged:
-            commit_staged(tmp, target)
-        self._staged.clear()
-        self._committed = True
+        """준비된 것을 전부 반영한다 — rename 만 연달아 실행.
+
+        ## 두 번째 rename 이 실패하면
+
+        위 문단이 말한 "rename 두 번 사이"의 창은 전원 차단만 뜻하지 않는다.
+        Windows 에서는 다른 프로세스가 파일을 열고 있으면 ``os.replace`` 가
+        ``PermissionError`` 로 **그냥 실패**한다. 즉 흔한 실패다.
+
+        그 상황에서 할 수 있는 일과 없는 일을 구분한다.
+
+        - **할 수 없는 것**: 이미 반영된 첫 파일을 되돌리는 것. 원본을 덮어썼으므로
+          되돌릴 원본이 없다. 진짜 되돌리려면 저널이 필요하고, 그건 이 패턴의 범위 밖이다.
+        - **해야 하는 것**: (1) 어디까지 반영됐는지 **로그로 남기고**, (2) 남은
+          ``.tmp`` 를 치우고, (3) 예외를 **그대로 올려** 호출자가 성공으로 착각하지
+          않게 하는 것.
+
+        이전에는 셋 다 하지 않았다. 예외가 ``__exit__`` 밖으로 나가면서 ``.tmp`` 가
+        남고, 사용자는 "어느 파일이 반영됐는지" 알 방법이 없었다.
+        """
+        done: List[str] = []
+        try:
+            while self._staged:
+                tmp, target = self._staged[0]
+                commit_staged(tmp, target)
+                self._staged.pop(0)  # 성공한 것만 목록에서 뺀다 — 나머지는 rollback 대상
+                done.append(target.name)
+        except OSError:
+            pending = [target.name for _, target in self._staged]
+            logger.warning(messages.LOG_UOW_PARTIAL, done or "없음", pending)
+            self.rollback()
+            raise
 
     def rollback(self) -> None:
         """준비한 ``.tmp`` 를 지운다 — 원본은 손대지 않았으므로 이것으로 끝이다."""

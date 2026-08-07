@@ -107,8 +107,29 @@ def parse_tags(value: Any) -> List[str]:
     """리스트 또는 쉼표 구분 문자열을 태그 리스트로 정규화한다.
 
     빈 항목은 버린다(``"a,,b"`` → ``["a", "b"]``). 태그 없음은 오류가 아니다.
+
+    **구분자를 품은 태그는 거부한다.** CSV 는 태그를 ``",".join(tags)`` 한 칸에
+    담으므로, 태그 자체에 쉼표가 있으면 내보냈다가 다시 가져올 때 두 개로 쪼개진다.
+    오류 없이 데이터가 바뀌는 부류라 **만들어지는 시점에 막는 것**이 맞다.
+    이스케이프를 도입하는 길도 있지만 교환 포맷이 복잡해지고, 태그에 쉼표를 넣을
+    실익이 그만한 값을 하지 않는다.
+
+    **중복은 순서를 지키며 제거한다.** ``"a,b,a"`` → ``["a", "b"]``. 같은 태그가
+    두 번 붙어 있으면 ``HasTag`` 판정은 같은데 표시만 지저분해진다.
     """
     if value is None:
         return []
     items = value if isinstance(value, list) else str(value).split(config.TAG_SEPARATOR)
-    return [str(t).strip() for t in items if str(t).strip()]
+
+    seen: List[str] = []
+    for item in items:
+        tag = str(item).strip()
+        if not tag:
+            continue
+        if config.TAG_SEPARATOR in tag:
+            raise ValidationError(
+                messages.ERR_TAG_HAS_SEPARATOR.format(tag=tag, sep=config.TAG_SEPARATOR)
+            )
+        if tag not in seen:
+            seen.append(tag)
+    return seen

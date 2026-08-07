@@ -20,6 +20,9 @@ BUDGET_FILE_NAME = "budgets.jsonl"
 #: 발급된 최대 거래 번호를 남기는 파일 — JSONL 이 아니라 숫자 한 줄이다
 ID_COUNTER_FILE_NAME = "id_counter"
 FILE_ENCODING = "utf-8"
+#: 디코딩 불가 바이트를 예외 대신 대리 문자로 받아 **무손실 왕복**시킨다.
+#: 읽기와 쓰기가 같은 정책을 쓰므로 손상된 줄이 원문 바이트 그대로 보존된다.
+FILE_ERRORS = "surrogateescape"
 LINE_TERMINATOR = "\n"
 TMP_SUFFIX = ".tmp"
 
@@ -31,7 +34,10 @@ BACKUP_GLOB = "*.jsonl"
 BACKUP_EXTRA_FILES = (ID_COUNTER_FILE_NAME,)
 
 # CSV 교환 스키마 — `id` 는 **선택** 컬럼이다(왕복 시 중복 방지, 외부 CSV 호환 유지)
+#: 쓰기는 BOM 없는 UTF-8 고정(왕복 안전성). 읽기만 utf-8-sig 로 BOM 을 흡수한다 —
+#: 엑셀이 저장한 CSV 는 BOM 이 붙고, 그러면 첫 컬럼명이 깨져 헤더 검증이 실패한다.
 CSV_ENCODING = "utf-8"
+CSV_READ_ENCODING = "utf-8-sig"
 CSV_ID_COLUMN = "id"
 CSV_FIELDS = ("id", "date", "type", "category", "amount", "memo", "tags")
 CSV_FIELDS_WITHOUT_ID = ("date", "type", "category", "amount", "memo", "tags")

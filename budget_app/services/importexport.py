@@ -186,7 +186,7 @@ class ImportExportService:
         애초에 "가능한 만큼 최대한 넣는다"는 정책이라 그 위험을 감수한다.
         """
         self.cats.add_many(batch.new_categories)
-        return self.txs.append_many(batch.transactions, atomic=False)
+        return self.txs.append_many(batch.transactions)
 
     def _commit_atomic(self, batch: _Batch) -> int:
         """원자 모드 — 두 파일을 **한 단위로** 커밋한다.

@@ -80,7 +80,7 @@ def read_rows(path: Path) -> Iterator[tuple[int, Dict[str, str]]]:
     if not path.exists():
         raise FileNotFoundError(str(path))
 
-    with open(path, encoding=config.CSV_ENCODING, newline="") as f:
+    with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
         _check_header(path, reader.fieldnames)
         for lineno, row in enumerate(reader, start=config.CSV_DATA_START_LINE):

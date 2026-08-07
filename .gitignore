@@ -9,7 +9,7 @@ uv.lock
 
 # 테스트·실행 중 생성되는 산출물
 backup_*/
-*.jsonl.tmp
+*.tmp
 
 # docs
 docs/*

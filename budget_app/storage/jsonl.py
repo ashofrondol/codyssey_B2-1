@@ -57,7 +57,13 @@ def stage_lines(path: Path, lines: Iterable[str]) -> Path:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + config.TMP_SUFFIX)
-    with open(tmp, "w", encoding=config.FILE_ENCODING, newline=config.LINE_TERMINATOR) as f:
+    with open(
+        tmp,
+        "w",
+        encoding=config.FILE_ENCODING,
+        errors=config.FILE_ERRORS,
+        newline=config.LINE_TERMINATOR,
+    ) as f:
         for line in lines:
             f.write(line + config.LINE_TERMINATOR)
         f.flush()
@@ -144,10 +150,15 @@ class JsonlStore(Generic[T]):
         """모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.
 
         빈 줄은 의미 없는 여백이므로 건너뛴다(보존 대상이 아니다).
+
+        ``errors=surrogateescape`` 가 "손상 줄 격리" 약속을 **인코딩 층까지** 넓힌다.
+        이전에는 엄격 디코딩이라 UTF-8 이 아닌 바이트 한 줄이 ``UnicodeDecodeError``
+        로 **파일 전체 읽기를 죽였다** — JSON 이 깨진 줄은 격리하면서 바이트가 깨진
+        줄은 격리하지 못하는, 같은 약속의 구멍이었다.
         """
         if not self.path.exists():
             return
-        with open(self.path, encoding=config.FILE_ENCODING) as f:
+        with open(self.path, encoding=config.FILE_ENCODING, errors=config.FILE_ERRORS) as f:
             for lineno, raw in enumerate(f, start=1):
                 line = raw.strip()
                 if not line:
@@ -184,19 +195,58 @@ class JsonlStore(Generic[T]):
         return json.dumps(entity.to_dict(), ensure_ascii=False)
 
     def append(self, entity: T) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, "a", encoding=config.FILE_ENCODING, newline=config.LINE_TERMINATOR) as f:
-            f.write(self._encode(entity) + config.LINE_TERMINATOR)
+        self._append_lines([self._encode(entity)])
 
     def append_all(self, entities: Iterable[T]) -> int:
         entities = list(entities)
         if not entities:
             return 0
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, "a", encoding=config.FILE_ENCODING, newline=config.LINE_TERMINATOR) as f:
-            for entity in entities:
-                f.write(self._encode(entity) + config.LINE_TERMINATOR)
+        self._append_lines([self._encode(e) for e in entities])
         return len(entities)
+
+    def _append_lines(self, lines: List[str]) -> None:
+        """줄을 파일 끝에 이어 쓴다 — 이어 쓰기의 두 가지 위험을 함께 막는다.
+
+        1. **찢어진 꼬리**: 마지막 줄에 개행이 없는 파일(쓰다 만 흔적, 손으로 편집한
+           파일)에 그냥 이어 쓰면 새 JSON 이 그 줄 뒤에 붙어 **한 줄**이 된다. 결과는
+           두 레코드가 동시에 죽는 것이다 — 기존 줄은 손상 줄로 보존되기라도 하지만,
+           방금 "저장 완료" 라고 알린 레코드까지 목록에서 사라진다. 그래서 마지막
+           바이트를 확인하고 필요하면 개행을 먼저 쓴다.
+        2. **내구성 비대칭**: 재작성 경로만 fsync 를 하고 있었다. 같은 프로그램의 두
+           쓰기 경로가 서로 다른 내구성을 약속할 이유가 없다. CLI 는 명령 하나에
+           한 번 쓰고 끝나므로 비용도 무시할 수 있다.
+        """
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        needs_newline = self._has_torn_tail()
+        with open(
+            self.path,
+            "a",
+            encoding=config.FILE_ENCODING,
+            errors=config.FILE_ERRORS,
+            newline=config.LINE_TERMINATOR,
+        ) as f:
+            if needs_newline:
+                f.write(config.LINE_TERMINATOR)
+                logger.warning(messages.LOG_TORN_TAIL, self.path.name)
+            for line in lines:
+                f.write(line + config.LINE_TERMINATOR)
+            f.flush()
+            os.fsync(f.fileno())
+
+    def _has_torn_tail(self) -> bool:
+        """마지막 바이트가 개행이 아닌가 — 바이트로 직접 확인한다.
+
+        텍스트 모드로 끝을 보려면 파일을 통째로 읽어야 한다. ``rb`` + ``seek`` 이면
+        1바이트만 읽으면 되고, 인코딩이 깨진 파일에서도 안전하다.
+        """
+        try:
+            if self.path.stat().st_size == 0:
+                return False
+            with open(self.path, "rb") as f:
+                f.seek(-1, os.SEEK_END)
+                return f.read(1) != config.LINE_TERMINATOR.encode(config.FILE_ENCODING)
+        except OSError:
+            return False  # 파일이 없다 — 이어 쓰기가 새로 만든다
 
     def plan_rewrite(
         self,

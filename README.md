@@ -32,8 +32,19 @@ python -m budget_app list --data-dir ./mydata
 | `data/transactions.jsonl` | 거래 내역 | JSON Lines (한 줄에 거래 1건) |
 | `data/categories.jsonl` | 카테고리 목록 | JSON Lines |
 | `data/budgets.jsonl` | 월별 예산 | JSON Lines |
+| `data/id_counter` | 발급된 최대 거래 번호 | 숫자 한 줄 |
 
 폴더가 없으면 첫 실행 시 자동 생성되며, 카테고리 파일이 비어 있으면 기본 카테고리(`food`, `transport`, `rent`, `salary`, `etc`)가 자동으로 등록됩니다.
+
+`id_counter` 는 **삭제해도 줄어들지 않는 기준선**입니다. 거래를 지우면 파일 안의 최대 id 는 줄어들지만, 이미 내보낸 CSV 에는 그 번호가 남아 있습니다. 번호를 재사용하면 그 CSV 를 다시 가져올 때 서로 다른 거래가 "중복"으로 판정돼 조용히 버려집니다. 지워도 안전하지만(파일 스캔 값으로 되돌아갑니다) 그만큼 방어가 사라집니다.
+
+### 동시 실행은 전제하지 않습니다
+
+이 프로그램은 **한 번에 한 프로세스**가 데이터 폴더를 쓴다고 가정합니다. 파일 잠금이 없으므로, 같은 `--data-dir` 를 두 프로세스가 동시에 수정하면 나중에 커밋한 쪽이 앞선 변경을 덮어쓸 수 있습니다.
+
+잠금을 넣지 않은 이유는 이 도구가 대화형 단일 사용자 CLI 이고, 잠금 파일은 그 자체로 새로운 고장(비정상 종료 후 남은 잠금 때문에 실행이 막힘)을 들여오기 때문입니다. 여러 프로세스가 함께 쓰는 상황이 실제로 필요해지는 시점은 저장소를 SQLite 로 바꿀 시점과 같습니다 — 그때는 트랜잭션이 이 문제를 통째로 가져갑니다.
+
+한 프로세스 안에서의 안전성은 보장합니다. 모든 파일 교체는 임시 파일 + `fsync` + `os.replace` 로 이뤄지므로, 중간에 죽어도 **원본이 반쯤 쓰인 상태로 남지 않습니다**.
 
 ### transactions.jsonl 한 줄 예시
 
@@ -423,4 +434,4 @@ BUDGET_APP_DEBUG=1 python -m budget_app summary --month 2024-01   # 환경변수
 python -m budget_app backup
 ```
 
-`./backup_YYYYMMDD_HHMMSS/` 폴더에 `data/*.jsonl` 가 복사됩니다.
+`./backup_YYYYMMDD_HHMMSS/` 폴더에 `data/*.jsonl` 과 `data/id_counter` 가 복사됩니다. 확장자가 없다고 `id_counter` 를 빠뜨리면, 백업을 되돌렸을 때 "발급한 적 있는 번호" 기록이 사라져 삭제된 id 재사용이 되살아납니다.

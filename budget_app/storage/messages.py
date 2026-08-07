@@ -7,6 +7,8 @@
 # 로그 (%-스타일 — logging 에 그대로 전달)
 LOG_CORRUPT_LINE = "%s:%d 손상된 줄을 건너뜁니다: %s"
 LOG_CORRUPT_PRESERVED = "%s: 손상된 줄 %d개를 해석하지 않고 원문 그대로 보존했습니다."
+LOG_TORN_TAIL = "%s: 마지막 줄에 개행이 없어 새 레코드를 붙이기 전에 줄을 바꿉니다."
+LOG_UOW_PARTIAL = "커밋 도중 실패했습니다 — 반영됨: %s / 반영 안 됨: %s. 임시 파일을 정리합니다."
 LOG_WATERMARK_CORRUPT = "%s 의 내용을 숫자로 읽을 수 없습니다(%r) — 파일 스캔 값만 사용합니다."
 
 # CSV 헤더 오류 (AppError message / hint)
