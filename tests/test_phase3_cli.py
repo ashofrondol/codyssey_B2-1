@@ -126,7 +126,8 @@ def test_update_tags_is_parsed_into_a_list(txs, cats, run):
     """
     txs.append(_tx(1))
     assert run("update", "--id", "TX-000001", "--tags", "a,b").code == 0
-    assert [tx.tags for tx in txs.stream()] == [["a", "b"]]
+    # 엔티티는 frozen 이라 tags 가 튜플로 굳는다(Phase 5-4).
+    assert [tx.tags for tx in txs.stream()] == [("a", "b")]
 
 
 def test_update_patch_receives_list_not_string():

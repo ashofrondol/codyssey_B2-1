@@ -110,6 +110,18 @@ class RawLine:
         return self.entity is not None
 
 
+@dataclass(frozen=True)
+class RewritePlan:
+    """재작성 계획 — 쓸 줄과, 그것이 지금 파일과 다른지.
+
+    두 값을 함께 돌려주는 이유: ``changed`` 는 줄을 만드는 도중에만 알 수 있는
+    정보다. 나중에 다시 계산하려면 파일을 한 번 더 읽어야 한다.
+    """
+
+    lines: List[str]
+    changed: bool
+
+
 # ============================================================
 # JSONL 공통 저장소
 # ============================================================
@@ -253,8 +265,8 @@ class JsonlStore(Generic[T]):
         transform: Callable[[T], Optional[T]],
         *,
         extra: Iterable[T] = (),
-    ) -> List[str]:
-        """재작성 결과를 **계산만** 하고 줄 목록으로 돌려준다 — 파일은 건드리지 않는다.
+    ) -> RewritePlan:
+        """재작성 결과를 **계산만** 하고 돌려준다 — 파일은 건드리지 않는다.
 
         ``transform(entity)`` 는 새 엔티티를 돌려주거나 ``None`` 으로 삭제를 뜻한다.
         **해석하지 못한 줄은 원문 그대로 다시 쓴다** — 그래서 손상된 줄이 무관한
@@ -262,8 +274,16 @@ class JsonlStore(Generic[T]):
 
         쓰기와 분리한 이유: 여러 저장소의 변경을 **한꺼번에** 커밋하려면(``UnitOfWork``)
         "무엇을 쓸지"와 "언제 쓸지"가 나뉘어야 한다.
+
+        ``changed`` 를 함께 계산하는 이유는 **파일을 한 번만 읽기 위해서**다.
+        이전에는 호출자가 "대상이 있나?" 를 먼저 확인하고(전체 스캔) 그다음에
+        재작성했다(전체 스캔). 같은 파일을 두 번 읽으면서 두 스캔의 판정 기준이
+        서로 다른 문제까지 있었다 — ``delete`` 는 손상 줄의 id 까지 보는
+        ``exists()`` 로 확인하고, 정작 재작성은 해석된 엔티티만 훑었다.
+        지금은 한 번 훑으면서 "바뀐 것이 있는가"를 같이 안다.
         """
         lines: List[str] = []
+        changed = False
         preserved = 0
         for raw in self.iter_raw():
             if not raw.is_valid:
@@ -272,18 +292,37 @@ class JsonlStore(Generic[T]):
                 continue
             new_entity = transform(raw.entity)
             if new_entity is None:
-                continue  # 삭제
-            lines.append(self._encode(new_entity))
-        lines.extend(self._encode(e) for e in extra)
+                changed = True  # 삭제
+                continue
+            encoded = self._encode(new_entity)
+            if encoded != raw.text:
+                # 값이 바뀌었거나, 정규화로 표기가 바뀌었다(비패딩 날짜 자동 치유 등).
+                changed = True
+            lines.append(encoded)
+
+        extra_lines = [self._encode(e) for e in extra]
+        if extra_lines:
+            changed = True
+        lines.extend(extra_lines)
+
         if preserved:
             logger.warning(messages.LOG_CORRUPT_PRESERVED, self.path.name, preserved)
-        return lines
+        return RewritePlan(lines=lines, changed=changed)
 
     def rewrite(
         self,
         transform: Callable[[T], Optional[T]],
         *,
         extra: Iterable[T] = (),
-    ) -> None:
-        """파일 하나를 원자적으로 다시 쓴다 — 계산 후 곧바로 커밋."""
-        atomic_write_lines(self.path, self.plan_rewrite(transform, extra=extra))
+    ) -> bool:
+        """파일 하나를 원자적으로 다시 쓴다 — 실제로 썼으면 ``True``.
+
+        바뀐 것이 없으면 **파일을 건드리지 않는다**. 조회만 한 명령이 파일의 수정
+        시각을 바꾸면 백업 도구나 파일 감시가 헛돌고, 무엇보다 "쓰지 않았는데 쓰기
+        실패로 죽을" 이유가 없다.
+        """
+        plan = self.plan_rewrite(transform, extra=extra)
+        if not plan.changed:
+            return False
+        atomic_write_lines(self.path, plan.lines)
+        return True

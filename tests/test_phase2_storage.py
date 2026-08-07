@@ -163,8 +163,14 @@ def test_uow_commit_failure_cleans_up_and_reports(tmp_path, monkeypatch):
     b.write_text("", encoding="utf-8")
 
     class _Store:
-        def __init__(self, path):
+        """``stage`` 가 요구하는 것만 갖춘 최소 저장소 — 경로와 재작성 계획."""
+
+        def __init__(self, path, line):
             self.path = path
+            self._line = line
+
+        def plan_rewrite(self, transform, *, extra=()):
+            return uow_module.RewritePlan(lines=[self._line], changed=True)
 
     calls = {"n": 0}
     real_commit = uow_module.commit_staged
@@ -178,8 +184,8 @@ def test_uow_commit_failure_cleans_up_and_reports(tmp_path, monkeypatch):
     monkeypatch.setattr(uow_module, "commit_staged", _flaky_commit)
 
     uow = uow_module.UnitOfWork()
-    uow.stage(_Store(a), ["1"])
-    uow.stage(_Store(b), ["2"])
+    uow.stage(_Store(a, "1"))
+    uow.stage(_Store(b, "2"))
     with pytest.raises(PermissionError):
         uow.commit()
 

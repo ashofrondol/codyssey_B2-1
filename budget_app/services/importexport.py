@@ -28,11 +28,6 @@ from ..storage.repositories import CategoryStore, TransactionRepository
 from ..storage.unit_of_work import UnitOfWork
 
 
-def _keep(entity):
-    """재작성 시 "기존 항목은 그대로" — ``plan_rewrite`` 의 항등 변환."""
-    return entity
-
-
 @dataclass
 class _Batch:
     """가져오기 준비 단계의 누적 상태.
@@ -207,6 +202,6 @@ class ImportExportService:
         self.txs.remember_ids(batch.transactions)
         with UnitOfWork() as uow:
             if fresh_categories:
-                uow.stage(self.cats, self.cats.plan_rewrite(_keep, extra=fresh_categories))
-            uow.stage(self.txs, self.txs.plan_rewrite(_keep, extra=batch.transactions))
+                uow.stage(self.cats, extra=fresh_categories)
+            uow.stage(self.txs, extra=batch.transactions)
         return len(batch.transactions)

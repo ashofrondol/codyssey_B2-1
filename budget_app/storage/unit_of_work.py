@@ -1,5 +1,19 @@
 """Unit of Work — 여러 파일에 걸친 변경을 하나의 커밋으로 묶는다.
 
+## 이름에 대한 정직한 단서
+
+Fowler 가 말한 Unit of Work 는 **변경을 추적**한다. 객체를 등록해 두면 어느 것이
+새로 생겼고(new) 어느 것이 바뀌었고(dirty) 어느 것이 지워졌는지(removed)를
+스스로 알고, 커밋 시점에 필요한 최소한의 쓰기를 순서대로 수행한다.
+
+이 클래스는 그것을 하지 않는다. 무엇이 바뀌었는지 **호출자가 이미 알고** 있고,
+여기서 하는 일은 "여러 파일의 최종 내용을 미리 준비해 두었다가 rename 만 몰아서
+실행"하는 것뿐이다. 정확한 이름은 *staged commit* 또는 *배치 커밋* 이다.
+
+그래도 이 이름을 쓰는 이유는 **해결하는 문제가 같기 때문**이다 — 여러 저장소에
+걸친 변경이 중간 상태로 남지 않게 하는 것. 다만 "UoW 를 썼습니다"라고만 말하면
+변경 추적까지 있는 것처럼 들리므로, 그 경계를 여기 적어 둔다.
+
 ## 이 패턴이 푸는 문제
 
 가져오기 커밋 단계는 파일 **둘**을 바꾼다::
@@ -39,12 +53,20 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from types import TracebackType
-from typing import List, Optional, Tuple, Type
+from typing import Any, Callable, Iterable, List, Optional, Tuple, Type
 
 from . import config, messages
-from .jsonl import commit_staged, stage_lines
+from .jsonl import RewritePlan, commit_staged, stage_lines
 
 logger = logging.getLogger(config.LOGGER_NAME)
+
+
+def _keep(entity: Any) -> Any:
+    """"기존 항목은 그대로" — ``plan_rewrite`` 의 항등 변환.
+
+    가져오기처럼 **추가만 하는** 커밋이 기본이라 이것을 기본값으로 둔다.
+    """
+    return entity
 
 
 class UnitOfWork:
@@ -53,8 +75,8 @@ class UnitOfWork:
     사용법::
 
         with UnitOfWork() as uow:
-            uow.stage(cats, cats.plan_rewrite(lambda c: c, extra=new_cats))
-            uow.stage(txs, txs.plan_rewrite(lambda t: t, extra=new_txs))
+            uow.stage(cats, extra=new_cats)
+            uow.stage(txs, extra=new_txs)
         # 블록을 정상적으로 빠져나가면 커밋, 예외가 나면 롤백
 
     ``with`` 를 쓰는 이유: 예외로 빠져나가는 경로에서도 ``.tmp`` 를 반드시 치우기
@@ -66,10 +88,36 @@ class UnitOfWork:
 
     # ---------- 준비 ----------
 
-    def stage(self, store, lines: List[str]) -> None:
-        """한 저장소의 최종 내용을 ``.tmp`` 로 준비한다 — 아직 반영하지 않는다."""
-        tmp = stage_lines(store.path, lines)
+    def stage(
+        self,
+        store,
+        transform: Callable[[Any], Optional[Any]] = _keep,
+        *,
+        extra: Iterable[Any] = (),
+    ) -> bool:
+        """한 저장소의 최종 내용을 ``.tmp`` 로 준비한다 — 아직 반영하지 않는다.
+
+        준비할 것이 있었으면 ``True``.
+
+        ## 왜 줄 목록이 아니라 변환 함수를 받나
+
+        이전 시그니처는 ``stage(store, lines)`` 였고, 호출자가 이렇게 썼다::
+
+            uow.stage(self.cats, self.cats.plan_rewrite(_keep, extra=new_cats))
+
+        서비스가 **저장소의 줄 목록을 손에 들고 나르는** 모양이다. 서비스는 JSONL
+        한 줄이 어떻게 생겼는지 알 이유가 없는데, 그 문자열 리스트가 서비스 코드를
+        통과하면서 계층 경계가 새고 있었다. 무엇보다 ``plan_rewrite`` 를 두 번
+        부르거나 다른 저장소의 계획을 넘기는 실수를 타입이 막지 못한다.
+
+        지금은 "무엇을 반영할지"만 넘기고 계획은 UoW 가 저장소에게 직접 시킨다.
+        """
+        plan: RewritePlan = store.plan_rewrite(transform, extra=extra)
+        if not plan.changed:
+            return False  # 바꿀 것이 없으면 임시 파일도 만들지 않는다
+        tmp = stage_lines(store.path, plan.lines)
         self._staged.append((tmp, store.path))
+        return True
 
     # ---------- 마무리 ----------
 

@@ -13,8 +13,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, fields
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import validators
 from .tx_id import TransactionId
@@ -25,7 +25,7 @@ from .tx_id import TransactionId
 # ============================================================
 
 
-@dataclass
+@dataclass(frozen=True)
 class Transaction:
     """단일 거래 내역.
 
@@ -36,12 +36,26 @@ class Transaction:
         amount   : 양의 정수
         category : 카테고리명(공백 정규화됨)
         memo     : 자유 문자열 (없으면 빈 문자열)
-        tags     : 태그 리스트 (없으면 빈 리스트)
+        tags     : 태그 튜플 (없으면 빈 튜플)
 
     ``id`` 만 값 객체이고 나머지는 원시 타입인 이유: id 는 형식 규칙(``TX-`` + 6자리),
     번호 변환, 손상 줄 발굴이라는 **고유 행동**이 붙어 있어 타입이 값을 한다.
     ``date``/``category`` 는 규칙이 ``validators`` 함수 하나로 끝나 값 객체를 만들면
     직렬화만 복잡해진다.
+
+    ## ``frozen=True`` 인 이유
+
+    이 클래스의 docstring 은 오래전부터 "생성자가 유일한 불변식 강제 지점"이라고
+    말해 왔는데, 정작 만들어진 뒤에 ``tx.amount = -1`` 이 그냥 됐다. 생성자가
+    유일한 강제 지점이 되려면 **생성자 이후에 바꿀 수 없어야** 한다.
+
+    수정은 이미 ``with_patch`` 가 새 객체를 만드는 방식이라 제자리 수정 코드는
+    한 곳도 없었다 — 즉 이 전환은 이미 지키고 있던 규약을 타입으로 굳힌 것이다.
+
+    ``tags`` 가 리스트가 아니라 **튜플**인 것도 같은 이유다. ``frozen`` 은 필드를
+    다시 묶는 것만 막지 리스트 안을 바꾸는 것(``tx.tags.append(...)``)은 막지
+    못한다. 튜플이면 그 구멍이 닫히고, 덤으로 ``Transaction`` 이 해시 가능해진다
+    (``frozen`` 이 만들어 주는 ``__hash__`` 는 필드가 전부 해시 가능해야 동작한다).
     """
 
     id: TransactionId
@@ -50,18 +64,21 @@ class Transaction:
     amount: int
     category: str
     memo: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         # TransactionId 를 받든 문자열을 받든 같은 결과가 되게 한다
         # (JSONL 은 문자열로, 서비스는 값 객체로 넘긴다).
-        self.id = TransactionId.parse(self.id)
-        self.type = validators.parse_type(self.type)
-        self.date = validators.parse_date(self.date)
-        self.amount = validators.parse_amount(self.amount)
-        self.category = validators.parse_category(self.category)
-        self.memo = validators.parse_memo(self.memo)
-        self.tags = validators.parse_tags(self.tags)
+        # frozen 이라 대입 대신 object.__setattr__ 로 정규화한다 — 생성자가 끝나는
+        # 순간 객체는 검증·정규화가 끝난 상태로 굳는다.
+        _set = object.__setattr__
+        _set(self, "id", TransactionId.parse(self.id))
+        _set(self, "type", validators.parse_type(self.type))
+        _set(self, "date", validators.parse_date(self.date))
+        _set(self, "amount", validators.parse_amount(self.amount))
+        _set(self, "category", validators.parse_category(self.category))
+        _set(self, "memo", validators.parse_memo(self.memo))
+        _set(self, "tags", tuple(validators.parse_tags(self.tags)))
 
     @property
     def id_number(self) -> int:
@@ -138,7 +155,7 @@ class TransactionPatch:
         return not self.changed_fields()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Budget:
     """월별 예산. month 는 'YYYY-MM' 문자열."""
 
@@ -146,8 +163,8 @@ class Budget:
     amount: int
 
     def __post_init__(self) -> None:
-        self.month = validators.parse_month(self.month)
-        self.amount = validators.parse_amount(self.amount)
+        object.__setattr__(self, "month", validators.parse_month(self.month))
+        object.__setattr__(self, "amount", validators.parse_amount(self.amount))
 
     def to_dict(self) -> dict:
         return {"month": self.month, "amount": self.amount}
@@ -157,14 +174,14 @@ class Budget:
         return cls(month=data["month"], amount=data["amount"])
 
 
-@dataclass
+@dataclass(frozen=True)
 class Category:
     """카테고리. 이름은 고유하게 관리된다."""
 
     name: str
 
     def __post_init__(self) -> None:
-        self.name = validators.parse_category(self.name)
+        object.__setattr__(self, "name", validators.parse_category(self.name))
 
     def to_dict(self) -> dict:
         return {"name": self.name}

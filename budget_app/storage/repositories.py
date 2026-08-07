@@ -148,7 +148,13 @@ class TransactionRepository(JsonlStore[Transaction]):
         return self.append_all(txs)
 
     def delete(self, tx_id: object) -> bool:
-        """삭제 성공 시 True, 대상 없으면 False."""
+        """삭제 성공 시 True, 대상 없으면 False — **파일을 한 번만 읽는다**.
+
+        이전에는 ``exists()`` 로 확인한 뒤 재작성하며 또 훑었다. 두 스캔의 판정
+        기준이 서로 달랐던 것이 더 문제였다 — ``exists()`` 는 손상 줄에서 건져낸
+        id 까지 "있다"고 했지만, 재작성은 해석된 엔티티만 훑으므로 그 줄은 지울 수
+        없었다. 지금은 훑으면서 만나는 것이 곧 판정이라 어긋날 수가 없다.
+        """
         target = self._as_id(tx_id)
         if target is None:
             return False
@@ -161,14 +167,11 @@ class TransactionRepository(JsonlStore[Transaction]):
                 return None
             return tx
 
-        # 대상이 있을 때만 파일을 다시 쓴다 — 조회만으로 파일 mtime 이 바뀌지 않도록.
-        if not self.exists(target):
-            return False
         self.rewrite(_drop)
         return found
 
     def replace(self, tx_id: object, new_tx: Transaction) -> bool:
-        """``tx_id`` 인 거래를 완성된 ``new_tx`` 로 통째 교체한다.
+        """``tx_id`` 인 거래를 완성된 ``new_tx`` 로 통째 교체한다 — 한 번만 읽는다.
 
         저장소는 "무엇이 어떻게 바뀌는지" 모른다. 부분 변경 해석은 서비스가
         ``Transaction.with_patch`` 로 끝내고 완성품만 여기로 온다.
@@ -185,8 +188,6 @@ class TransactionRepository(JsonlStore[Transaction]):
                 return new_tx
             return tx
 
-        if self.get(target) is None:
-            return False
         self.rewrite(_swap)
         return found
 
@@ -209,8 +210,6 @@ class TransactionRepository(JsonlStore[Transaction]):
             changed += 1
             return tx.with_patch(patch)
 
-        if not self.category_in_use(source):
-            return 0
         self.rewrite(_reassign)
         return changed
 
@@ -277,8 +276,6 @@ class CategoryStore(JsonlStore[Category]):
                 return None
             return cat
 
-        if not self.exists(target):
-            return False
         self.rewrite(_drop)
         return found
 
