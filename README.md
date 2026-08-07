@@ -310,32 +310,52 @@ python -m budget_app import --from import.csv --atomic
 
 ```
 budget_app/
-├── __main__.py            # 엔트리포인트 (python -m budget_app)
+├── __main__.py                # 엔트리포인트 (python -m budget_app)
+├── config.py                  # 앱 정체성 (로거 이름) — 계층 아님
+├── errors.py                  # 예외 어휘 (ValidationError / AppError) — import 0개
+├── decorators.py              # 관측 — @log_call / @measure_time
+├── context.py                 # 합성 루트 — 저장소·서비스 조립 (계층 밖)
 │
-│  ── 횡단 (어느 계층에도 속하지 않음) ──────────────────────
-├── config.py              # 값·정책 상수 (바꾸면 동작이 달라짐)
-├── messages.py            # 사용자 노출 문자열 (바꿔도 동작은 같음)
-├── errors.py              # 예외 어휘 (ValidationError / AppError) — import 0개
-├── decorators.py          # 관측 — 로그 / 시간 측정
+├── domain/                    # ── 도메인 (I/O 를 전혀 모름) ──
+│   ├── config.py              #    타입 어휘·날짜 형식·ID 형식
+│   ├── messages.py            #    필드 검증 실패 메시지
+│   ├── validators.py          #    규칙 하나 = 함수 하나
+│   ├── tx_id.py               #    TransactionId 값 객체
+│   ├── entities.py            #    Transaction / Budget / Category / TransactionPatch
+│   ├── specs.py               #    Specification — 조합 가능한 검색 조건
+│   ├── queries.py             #    SearchFilter — CLI 인자를 명세로 조립
+│   ├── results.py             #    MonthlySummary / ImportReport
+│   └── periods.py             #    month_range — "이 달"의 정의처
 │
-├── domain/                # ── 도메인 계층 (I/O 를 전혀 모름) ──
-│   ├── models.py          #    엔티티 + 질의/결과 모델 + 생성자 불변식
-│   └── validators.py      #    필드 규칙의 단일 정의처
+├── storage/                   # ── 저장소 (open() 은 전부 여기) ──
+│   ├── config.py              #    파일명·인코딩·CSV 스키마·백업
+│   ├── messages.py            #    손상 줄 로그 / CSV 헤더 오류
+│   ├── jsonl.py               #    JsonlStore / RawLine / stage·commit
+│   ├── ids.py                 #    IdAllocator
+│   ├── repositories.py        #    거래·카테고리·예산 저장소
+│   ├── csv_io.py              #    CSV 경계 어댑터
+│   ├── unit_of_work.py        #    UnitOfWork — 다중 파일 커밋
+│   └── backup.py              #    데이터 폴더 백업
 │
-├── storage/               # ── 저장소 계층 (open() 은 전부 여기) ──
-│   ├── repository.py      #    JSONL 입출력 + ID 발급 + 백업 (스트리밍 + 원자적 교체)
-│   └── csv_io.py          #    CSV 경계 어댑터 (외부 교환 포맷 ↔ 도메인)
+├── services/                  # ── 서비스 (판단만) ──
+│   ├── config.py              #    중복 정책·한도
+│   ├── messages.py            #    AppError message / hint
+│   ├── transactions.py        #    거래 유스케이스
+│   ├── budgets.py             #    예산 + 월별 요약
+│   ├── categories.py          #    카테고리 + 참조 무결성
+│   └── importexport.py        #    CSV 정책 (실패 축 × 중복 축)
 │
-├── services.py            # ── 서비스 계층 — 유스케이스와 정책 ──
-│
-└── cli/                   # ── CLI 계층 (사람과 만나는 곳) ──
-    ├── __init__.py        #    main 만 재수출
-    ├── app.py             #    핸들러 + 명령 레지스트리 + AppContext + main
-    ├── parser.py          #    argparse 문법 정의
-    ├── prompts.py         #    대화형 입력 (재입력 루프 / EOF 처리)
-    ├── presenter.py       #    도메인 → 화면 문자열 (출력하지 않고 반환만)
-    ├── output.py          #    출력 채널 — stdout(결과) / stderr(진단) / logging
-    └── error_handler.py   #    예외 → 사용자 메시지 → 종료 코드
+└── cli/                       # ── CLI (사람과 만나는 곳) ──
+    ├── __init__.py            #    main 만 재수출
+    ├── config.py              #    한도·종료 코드
+    ├── messages.py            #    프롬프트·결과·오류 표시 (전체의 3분의 2)
+    ├── app.py                 #    HANDLERS 레지스트리 + main
+    ├── handlers.py            #    cmd_* 13개
+    ├── parser.py              #    argparse 문법
+    ├── prompts.py             #    대화형 입력
+    ├── presenter.py           #    도메인 → 문자열 (출력 안 함)
+    ├── output.py              #    채널 결정
+    └── error_handler.py       #    예외 → 종료 코드
 ```
 
 의존은 **아래로만** 흐릅니다. `services` 는 `open()` 을 호출하지 않고, `storage` 는
