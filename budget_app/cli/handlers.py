@@ -28,18 +28,17 @@ from ..domain import validators
 from ..domain.entities import TransactionPatch
 from ..domain.queries import SearchFilter
 from ..errors import AppError
-from ..storage.backup import backup_data_dir
 from . import output, presenter, prompts
 
 
 def cmd_add(ctx: AppContext, args: argparse.Namespace) -> int:
-    if not ctx.cats.list_names():
+    if not ctx.cat_service.list_names():
         # 0 이 아닌 종료 코드로 끝나는 실패 경로 → 진단 채널(stderr).
         output.err(messages.MSG_NO_CATEGORIES)
         return config.EXIT_NO_CATEGORY
 
     output.out(messages.MSG_ADD_INTERACTIVE)
-    entered = prompts.ask_transaction(ctx.cats)
+    entered = prompts.ask_transaction(ctx.cat_service)
     tx = ctx.tx_service.add(
         date=entered.date,
         type_=entered.type,
@@ -187,6 +186,6 @@ def cmd_import(ctx: AppContext, args: argparse.Namespace) -> int:
 
 
 def cmd_backup(ctx: AppContext, args: argparse.Namespace) -> int:
-    dest = backup_data_dir(ctx.data_dir)
+    dest = ctx.backup_service.create()
     output.out(messages.MSG_BACKUP_DONE.format(dest=dest))
     return config.EXIT_OK

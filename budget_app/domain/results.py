@@ -58,6 +58,22 @@ class MonthlySummary:
 
 
 @dataclass(frozen=True)
+class RejectedRow:
+    """데이터가 잘못돼 가져오지 못한 CSV 한 행 — 줄 번호와 사유."""
+
+    lineno: int
+    reason: str
+
+
+@dataclass(frozen=True)
+class DuplicateRow:
+    """이미 저장된 id 라 건너뛴 CSV 한 행 — 줄 번호와 그 id."""
+
+    lineno: int
+    tx_id: str
+
+
+@dataclass(frozen=True)
 class ImportReport:
     """CSV 가져오기 결과.
 
@@ -65,14 +81,23 @@ class ImportReport:
     사용자가 해야 할 일이 정반대다. ``skipped`` 는 데이터가 잘못돼 **고쳐야**
     하고, ``duplicated`` 는 이미 저장돼 있어서 **아무것도 안 해도 된다**.
     한 숫자로 합치면 정상 왕복인데 실패처럼 읽힌다.
+
+    ## 왜 문자열이 아니라 구조체를 담나
+
+    이전에는 ``errors`` 가 ``"line 3: 금액은 양의 정수여야 합니다"`` 처럼 **포맷이
+    끝난 사용자 문장**이었다. 그러면 서비스가 화면 문구를 결정하게 되고,
+    "3번 줄만 다시 보여 줘" 같은 요구가 오면 문자열을 되파싱해야 한다.
+
+    같은 파일의 ``MonthlySummary`` 는 이미 반대로 하고 있었다 — 원자료만 담고
+    표시는 프레젠터가 만든다. 두 결과 모델이 서로 다른 규칙을 따를 이유가 없다.
     """
 
     imported: int = 0
     skipped: int = 0
     duplicated: int = 0
-    errors: Tuple[str, ...] = ()
-    duplicate_notes: Tuple[str, ...] = ()
+    errors: Tuple[RejectedRow, ...] = ()
+    duplicates: Tuple[DuplicateRow, ...] = ()
 
     @property
     def has_problems(self) -> bool:
-        return bool(self.errors or self.duplicate_notes)
+        return bool(self.errors or self.duplicates)

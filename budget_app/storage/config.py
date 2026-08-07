@@ -8,7 +8,7 @@
 from .. import config as app_config
 
 # 로거 — 저장소 로그만 따로 조정할 수 있게 앱 로거의 자식으로 둔다
-LOGGER_NAME = app_config.LOGGER_NAME_STORAGE
+LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"
 
 # 부트스트랩
 DEFAULT_CATEGORIES = ("food", "transport", "rent", "salary", "etc")

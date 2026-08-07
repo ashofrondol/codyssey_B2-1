@@ -121,12 +121,22 @@ def import_problem_lines(report: ImportReport) -> List[str]:
 
     오류와 중복을 따로 보여 준다. 사용자가 해야 할 일이 다르기 때문이다
     (오류는 CSV 를 고쳐야 하고, 중복은 아무것도 안 해도 된다).
+
+    **문장을 만드는 것이 여기로 왔다.** 이전에는 서비스가 ``"line 3: ..."`` 까지
+    완성해 넘겼다. 지금 서비스가 넘기는 것은 ``(줄번호, 사유)`` 뿐이고, 그것을
+    어떤 문장으로 보여 줄지는 화면의 결정이다.
     """
     lines: List[str] = []
     if report.errors:
         lines.append(messages.MSG_IMPORT_ERROR_HEADER)
-        lines.extend(messages.FMT_IMPORT_ERROR_ITEM.format(error=e) for e in report.errors)
-    if report.duplicate_notes:
-        lines.extend(messages.FMT_IMPORT_ERROR_ITEM.format(error=d) for d in report.duplicate_notes)
+        lines.extend(
+            messages.FMT_IMPORT_ERROR_ITEM.format(lineno=e.lineno, reason=e.reason)
+            for e in report.errors
+        )
+    if report.duplicates:
+        lines.extend(
+            messages.FMT_IMPORT_DUPLICATE_ITEM.format(lineno=d.lineno, tx_id=d.tx_id)
+            for d in report.duplicates
+        )
         lines.append(messages.MSG_IMPORT_DUPLICATE_HINT)
     return lines

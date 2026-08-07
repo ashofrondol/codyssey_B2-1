@@ -24,6 +24,4 @@ ERR_ATOMIC_IMPORT_FAILED = "원자적 가져오기 실패 — line {lineno}: {re
 HINT_ATOMIC_IMPORT = "CSV 를 고쳐 다시 시도하거나, --atomic 없이 부분 가져오기를 사용하세요."
 ERR_DUPLICATE_ID = "이미 존재하는 거래 id 입니다: {tx_id}"
 HINT_DUPLICATE_ID = "`--on-duplicate new-id` 로 새 id 를 발급하거나, CSV 의 id 컬럼을 비우세요."
-FMT_IMPORT_ERROR = "line {lineno}: {reason}"
-FMT_IMPORT_DUPLICATE = "line {lineno}: 중복 id {tx_id} — 건너뜀"
 ERR_UNKNOWN_DUPLICATE_POLICY = "알 수 없는 중복 정책입니다: {policy}"

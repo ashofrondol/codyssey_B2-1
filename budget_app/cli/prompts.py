@@ -17,7 +17,8 @@ from typing import Callable, List, Optional, TypeVar
 
 from ..domain import validators
 from ..errors import AppError, ValidationError
-from ..storage.repositories import CategoryStore
+from ..services import messages as service_messages
+from ..services.categories import CategoryService
 from . import config, messages, output
 
 T = TypeVar("T")
@@ -72,31 +73,47 @@ def ask_until(prompt: str, validator: Callable[[str], T]) -> T:
     raise AppError(messages.ERR_MAX_RETRIES, hint=messages.HINT_MAX_RETRIES)
 
 
-def registered_category_validator(cats: CategoryStore) -> Callable[[str], str]:
+def registered_category_validator(cat_service: CategoryService) -> Callable[[str], str]:
     """등록된 카테고리만 통과시키는 검증기 (미등록이면 ``ValidationError`` → 재입력).
 
-    ``validators`` 의 함수들과 달리 저장소를 봐야 판단되므로 여기서 만든다.
+    ``validators`` 의 함수들과 달리 **저장된 상태를 봐야** 판단되므로 여기서 만든다.
     필드 규칙(``parse_category``)은 그대로 재사용하고 '등록 여부'만 덧댄다.
+
+    ## 왜 ``CategoryStore`` 가 아니라 ``CategoryService`` 인가
+
+    이전에는 저장소를 직접 받았다. CLI 가 서비스를 건너뛰고 저장소를 부르는
+    유일한 자리였고, 그래서 "CLI 는 서비스와만 말한다"가 규칙이 아니라 관습이었다.
+
+    ## 왜 예외 종류가 서비스와 다른가
+
+    같은 상황을 ``TransactionService`` 는 ``AppError`` 로, 여기서는
+    ``ValidationError`` 로 던진다. 모순이 아니라 **대화형이라는 맥락의 차이**다.
+    ``ask_until`` 은 ``ValidationError`` 를 잡아 다시 묻는데, 사용자가 카테고리
+    이름을 다시 칠 수 있는 자리에서는 그것이 맞는 처리다. 옵션으로 한 번에 넘기는
+    경로에는 다시 물을 기회가 없으므로 그대로 끝내야 한다.
+
+    문장은 하나만 존재한다 — 상황의 이름은 서비스가 소유하고(``서비스 messages``),
+    CLI 는 대화형에서만 의미 있는 "사용 가능 목록"을 덧붙인다.
     """
 
     def _validate(raw: str) -> str:
         name = validators.parse_category(raw)
-        if cats.exists(name):
+        if cat_service.exists(name):
             return name
-        available = ", ".join(cats.list_names())
         raise ValidationError(
-            messages.ERR_CATEGORY_NOT_REGISTERED_AVAILABLE.format(name=name, available=available)
+            service_messages.ERR_CATEGORY_NOT_REGISTERED.format(name=name)
+            + messages.FMT_AVAILABLE_SUFFIX.format(available=", ".join(cat_service.list_names()))
         )
 
     return _validate
 
 
-def ask_transaction(cats: CategoryStore) -> TransactionInput:
+def ask_transaction(cat_service: CategoryService) -> TransactionInput:
     """거래 한 건에 필요한 값을 순서대로 받아 온다."""
     return TransactionInput(
         date=ask_until(messages.PROMPT_DATE, validators.parse_date),
         type=ask_until(messages.PROMPT_TYPE, validators.parse_type),
-        category=ask_until(messages.PROMPT_CATEGORY, registered_category_validator(cats)),
+        category=ask_until(messages.PROMPT_CATEGORY, registered_category_validator(cat_service)),
         amount=ask_until(messages.PROMPT_AMOUNT, validators.parse_amount),
         memo=validators.parse_memo(ask(messages.PROMPT_MEMO)),
         tags=validators.parse_tags(ask(messages.PROMPT_TAGS)),

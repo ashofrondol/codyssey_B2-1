@@ -19,5 +19,7 @@
 | ``DEFAULT_TOP_N`` | ``services.config`` | services, cli(기본값) |
 """
 
+#: 앱 이름 하나만 소유한다. 계층별 자식 로거는 각 계층 config 가 여기서 **파생**시킨다
+#: (이전에는 여기에 LOGGER_NAME_STORAGE 를 따로 두고 storage/config 가 그것을
+#:  이름만 바꿔 재수출했다 — 값 하나가 세 곳을 거치는 순수 보일러플레이트였다).
 LOGGER_NAME = "budget_app"
-LOGGER_NAME_STORAGE = "budget_app.storage"

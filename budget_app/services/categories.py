@@ -27,6 +27,16 @@ class CategoryService:
     def list_names(self) -> List[str]:
         return self.cats.list_names()
 
+    def exists(self, name: str) -> bool:
+        """등록된 카테고리인가 — **등록 여부를 묻는 단 하나의 창구**.
+
+        CLI 의 대화형 재입력 루프도 이것을 쓴다. 이전에는 ``prompts`` 가
+        ``CategoryStore`` 를 직접 받아 물었는데, 그러면 프레젠테이션 계층이 저장소를
+        알게 될 뿐 아니라 "등록됐는가"의 판정이 두 계층에 각각 있게 된다. 나중에
+        판정에 조건이 하나라도 붙으면(비활성 카테고리 등) 한쪽만 고쳐진다.
+        """
+        return self.cats.exists(name)
+
     def remove(self, name: str, replace_with: Optional[str] = None) -> int:
         """카테고리 삭제. 사용 중이라면:
 

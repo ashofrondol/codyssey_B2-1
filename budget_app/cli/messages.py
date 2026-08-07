@@ -34,7 +34,9 @@ ERR_INPUT_ABORTED = "입력이 중단되었습니다 (EOF)."
 HINT_INPUT_ABORTED = "대화형 명령은 필요한 값을 표준입력으로 끝까지 제공해야 합니다."
 ERR_MAX_RETRIES = "재입력 횟수를 초과했습니다."
 HINT_MAX_RETRIES = "올바른 형식으로 값을 입력한 뒤 다시 시도해 주세요."
-ERR_CATEGORY_NOT_REGISTERED_AVAILABLE = "등록되지 않은 카테고리입니다: {name} (사용 가능: {available})"
+#: 상황의 이름("등록되지 않은 카테고리입니다")은 services.messages 가 소유한다.
+#: 여기서는 **대화형에서만 의미 있는** 덧말만 갖는다 — 다시 칠 수 있으니 목록을 보여 준다.
+FMT_AVAILABLE_SUFFIX = " (사용 가능: {available})"
 
 # 공통 표
 MSG_NO_DATA = "(데이터 없음)"
@@ -85,7 +87,8 @@ MODE_ATOMIC = "원자(전수 롤백)"
 MODE_PARTIAL = "부분 성공"
 MSG_IMPORT_DONE = "[완료] mode={mode}, imported={imported}, duplicated={duplicated}, skipped={skipped}"
 MSG_IMPORT_ERROR_HEADER = "[오류 라인 일부]"
-FMT_IMPORT_ERROR_ITEM = "  - {error}"
+FMT_IMPORT_ERROR_ITEM = "  - line {lineno}: {reason}"
+FMT_IMPORT_DUPLICATE_ITEM = "  - line {lineno}: 중복 id {tx_id} — 건너뜀"
 MSG_IMPORT_DUPLICATE_HINT = "[힌트] 중복은 이미 저장된 거래입니다. 다시 넣으려면 `--on-duplicate new-id` 를 쓰세요."
 
 # backup

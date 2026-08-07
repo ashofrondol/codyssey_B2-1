@@ -112,7 +112,7 @@ class UnitOfWork:
             try:
                 tmp.unlink(missing_ok=True)
             except OSError:  # 지우지 못해도 원본은 무사하다. 다음 실행이 덮어쓴다.
-                logger.debug("임시 파일 정리 실패: %s", tmp)
+                logger.debug(messages.LOG_TMP_CLEANUP_FAILED, tmp)
         self._staged.clear()
 
     # ---------- 컨텍스트 매니저 ----------

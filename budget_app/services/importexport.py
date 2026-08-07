@@ -19,7 +19,7 @@ from typing import List, Optional
 from . import config, messages
 from ..domain.entities import Category, Transaction
 from ..domain.queries import SearchFilter
-from ..domain.results import ImportReport
+from ..domain.results import DuplicateRow, ImportReport, RejectedRow
 from ..domain.tx_id import TransactionId
 from ..errors import AppError, ValidationError
 from ..storage import csv_io
@@ -45,20 +45,23 @@ class _Batch:
     new_categories: List[str] = field(default_factory=list)
     skipped: int = 0
     duplicated: int = 0
-    errors: List[str] = field(default_factory=list)
-    duplicate_notes: List[str] = field(default_factory=list)
+    errors: List[RejectedRow] = field(default_factory=list)
+    duplicates: List[DuplicateRow] = field(default_factory=list)
 
     def note_error(self, lineno: int, reason: object) -> None:
+        """세는 것은 전부, 사유를 남기는 것은 앞의 몇 건만.
+
+        수천 줄짜리 CSV 가 통째로 잘못됐을 때 사유를 전부 모으면 메모리와 화면이
+        같이 터진다. 숫자(``skipped``)는 정확하고, 목록은 표본이다.
+        """
         self.skipped += 1
         if len(self.errors) < config.MAX_IMPORT_ERRORS:
-            self.errors.append(messages.FMT_IMPORT_ERROR.format(lineno=lineno, reason=reason))
+            self.errors.append(RejectedRow(lineno=lineno, reason=str(reason)))
 
     def note_duplicate(self, lineno: int, tx_id: TransactionId) -> None:
         self.duplicated += 1
-        if len(self.duplicate_notes) < config.MAX_IMPORT_ERRORS:
-            self.duplicate_notes.append(
-                messages.FMT_IMPORT_DUPLICATE.format(lineno=lineno, tx_id=tx_id)
-            )
+        if len(self.duplicates) < config.MAX_IMPORT_ERRORS:
+            self.duplicates.append(DuplicateRow(lineno=lineno, tx_id=tx_id.value))
 
 
 class ImportExportService:
@@ -176,7 +179,7 @@ class ImportExportService:
             skipped=batch.skipped,
             duplicated=batch.duplicated,
             errors=tuple(batch.errors),
-            duplicate_notes=tuple(batch.duplicate_notes),
+            duplicates=tuple(batch.duplicates),
         )
 
     def _commit_appending(self, batch: _Batch) -> int:

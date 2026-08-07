@@ -25,6 +25,7 @@ from pathlib import Path
 from .services.budgets import BudgetService
 from .services.categories import CategoryService
 from .services.importexport import ImportExportService
+from .services.maintenance import BackupService
 from .services.transactions import TransactionService
 from .storage.repositories import BudgetStore, CategoryStore, TransactionRepository
 
@@ -40,21 +41,28 @@ class AppContext:
 
     def __init__(self, data_dir: Path):
         self.data_dir = Path(data_dir)
-        self.txs = TransactionRepository(self.data_dir)
-        self.cats = CategoryStore(self.data_dir)
-        self.budgets = BudgetStore(self.data_dir)
-        self.tx_service = TransactionService(self.txs, self.cats)
-        self.cat_service = CategoryService(self.cats, self.txs)
-        self.budget_service = BudgetService(self.txs, self.budgets)
-        self.io_service = ImportExportService(self.txs, self.cats)
+
+        # 저장소는 비공개다 — 조립하는 데만 쓰고 밖으로 내보이지 않는다.
+        # 공개해 두면 핸들러가 서비스를 건너뛰어 `ctx.cats.list_names()` 처럼
+        # 부를 수 있고, 실제로 그런 자리가 있었다. 이름 앞의 밑줄 하나가
+        # "이 계층은 서비스와만 말한다"를 코드로 강제한다.
+        self._txs = TransactionRepository(self.data_dir)
+        self._cats = CategoryStore(self.data_dir)
+        self._budgets = BudgetStore(self.data_dir)
+
+        self.tx_service = TransactionService(self._txs, self._cats)
+        self.cat_service = CategoryService(self._cats, self._txs)
+        self.budget_service = BudgetService(self._txs, self._budgets)
+        self.io_service = ImportExportService(self._txs, self._cats)
+        self.backup_service = BackupService(self.data_dir)
 
     def prepare(self) -> None:
         """데이터 폴더와 파일을 준비한다 — 명령 실행 전 한 번만."""
         self._require_usable_data_dir()
-        self.txs.ensure_ready()
-        self.budgets.ensure_ready()
-        self.cats.ensure_ready()
-        self.cats.seed_defaults()
+        self._txs.ensure_ready()
+        self._budgets.ensure_ready()
+        self._cats.ensure_ready()
+        self._cats.seed_defaults()
 
     def _require_usable_data_dir(self) -> None:
         """``--data-dir`` 가 폴더가 아니면 **여기서** 원인을 말하고 멈춘다.
