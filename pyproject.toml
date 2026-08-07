@@ -26,3 +26,9 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+# ---------- pytest ----------
+# 런타임 의존성은 여전히 0 이다. pytest 는 개발 도구이며 .venv 에만 있다.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
