@@ -17,18 +17,19 @@
 
 규칙 = 함수 하나 = 파일 한 곳. 모든 함수는 **검증과 정규화를 함께** 수행하고
 (공백 제거·소문자화 등) 정규화된 값을 돌려준다. 실패는 ``ValidationError``.
+
+**거래 id 는 여기 없다.** 형식 검증뿐 아니라 번호 변환·생성·손상 줄 발굴이라는
+고유 행동이 붙어 있어 값 객체(``tx_id.TransactionId``)로 따로 뺐다. 여기 남은 것은
+"규칙이 함수 하나로 끝나는" 필드들이다.
 """
 
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Any, List
 
-from .. import config, messages
+from . import config, messages
 from ..errors import ValidationError
-
-_TX_ID_RE = re.compile(config.TX_ID_PATTERN)
 
 
 def parse_amount(value: Any) -> int:
@@ -91,23 +92,5 @@ def parse_tags(value: Any) -> List[str]:
     """
     if value is None:
         return []
-    items = value if isinstance(value, list) else str(value).split(config.CSV_TAG_SEPARATOR)
+    items = value if isinstance(value, list) else str(value).split(config.TAG_SEPARATOR)
     return [str(t).strip() for t in items if str(t).strip()]
-
-
-def parse_tx_id(value: Any) -> str:
-    """거래 id 형식(``TX-000001``)을 검증한다.
-
-    CSV 가 id 컬럼을 실어 오게 되면서 필요해진 규칙이다. 형식을 강제하지 않으면
-    ``max_id_num`` 이 인식하지 못하는 id 가 파일에 섞여 이후 발급이 충돌한다.
-    """
-    v = str(value or "").strip()
-    if not _TX_ID_RE.match(v):
-        raise ValidationError(messages.ERR_TX_ID_INVALID.format(value=v))
-    return v
-
-
-def tx_id_number(tx_id: str) -> int:
-    """``TX-000007`` → ``7``. 형식이 아니면 0 (호출자가 최댓값 갱신에 쓴다)."""
-    m = _TX_ID_RE.match(str(tx_id or "").strip())
-    return int(m.group(1)) if m else 0

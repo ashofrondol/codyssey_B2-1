@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import argparse
 
-from .. import config, messages
+from . import config, messages
+from ..services import config as services_config
+from ..domain import config as domain_config
 
 DEBUG_HELP = "디버그 로그 활성화 — 예기치 못한 오류의 스택트레이스를 stderr 로 출력"
 
@@ -102,7 +104,7 @@ def _add_search(sub) -> None:
     p.add_argument("--from", dest="from_", help="시작일 YYYY-MM-DD")
     p.add_argument("--to", dest="to", help="종료일 YYYY-MM-DD")
     p.add_argument("--category", help="카테고리")
-    p.add_argument("--type", choices=list(config.VALID_TYPES), help="타입")
+    p.add_argument("--type", choices=list(domain_config.VALID_TYPES), help="타입")
     p.add_argument("--q", help="메모 키워드 부분 일치")
     p.add_argument("--tag", help="태그 정확 일치")
     p.set_defaults(handler="search")
@@ -112,7 +114,7 @@ def _add_summary(sub) -> None:
     p = sub.add_parser("summary", help="월별 요약")
     _add_common_options(p)
     p.add_argument("--month", required=True, help="대상 월 YYYY-MM")
-    p.add_argument("--top", type=int, default=config.DEFAULT_TOP_N, help="지출 TOP N (기본 5)")
+    p.add_argument("--top", type=int, default=services_config.DEFAULT_TOP_N, help="지출 TOP N (기본 5)")
     p.set_defaults(handler="summary")
 
 
@@ -153,7 +155,7 @@ def _add_update(sub) -> None:
     _add_common_options(p)
     p.add_argument("--id", required=True, help="수정 대상 거래 id")
     p.add_argument("--date", help="YYYY-MM-DD")
-    p.add_argument("--type", choices=list(config.VALID_TYPES))
+    p.add_argument("--type", choices=list(domain_config.VALID_TYPES))
     p.add_argument("--category")
     p.add_argument("--amount", type=int)
     p.add_argument("--memo")
@@ -196,8 +198,8 @@ def _add_import(sub) -> None:
     p.add_argument(
         "--on-duplicate",
         dest="on_duplicate",
-        choices=list(config.ON_DUPLICATE_CHOICES),
-        default=config.DEFAULT_ON_DUPLICATE,
+        choices=list(services_config.ON_DUPLICATE_CHOICES),
+        default=services_config.DEFAULT_ON_DUPLICATE,
         help=(
             "이미 있는 id 를 만났을 때: skip=건너뜀(기본), "
             "new-id=새 id 로 추가, error=오류로 중단"

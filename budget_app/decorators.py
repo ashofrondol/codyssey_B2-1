@@ -22,7 +22,13 @@ import logging
 import time
 from typing import Any, Callable
 
-from . import config, messages
+from . import config
+
+#: 이 세 문구는 이 모듈만 쓴다. 별도 messages 파일로 빼면 3줄짜리 파일이 생기고
+#: 오히려 찾기 어려워진다. %-스타일인 이유는 logging 의 지연 포맷팅 때문이다.
+LOG_CALL = "call %s"
+LOG_DONE = "done %s"
+LOG_TOOK = "%s took %.2fms"
 
 logger = logging.getLogger(config.LOGGER_NAME)
 
@@ -32,9 +38,9 @@ def log_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        logger.debug(messages.LOG_CALL, func.__name__)
+        logger.debug(LOG_CALL, func.__name__)
         result = func(*args, **kwargs)
-        logger.debug(messages.LOG_DONE, func.__name__)
+        logger.debug(LOG_DONE, func.__name__)
         return result
 
     return wrapper
@@ -54,6 +60,6 @@ def measure_time(func: Callable[..., Any]) -> Callable[..., Any]:
             return func(*args, **kwargs)
         finally:
             elapsed = (time.perf_counter() - start) * 1000
-            logger.debug(messages.LOG_TOOK, func.__name__, elapsed)
+            logger.debug(LOG_TOOK, func.__name__, elapsed)
 
     return wrapper

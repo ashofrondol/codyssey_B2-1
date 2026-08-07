@@ -11,7 +11,7 @@ import functools
 import logging
 from typing import Callable
 
-from .. import config, messages
+from . import config, messages
 from ..errors import AppError, ValidationError
 from . import output
 

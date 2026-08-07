@@ -28,9 +28,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional
 
-from .. import config, messages
+from . import config, messages
+from ..domain import config as domain_config
 from ..domain import validators
-from ..domain.models import Transaction
+from ..domain.entities import Transaction
+from ..domain.tx_id import TransactionId
 from ..errors import AppError
 
 
@@ -43,7 +45,7 @@ class ParsedRow:
     """
 
     lineno: int
-    tx_id: Optional[str]
+    tx_id: Optional[TransactionId]
     type: str
     date: str
     amount: int
@@ -51,7 +53,7 @@ class ParsedRow:
     memo: str
     tags: List[str]
 
-    def to_transaction(self, tx_id: str) -> Transaction:
+    def to_transaction(self, tx_id: TransactionId) -> Transaction:
         return Transaction(
             id=tx_id,
             type=self.type,
@@ -91,7 +93,7 @@ def _check_header(path: Path, fieldnames: Optional[Iterable[str]]) -> None:
         raise AppError(
             messages.ERR_CSV_NO_HEADER.format(path=path),
             hint=messages.HINT_CSV_NO_HEADER.format(
-                columns=config.CSV_TAG_SEPARATOR.join(config.CSV_REQUIRED_COLUMNS)
+                columns=domain_config.TAG_SEPARATOR.join(config.CSV_REQUIRED_COLUMNS)
             ),
         )
     missing = [c for c in config.CSV_REQUIRED_COLUMNS if c not in names]
@@ -112,7 +114,7 @@ def parse_row(lineno: int, row: Dict[str, str]) -> ParsedRow:
     return ParsedRow(
         lineno=lineno,
         # 빈 id 는 "발급해 달라"는 뜻이므로 오류가 아니다. 값이 있으면 형식을 강제한다.
-        tx_id=validators.parse_tx_id(raw_id) if raw_id else None,
+        tx_id=TransactionId.parse(raw_id) if raw_id else None,
         type=validators.parse_type(row["type"]),
         date=validators.parse_date(row["date"]),
         amount=validators.parse_amount(row["amount"]),
@@ -154,8 +156,9 @@ def _to_row(tx: Transaction, include_id: bool) -> Dict[str, object]:
         "category": tx.category,
         "amount": tx.amount,
         "memo": tx.memo,
-        "tags": config.CSV_TAG_SEPARATOR.join(tx.tags),
+        "tags": domain_config.TAG_SEPARATOR.join(tx.tags),
     }
     if include_id:
-        row[config.CSV_ID_COLUMN] = tx.id
+        # 값 객체는 경계에서 원시 값으로 푼다 (CSV 셀은 문자열이어야 한다).
+        row[config.CSV_ID_COLUMN] = tx.id.value
     return row
