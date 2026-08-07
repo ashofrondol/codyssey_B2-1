@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 from . import config
 
@@ -28,6 +28,20 @@ def backup_data_dir(data_dir: Path, now: Optional[datetime] = None) -> Path:
     ts = (now or datetime.now()).strftime(config.BACKUP_TS_FORMAT)
     dest = src.parent / f"{config.BACKUP_DIR_PREFIX}{ts}"
     dest.mkdir(parents=True, exist_ok=False)
-    for p in src.glob(config.BACKUP_GLOB):
+    for p in _files_to_copy(src):
         (dest / p.name).write_bytes(p.read_bytes())
     return dest
+
+
+def _files_to_copy(src: Path) -> Iterator[Path]:
+    """백업 대상 — ``*.jsonl`` 과, glob 에 걸리지 않지만 데이터인 파일들.
+
+    ``id_counter`` 를 빠뜨리면 백업을 복원했을 때 "발급한 적 있는 번호" 기록이
+    사라져 삭제된 id 재사용 버그가 되살아난다. 확장자가 없다는 이유로 데이터가
+    아닌 것은 아니다.
+    """
+    yield from src.glob(config.BACKUP_GLOB)
+    for name in config.BACKUP_EXTRA_FILES:
+        extra = src / name
+        if extra.is_file():
+            yield extra

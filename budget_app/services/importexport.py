@@ -200,6 +200,8 @@ class ImportExportService:
         줄어든다(완전한 제거는 저널이나 SQLite 가 필요하다).
         """
         fresh_categories = [Category(name=n) for n in batch.new_categories]
+        # 파일을 저장소 밖(UoW)에서 쓰므로 id 워터마크는 여기서 명시적으로 알린다.
+        self.txs.remember_ids(batch.transactions)
         with UnitOfWork() as uow:
             if fresh_categories:
                 uow.stage(self.cats, self.cats.plan_rewrite(_keep, extra=fresh_categories))

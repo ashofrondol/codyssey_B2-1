@@ -33,6 +33,7 @@ ID 형식을 바꾸려면 네 파일을 열어야 했다. 값 객체(Value Objec
 
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -47,16 +48,34 @@ _EXACT = re.compile(config.TX_ID_PATTERN)
 _SCAN = re.compile(config.TX_ID_SCAN_PATTERN)
 
 
-@dataclass(frozen=True, order=True)
+@functools.total_ordering
+@dataclass(frozen=True)
 class TransactionId:
-    """``TX-000001`` 형식의 거래 식별자.
+    """``TX-000001`` 형식의 거래 식별자 — 만들어지는 순간 **정규형**이 된다.
 
-    ``order=True`` 인 이유: ``stream_sorted`` 가 ``(date, id)`` 튜플로 정렬하는데,
-    날짜가 같은 거래가 둘 이상이면 튜플 비교가 id 까지 내려온다. ``__lt__`` 가 없으면
-    그 순간 ``TypeError`` 가 난다 — 날짜가 전부 다르면 드러나지 않는 잠재 버그다.
+    ## 정규화가 왜 필수인가
 
-    번호가 **0 으로 채워진 고정 폭**(``TX-000007``)이라 문자열 순서가 곧 숫자 순서다.
-    그래서 ``value`` 하나만 비교해도 정렬이 정확하다.
+    형식 검사만 하면 ``TX-1`` 과 ``TX-000001`` 이 **다른 값으로 공존**한다. 정규식
+    ``^TX-(\\d+)$`` 는 둘 다 통과시키기 때문이다. 그러면 같은 거래를 가리키는 두
+    표기가 서로 다른 dict 키·set 원소가 되고, 무엇보다:
+
+    - ``IdAllocator`` 의 ``taken`` 집합이 중복을 거르지 못해 같은 번호가 두 번 발급된다.
+    - ``get("TX-1")`` 이 ``TX-000001`` 을 찾지 못한다.
+    - 문자열 정렬이 자릿수 순서가 되어 ``TX-10`` 이 ``TX-9`` 앞에 온다.
+
+    그래서 ``__post_init__`` 이 번호를 뽑아 ``TX_ID_FORMAT`` 으로 **다시 찍는다**.
+    기존 파일의 비정규 id 도 읽는 순간 이 생성자를 지나므로 자동으로 치유된다.
+
+    ## 순서 비교는 번호로 한다
+
+    ``stream_sorted`` 가 ``(date, id)`` 튜플로 정렬하는데, 날짜가 같은 거래가 둘
+    이상이면 튜플 비교가 id 까지 내려온다. 비교 연산이 없으면 그 순간 ``TypeError``
+    가 난다 — 날짜가 전부 다르면 드러나지 않는 잠재 버그다.
+
+    ``dataclass(order=True)`` 대신 ``__lt__`` 를 직접 쓴 이유: 그쪽은 ``value``
+    문자열을 비교하는데, 그것이 숫자 순서와 일치하려면 "폭이 항상 같다"는 전제가
+    필요하다. 100만 건을 넘기면 ``TX-1000000``(7자리)이 ``TX-999999``(6자리)보다
+    **작다**고 판정된다. 번호로 비교하면 그 전제 자체가 사라진다.
     """
 
     value: str
@@ -64,9 +83,16 @@ class TransactionId:
     def __post_init__(self) -> None:
         # frozen dataclass 라 object.__setattr__ 로 정규화한다.
         v = str(self.value or "").strip()
-        if not _EXACT.match(v):
+        m = _EXACT.match(v)
+        if not m:
             raise ValidationError(messages.ERR_TX_ID_INVALID.format(value=v))
-        object.__setattr__(self, "value", v)
+        object.__setattr__(self, "value", config.TX_ID_FORMAT.format(int(m.group(1))))
+
+    def __lt__(self, other: Any) -> Any:
+        """번호 순서로 비교한다. ``total_ordering`` 이 나머지 셋을 채운다."""
+        if not isinstance(other, TransactionId):
+            return NotImplemented
+        return self.number < other.number
 
     # ---------- 생성 ----------
 

@@ -56,21 +56,39 @@ def parse_type(value: Any) -> str:
 
 
 def parse_date(value: Any) -> str:
+    """날짜를 검증하고 **정규형 ``YYYY-MM-DD`` 로 재직렬화**한다.
+
+    ``strptime`` 은 검증기이지 정규화기가 아니다 — ``"2024-1-5"`` 를 오류 없이
+    받아 준다. 검증만 하고 원문을 돌려주면 같은 날이 파일에 두 표기로 공존하고,
+    이 프로그램은 날짜를 **문자열로 비교**하므로(ISO 8601 이라 문자열 순서 = 날짜
+    순서라는 전제) 그 순간 전제가 깨진다::
+
+        "2024-1-5" <= "2024-01-31"   →   False
+
+    즉 1월 5일 거래가 1월 요약·검색·내보내기에서 조용히 사라진다. 그래서
+    ``strftime`` 으로 다시 찍어 **표기를 하나로 강제**한다. 기존 파일의 비정규
+    표기도 읽는 순간 ``__post_init__`` 을 다시 지나므로 자동으로 치유된다.
+    """
     v = str(value or "").strip()
     try:
-        datetime.strptime(v, config.DATE_FORMAT)
+        dt = datetime.strptime(v, config.DATE_FORMAT)
     except ValueError as exc:
         raise ValidationError(messages.ERR_DATE_INVALID) from exc
-    return v
+    return dt.strftime(config.DATE_FORMAT)
 
 
 def parse_month(value: Any) -> str:
+    """월을 검증하고 정규형 ``YYYY-MM`` 으로 재직렬화한다 — 이유는 ``parse_date`` 와 같다.
+
+    예산은 월 문자열이 **사실상 키**라 영향이 더 직접적이다. ``budget set --month
+    2024-1`` 로 넣은 값을 ``summary --month 2024-01`` 이 찾지 못했다.
+    """
     v = str(value or "").strip()
     try:
-        datetime.strptime(v, config.MONTH_FORMAT)
+        dt = datetime.strptime(v, config.MONTH_FORMAT)
     except ValueError as exc:
         raise ValidationError(messages.ERR_MONTH_INVALID) from exc
-    return v
+    return dt.strftime(config.MONTH_FORMAT)
 
 
 def parse_category(value: Any) -> str:

@@ -2,7 +2,7 @@
 
 여기 있는 것 셋:
 
-- ``_atomic_write_lines`` : 임시 파일 + fsync + ``os.replace``
+- ``atomic_write_lines``  : 임시 파일 + fsync + ``os.replace``
 - ``RawLine``             : 한 줄의 세 가지 상태(원문만 / dict 까지 / 객체까지)
 - ``JsonlStore``          : 열기·스트리밍·원자적 재작성 (제네릭)
 
@@ -70,8 +70,13 @@ def commit_staged(tmp: Path, target: Path) -> None:
     os.replace(tmp, target)
 
 
-def _atomic_write_lines(path: Path, lines: Iterable[str]) -> None:
-    """파일 하나를 원자적으로 교체한다 — 준비와 커밋을 연달아 수행."""
+def atomic_write_lines(path: Path, lines: Iterable[str]) -> None:
+    """파일 하나를 원자적으로 교체한다 — 준비와 커밋을 연달아 수행.
+
+    이름에 밑줄이 없는 이유: 같은 계층의 ``ids.IdWatermark`` 도 이 함수를 쓴다.
+    "JSONL 파일을 다루는 법"이 아니라 "파일 하나를 안전하게 갈아 끼우는 법"이라
+    저장소 계층의 공용 도구다.
+    """
     commit_staged(stage_lines(path, lines), path)
 
 
@@ -231,4 +236,4 @@ class JsonlStore(Generic[T]):
         extra: Iterable[T] = (),
     ) -> None:
         """파일 하나를 원자적으로 다시 쓴다 — 계산 후 곧바로 커밋."""
-        _atomic_write_lines(self.path, self.plan_rewrite(transform, extra=extra))
+        atomic_write_lines(self.path, self.plan_rewrite(transform, extra=extra))

@@ -20,7 +20,7 @@ from ..domain import tx_id as tx_id_module
 from ..domain import validators
 from ..domain.entities import Budget, Category, Transaction, TransactionPatch
 from ..domain.tx_id import TransactionId
-from .ids import IdAllocator
+from .ids import IdAllocator, IdWatermark
 from .jsonl import JsonlStore, RawLine
 
 
@@ -32,6 +32,7 @@ class TransactionRepository(JsonlStore[Transaction]):
 
     def __init__(self, data_dir: Path) -> None:
         super().__init__(Path(data_dir) / self.FILE_NAME)
+        self._watermark = IdWatermark(Path(data_dir) / config.ID_COUNTER_FILE_NAME)
 
     # ---------- ID ----------
 
@@ -62,13 +63,32 @@ class TransactionRepository(JsonlStore[Transaction]):
         return max_n, taken
 
     def id_allocator(self) -> IdAllocator:
-        """이 파일 상태에 맞춘 발급기를 만든다. 배치 작업은 이걸 한 번만 받아 쓴다."""
+        """이 파일 상태에 맞춘 발급기를 만든다. 배치 작업은 이걸 한 번만 받아 쓴다.
+
+        시작점이 **두 값의 최대**인 것이 핵심이다.
+
+        - 파일 스캔 최대값 — 지금 무엇이 있는가(삭제하면 줄어든다)
+        - 워터마크        — 무엇을 발급한 적이 있는가(줄어들지 않는다)
+
+        워터마크만 믿지 않는 이유: 파일이 손으로 편집되거나 다른 폴더에서 복사돼
+        올 수 있다. 스캔만 믿지 않는 이유는 ``IdWatermark`` 문서에 있다.
+        """
         max_n, taken = self.id_state()
-        return IdAllocator(start=max_n, taken=taken)
+        return IdAllocator(start=max(max_n, self._watermark.read()), taken=taken)
 
     def next_id(self) -> TransactionId:
         """단건 추가용 — 발급기를 한 번 쓰고 버린다."""
         return self.id_allocator().next()
+
+    def remember_ids(self, txs: Iterable[Transaction]) -> None:
+        """이 거래들의 번호를 워터마크에 반영한다.
+
+        저장소 밖에서 파일을 쓰는 경로(``UnitOfWork`` 커밋)를 위한 공개 지점이다.
+        ``append``/``append_many`` 는 스스로 부르므로 호출자가 신경 쓸 필요가 없다.
+        """
+        numbers = [tx.id.number for tx in txs]
+        if numbers:
+            self._watermark.remember(max(numbers))
 
     @staticmethod
     def _as_id(value: object) -> Optional[TransactionId]:
@@ -99,9 +119,21 @@ class TransactionRepository(JsonlStore[Transaction]):
         return None
 
     def category_in_use(self, name: str) -> bool:
-        return any(tx.category == name for tx in self.stream())
+        """저장된 카테고리는 정규형이므로 **묻는 쪽도 정규화**해야 판정이 맞는다."""
+        target = validators.parse_category(name)
+        return any(tx.category == target for tx in self.stream())
 
     # ---------- 쓰기 ----------
+
+    def append(self, tx: Transaction) -> None:
+        """한 건을 이어 쓰고 워터마크를 갱신한다.
+
+        워터마크를 **쓰기 전에** 올린다. 그래야 "발급된 번호는 어느 순간에도
+        기준선 아래로 내려가지 않는다"가 항상 성립한다. 쓰기가 실패하면 번호가
+        하나 건너뛰지만, 빈 번호는 아무 문제도 일으키지 않는다.
+        """
+        self._watermark.remember(tx.id.number)
+        super().append(tx)
 
     def append_many(self, txs: Iterable[Transaction], *, atomic: bool = False) -> int:
         """여러 거래를 추가하고 추가된 건수를 반환한다.
@@ -113,6 +145,7 @@ class TransactionRepository(JsonlStore[Transaction]):
           보존된다(``rewrite`` 가 원문을 유지하므로).
         """
         txs = list(txs)
+        self.remember_ids(txs)
         if not atomic:
             return self.append_all(txs)
         self.rewrite(lambda tx: tx, extra=txs)
@@ -162,19 +195,25 @@ class TransactionRepository(JsonlStore[Transaction]):
         return found
 
     def reassign_category(self, old: str, new: str) -> int:
-        """old → new 카테고리 일괄 재지정. 변경된 건수 반환."""
+        """old → new 카테고리 일괄 재지정. 변경된 건수 반환.
+
+        두 이름 모두 정규화한다. ``old`` 는 비교 대상이라(저장된 값은 정규형),
+        ``new`` 는 "바뀐 게 없는데 바뀌었다고 세는" 일을 막기 위해서다.
+        """
+        source = validators.parse_category(old)
+        destination = validators.parse_category(new)
         changed = 0
 
-        patch = TransactionPatch(category=new)
+        patch = TransactionPatch(category=destination)
 
         def _reassign(tx: Transaction) -> Transaction:
             nonlocal changed
-            if tx.category != old:
+            if tx.category != source:
                 return tx
             changed += 1
             return tx.with_patch(patch)
 
-        if not self.category_in_use(old):
+        if not self.category_in_use(source):
             return 0
         self.rewrite(_reassign)
         return changed
