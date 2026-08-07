@@ -21,6 +21,7 @@ from typing import Callable, Dict, List, Optional
 from . import config
 from ..context import AppContext
 from . import handlers, output, parser as parser_module
+from .error_handler import handle_errors
 
 
 Handler = Callable[[AppContext, argparse.Namespace], int]
@@ -58,17 +59,36 @@ def _silence_broken_pipe() -> None:
         pass
 
 
+@handle_errors
+def _dispatch(args: argparse.Namespace) -> int:
+    """컨텍스트를 조립하고 핸들러를 부른다 — **오류 방패 안에서**.
+
+    이 함수가 따로 있는 이유가 3-1 수정의 전부다. 이전에는 ``AppContext`` 생성과
+    ``prepare()`` 가 ``main`` 안, 즉 ``@handle_errors`` **밖**에 있었다. 그래서
+    ``--data-dir`` 에 파일 경로를 주면(오타 하나로 충분하다) ``mkdir`` 이
+    ``FileExistsError`` 를 던지고, 그것을 아무도 잡지 않아 **원시 트레이스백**과
+    종료 코드 1 로 끝났다. "사용자에게 스택트레이스를 노출하지 않는다", "입출력
+    문제는 3번" 이라는 두 정책이 동시에 깨지는 자리였다.
+
+    파일을 여는 코드가 방패 밖에 있으면 방패가 아니다. 그래서 저장소를 만지는
+    모든 경로를 한 함수로 모아 데코레이터를 한 번만 씌운다.
+
+    핸들러 각각에 붙어 있던 ``@handle_errors`` 는 이제 없앴다. 정책이 한 곳에서
+    적용되면 "핸들러를 추가할 때 데코레이터를 빠뜨리는" 실수 자체가 사라진다.
+    """
+    ctx = AppContext(Path(args.data_dir))
+    if args.needs_storage:
+        ctx.prepare()
+    return HANDLERS[args.handler](ctx, args)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
         # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info=True 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
         output.setup_logging(getattr(args, "debug", False))
-
-        ctx = AppContext(Path(args.data_dir))
-        if args.needs_storage:
-            ctx.prepare()
-        return HANDLERS[args.handler](ctx, args)
+        return _dispatch(args)
     except BrokenPipeError:
         # 예: `budget_app list | head` — head 가 먼저 닫음. 오류가 아니므로 조용히 종료.
         _silence_broken_pipe()

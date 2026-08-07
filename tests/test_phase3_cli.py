@@ -64,15 +64,17 @@ def test_data_dir_error_does_not_leak_traceback(tmp_path, capsys, monkeypatch):
 # ============================================================
 
 
-def test_list_limit_zero_is_rejected(txs, run):
+def test_list_limit_zero_never_reports_empty_data(txs, run, capsys):
     """``--limit 0`` 이 데이터가 있는데도 "(데이터 없음)" 을 출력하면 안 된다.
 
     프레젠터가 ``count == 0`` 하나로 "비었다"와 "잘라서 아무것도 안 냈다"를 같이
-    취급한다. 애초에 0/음수를 argparse 에서 막는 것이 맞다.
+    취급했다. 해결은 argparse 에서 0/음수를 거절하는 것이므로, 이 테스트는
+    "거짓 안내가 나오지 않는다"만 확인한다(거절 자체는 아래 테스트가 본다).
     """
     txs.append(_tx(1))
-    result = run("list", "--limit", "0")
-    assert "(데이터 없음)" not in result.out
+    with pytest.raises(SystemExit):
+        run("list", "--limit", "0")
+    assert "(데이터 없음)" not in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("bad", ["0", "-1"])
@@ -144,21 +146,25 @@ def test_update_patch_receives_list_not_string():
 # ============================================================
 
 
-def test_unexpected_exception_is_logged_at_error_level(caplog, run, monkeypatch):
-    """스택트레이스가 DEBUG 로만 남으면 기본 실행에서 증발한다 — 사후 분석 불가."""
-    import logging
+def test_unexpected_exception_leaves_a_stacktrace_without_debug_flag(run, monkeypatch):
+    """스택트레이스가 DEBUG 로만 남으면 **기본 실행에서 증발**한다 — 사후 분석 불가.
 
+    ``caplog`` 로 확인할 수 없다: ``setup_logging`` 이 ``basicConfig(force=True)`` 로
+    루트 핸들러를 갈아 끼우면서 pytest 가 꽂아 둔 핸들러까지 떼어 낸다. 그래서
+    실제 사용자가 보는 것과 같은 **stderr 내용**을 직접 확인한다(더 강한 검증이다).
+    """
     from budget_app.cli import handlers
 
     def _boom(*a, **kw):
         raise RuntimeError("의도적 폭발")
 
     monkeypatch.setattr(handlers.presenter, "category_lines", _boom)
-    with caplog.at_level(logging.ERROR):
-        result = run("category", "list")
+    result = run("category", "list")  # --debug 없이 실행
 
     assert result.code == cli_config.EXIT_ERROR
-    assert any(r.levelno >= logging.ERROR and r.exc_info for r in caplog.records)
+    assert "[오류]" in result.err          # 사용자용 한 줄 요약은 그대로
+    assert "Traceback" in result.err       # 원인 추적용 스택은 남는다
+    assert "RuntimeError" in result.err
 
 
 # ============================================================

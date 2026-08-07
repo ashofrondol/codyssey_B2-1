@@ -19,6 +19,7 @@ mkdir·touch·기본 카테고리 시딩까지 해서, 핸들러마다 컨텍스
 
 from __future__ import annotations
 
+import errno
 from pathlib import Path
 
 from .services.budgets import BudgetService
@@ -49,7 +50,23 @@ class AppContext:
 
     def prepare(self) -> None:
         """데이터 폴더와 파일을 준비한다 — 명령 실행 전 한 번만."""
+        self._require_usable_data_dir()
         self.txs.ensure_ready()
         self.budgets.ensure_ready()
         self.cats.ensure_ready()
         self.cats.seed_defaults()
+
+    def _require_usable_data_dir(self) -> None:
+        """``--data-dir`` 가 폴더가 아니면 **여기서** 원인을 말하고 멈춘다.
+
+        이 검사가 없으면 저 아래 ``mkdir`` 이 ``FileExistsError`` 를 던지고, 사용자는
+        "파일이 이미 있으므로 만들 수 없습니다" 라는 — 무엇을 잘못했는지 알 수 없는 —
+        메시지를 받는다. 오류는 **원인을 아는 자리**에서 만들어야 한다. 여기가
+        "이 경로는 데이터 폴더여야 한다"를 아는 유일한 자리다.
+
+        ``NotADirectoryError`` 를 쓰는 이유: 이것은 값 오류가 아니라 환경 상태
+        문제이므로 ``handle_errors`` 의 (3)번 부류로 흘러 종료 코드 3 이 된다.
+        ``AppError`` 로 던지면 4번이 되어 "대상 없음"과 같은 코드가 돼 버린다.
+        """
+        if self.data_dir.exists() and not self.data_dir.is_dir():
+            raise NotADirectoryError(errno.ENOTDIR, "not a directory", str(self.data_dir))

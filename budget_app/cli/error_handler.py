@@ -30,8 +30,8 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
     2. **입력 오류** — 사용자가 값을 고치면 해결된다.
        ``ValidationError`` / ``AppError``
     3. **환경 상태** — 프로그램 밖(파일·권한·디스크·인코딩)의 상태 문제.
-       ``FileNotFoundError`` / ``IsADirectoryError`` / ``PermissionError`` /
-       ``UnicodeDecodeError`` / ``OSError``
+       ``FileNotFoundError`` / ``IsADirectoryError`` / ``NotADirectoryError`` /
+       ``PermissionError`` / ``UnicodeDecodeError`` / ``OSError``
     4. **최후 방어선** — 위 어디에도 속하지 않는 버그.
        ``Exception`` — 사용자에겐 스택트레이스를 감추고 로그에만 남긴다.
 
@@ -83,6 +83,12 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
             output.err(messages.MSG_ERR_IS_A_DIR.format(name=exc.filename or exc))
             output.err(messages.HINT_IS_A_DIR)
             return config.EXIT_IO
+        except NotADirectoryError as exc:
+            # 주로 `--data-dir` 에 파일 경로를 준 경우. 아래 mkdir 까지 흘려보내면
+            # "파일이 이미 있으므로 만들 수 없습니다" 라는 원인 불명의 메시지가 된다.
+            output.err(messages.MSG_ERR_NOT_A_DIR.format(name=exc.filename or exc))
+            output.err(messages.HINT_NOT_A_DIR)
+            return config.EXIT_IO
         except PermissionError as exc:
             output.err(messages.MSG_ERR_PERMISSION.format(name=exc.filename or exc))
             output.err(messages.HINT_PERMISSION)
@@ -98,13 +104,19 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
             return config.EXIT_IO
 
         # ---------- (4) 최후 방어선 — 분류 밖의 버그 ----------
-        except Exception as exc:  # noqa: BLE001 — 사용자에게 스택트레이스를 노출하지 않기 위함
-            # 사용자에겐 한 줄 요약만, 원인 추적용 스택트레이스는 로그로 보존한다.
-            # 이 로그가 실제로 보이려면 output.setup_logging() 이 핸들러를 붙여야
-            # 하고, DEBUG 레벨은 `--debug`(또는 BUDGET_APP_DEBUG)로만 켜진다.
-            logger.debug(messages.LOG_UNHANDLED, exc_info=True)
+        except Exception as exc:  # noqa: BLE001 — 어떤 예외도 트레이스백으로 끝내지 않기 위함
+            # 사용자용 한 줄 요약을 먼저 내고, 그다음에 원인 추적용 기록을 남긴다.
             output.err(messages.MSG_ERR_UNEXPECTED.format(error=exc))
             output.err(messages.HINT_UNEXPECTED)
+            # ERROR 인 이유: 이전에는 DEBUG 였고, 기본 로그 레벨이 WARNING 이라
+            # **기본 실행에서는 스택트레이스가 아무 데도 남지 않았다.** 여기까지 온
+            # 예외는 분류되지 않은 버그이고, 그 스택은 나중에 원인을 찾을 유일한
+            # 단서다. `--debug` 를 켜고 재현할 수 있는 상황이 아닐 수도 있다.
+            #
+            # 트레이스백이 화면에 보이게 되는 것은 감수한다. 이 자리는 "프로그램이
+            # 예상하지 못한 상태"이고, 그때는 감추는 것보다 신고할 수 있게 하는 편이
+            # 낫다 — 앞선 세 부류(사용자가 고칠 수 있는 오류)는 여전히 한 줄로 끝난다.
+            logger.exception(messages.LOG_UNHANDLED)
             return config.EXIT_ERROR
 
     return wrapper
