@@ -7,14 +7,14 @@
 
 from __future__ import annotations
 
-from typing import Iterator, List, Optional
+from collections.abc import Iterator
 
-from . import messages
 from ..decorators import log_call
 from ..domain.entities import Transaction, TransactionPatch
 from ..domain.queries import SearchFilter
 from ..errors import AppError
 from ..storage.repositories import CategoryStore, TransactionRepository
+from . import messages
 
 
 class TransactionService:
@@ -32,7 +32,7 @@ class TransactionService:
         category: str,
         amount: int,
         memo: str = "",
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> Transaction:
         self._require_registered_category(category, hint=messages.HINT_CATEGORY_ADD_OR_LIST)
         # 검증·정규화는 Transaction.__post_init__ 이 일괄 수행한다(생성자가 유일한
@@ -61,7 +61,9 @@ class TransactionService:
 
         current = self.txs.get(tx_id)
         if current is None:
-            raise AppError(messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id), hint=messages.HINT_LIST_ID)
+            raise AppError(
+                messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id), hint=messages.HINT_LIST_ID
+            )
 
         updated = current.with_patch(patch)
         self.txs.replace(tx_id, updated)
@@ -70,9 +72,11 @@ class TransactionService:
     @log_call
     def delete(self, tx_id: str) -> None:
         if not self.txs.delete(tx_id):
-            raise AppError(messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id), hint=messages.HINT_LIST_ID)
+            raise AppError(
+                messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id), hint=messages.HINT_LIST_ID
+            )
 
-    def stream_sorted(self, flt: Optional[SearchFilter] = None) -> Iterator[Transaction]:
+    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
         """최신순 정렬된 거래를 yield 한다.
 
         주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).

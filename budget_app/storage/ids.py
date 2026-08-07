@@ -13,8 +13,8 @@ ID 의 *형식* 은 도메인 값 객체(``domain.tx_id.TransactionId``)가 알�
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional, Set
 
 from ..domain.tx_id import TransactionId
 from . import config, messages
@@ -90,9 +90,9 @@ class IdAllocator:
     "자동 발급 번호가 나중에 그 id 와 부딪치지 않는다"를 보장해야 한다.
     """
 
-    def __init__(self, start: int = 0, taken: Optional[Iterable[TransactionId]] = None) -> None:
+    def __init__(self, start: int = 0, taken: Iterable[TransactionId] | None = None) -> None:
         self._counter = start
-        self._taken: Set[TransactionId] = set(taken or ())
+        self._taken: set[TransactionId] = set(taken or ())
 
     def is_taken(self, tx_id: TransactionId) -> bool:
         return tx_id in self._taken

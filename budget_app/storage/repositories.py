@@ -12,14 +12,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Tuple
 
-from . import config
 from ..domain import tx_id as tx_id_module
 from ..domain import validators
 from ..domain.entities import Budget, Category, Transaction, TransactionPatch
 from ..domain.tx_id import TransactionId
+from . import config
 from .ids import IdAllocator, IdWatermark
 from .jsonl import JsonlStore, RawLine
 
@@ -37,7 +37,7 @@ class TransactionRepository(JsonlStore[Transaction]):
     # ---------- ID ----------
 
     @staticmethod
-    def _scan_id(raw: RawLine) -> Optional[TransactionId]:
+    def _scan_id(raw: RawLine) -> TransactionId | None:
         """한 줄에서 거래 id 를 최대한 건져낸다.
 
         검증에 실패한 줄에도 id 는 들어 있을 수 있고, 그 번호는 **이미 쓰인 번호**다.
@@ -50,10 +50,10 @@ class TransactionRepository(JsonlStore[Transaction]):
                 return TransactionId(candidate.strip())
         return TransactionId.scan(raw.text)
 
-    def id_state(self) -> Tuple[int, Set[TransactionId]]:
+    def id_state(self) -> tuple[int, set[TransactionId]]:
         """(최대 번호, 사용 중인 id 집합) — 파일을 한 번만 훑는다."""
         max_n = 0
-        taken: Set[TransactionId] = set()
+        taken: set[TransactionId] = set()
         for raw in self.iter_raw():
             found = self._scan_id(raw)
             if found is None:
@@ -91,7 +91,7 @@ class TransactionRepository(JsonlStore[Transaction]):
             self._watermark.remember(max(numbers))
 
     @staticmethod
-    def _as_id(value: object) -> Optional[TransactionId]:
+    def _as_id(value: object) -> TransactionId | None:
         """조회 인자를 값 객체로 정규화한다 — 형식이 아니면 ``None``.
 
         예외를 던지지 않는 이유: "형식이 틀린 id 로 조회"는 **찾지 못한 것**과 같다.
@@ -109,7 +109,7 @@ class TransactionRepository(JsonlStore[Transaction]):
 
     # ---------- 조회 ----------
 
-    def get(self, tx_id: object) -> Optional[Transaction]:
+    def get(self, tx_id: object) -> Transaction | None:
         target = self._as_id(tx_id)
         if target is None:
             return None
@@ -160,7 +160,7 @@ class TransactionRepository(JsonlStore[Transaction]):
             return False
         found = False
 
-        def _drop(tx: Transaction) -> Optional[Transaction]:
+        def _drop(tx: Transaction) -> Transaction | None:
             nonlocal found
             if tx.id == target:
                 found = True
@@ -234,10 +234,10 @@ class CategoryStore(JsonlStore[Category]):
             return 0
         return self.append_all(Category(name=name) for name in config.DEFAULT_CATEGORIES)
 
-    def list_names(self) -> List[str]:
+    def list_names(self) -> list[str]:
         return [c.name for c in self.stream()]
 
-    def name_set(self) -> Set[str]:
+    def name_set(self) -> set[str]:
         """존재 확인을 반복할 때 쓰는 스냅숏 — 매번 파일을 훑지 않기 위해."""
         return {c.name for c in self.stream()}
 
@@ -256,7 +256,7 @@ class CategoryStore(JsonlStore[Category]):
     def add_many(self, names: Iterable[str]) -> int:
         """여러 이름을 한 번에 추가한다 — 존재 확인을 위해 파일을 한 번만 훑는다."""
         known = self.name_set()
-        fresh: List[Category] = []
+        fresh: list[Category] = []
         for name in names:
             cat = Category(name=name)
             if cat.name in known:
@@ -269,7 +269,7 @@ class CategoryStore(JsonlStore[Category]):
         target = validators.parse_category(name)
         found = False
 
-        def _drop(cat: Category) -> Optional[Category]:
+        def _drop(cat: Category) -> Category | None:
             nonlocal found
             if cat.name == target:
                 found = True
@@ -289,9 +289,9 @@ class BudgetStore(JsonlStore[Budget]):
     def __init__(self, data_dir: Path) -> None:
         super().__init__(Path(data_dir) / self.FILE_NAME)
 
-    def get(self, month: str) -> Optional[Budget]:
+    def get(self, month: str) -> Budget | None:
         target = validators.parse_month(month)
-        result: Optional[Budget] = None
+        result: Budget | None = None
         for b in self.stream():
             if b.month == target:
                 result = b  # 같은 월의 마지막 값을 유효값으로 본다
@@ -301,7 +301,7 @@ class BudgetStore(JsonlStore[Budget]):
         budget = Budget(month=month, amount=amount)
 
         # month 별 단일 값 유지 — 같은 달의 기존 항목은 지우고 새 값을 끝에 붙인다.
-        def _drop_same_month(existing: Budget) -> Optional[Budget]:
+        def _drop_same_month(existing: Budget) -> Budget | None:
             return None if existing.month == budget.month else existing
 
         self.rewrite(_drop_same_month, extra=[budget])

@@ -7,14 +7,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Optional
 
 from . import config
 
 
-def backup_data_dir(data_dir: Path, now: Optional[datetime] = None) -> Path:
+def backup_data_dir(data_dir: Path, now: datetime | None = None) -> Path:
     """data 폴더의 모든 ``*.jsonl`` 을 타임스탬프 폴더로 복사한다.
 
     서비스가 아니라 저장소 계층에 있는 이유: 도메인 판단이 전혀 없고 데이터

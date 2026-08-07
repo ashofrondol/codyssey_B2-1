@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any
 
 from . import specs
 from .entities import Transaction
@@ -41,12 +41,12 @@ class SearchFilter:
     핸들러는 날짜를 미리 검증할 필요가 없다.
     """
 
-    date_from: Optional[str] = None  # YYYY-MM-DD
-    date_to: Optional[str] = None
-    category: Optional[str] = None
-    type: Optional[str] = None  # income/expense
-    query: Optional[str] = None  # memo 부분 일치
-    tag: Optional[str] = None
+    date_from: str | None = None  # YYYY-MM-DD
+    date_to: str | None = None
+    category: str | None = None
+    type: str | None = None  # income/expense
+    query: str | None = None  # memo 부분 일치
+    tag: str | None = None
 
     #: 조립된 명세 — 생성 시 한 번만 만든다(거래마다 다시 만들지 않는다)
     spec: specs.Spec = field(init=False, repr=False)
@@ -56,7 +56,7 @@ class SearchFilter:
 
     def _build_spec(self) -> specs.Spec:
         """지정된 조건만 골라 AND 로 잇는다. 하나도 없으면 ``Always``."""
-        parts: List[specs.Spec] = []
+        parts: list[specs.Spec] = []
         if self.date_from:
             parts.append(specs.DateFrom(self.date_from))
         if self.date_to:
@@ -72,7 +72,7 @@ class SearchFilter:
         return specs.And(*parts) if parts else specs.Always()
 
     @classmethod
-    def for_month(cls, month: str, **extra: Any) -> "SearchFilter":
+    def for_month(cls, month: str, **extra: Any) -> SearchFilter:
         """월 전체를 덮는 필터 — 요약과 내보내기가 같은 경계를 쓰게 한다."""
         start, end = month_range(month)
         return cls(date_from=start, date_to=end, **extra)

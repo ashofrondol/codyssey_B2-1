@@ -69,7 +69,9 @@ ERR_ARG_NOT_INT = "정수여야 합니다: {value}"
 ERR_ARG_NOT_POSITIVE = "1 이상이어야 합니다: {value}"
 ERR_NAME_REQUIRED = "--name 이 필요합니다."
 HINT_CATEGORY_REMOVE = "`category remove --name <카테고리>`"
-MSG_CATEGORY_REMOVED_REASSIGNED = "[완료] '{name}' 삭제, {count}건을 '{replace_with}' 로 재지정했습니다."
+MSG_CATEGORY_REMOVED_REASSIGNED = (
+    "[완료] '{name}' 삭제, {count}건을 '{replace_with}' 로 재지정했습니다."
+)
 MSG_CATEGORY_REMOVED = "[완료] '{name}' 삭제"
 
 # update / delete
@@ -80,16 +82,22 @@ MSG_DELETED_TX = "[삭제 완료] id={id}"
 
 # export / import
 ERR_EXPORT_PERIOD_REQUIRED = "--month 또는 --from/--to 중 하나는 필수입니다."
-ERR_EXPORT_PERIOD_CONFLICT = "--month 와 --from/--to 는 함께 쓸 수 없습니다 (기간 정의가 둘이 됩니다)."
+ERR_EXPORT_PERIOD_CONFLICT = (
+    "--month 와 --from/--to 는 함께 쓸 수 없습니다 (기간 정의가 둘이 됩니다)."
+)
 HINT_EXPORT_PERIOD = "예: `export --out a.csv --month 2024-01`"
 MSG_EXPORT_DONE = "[완료] {out} ({count} records)"
 MODE_ATOMIC = "원자(전수 롤백)"
 MODE_PARTIAL = "부분 성공"
-MSG_IMPORT_DONE = "[완료] mode={mode}, imported={imported}, duplicated={duplicated}, skipped={skipped}"
+MSG_IMPORT_DONE = (
+    "[완료] mode={mode}, imported={imported}, duplicated={duplicated}, skipped={skipped}"
+)
 MSG_IMPORT_ERROR_HEADER = "[오류 라인 일부]"
 FMT_IMPORT_ERROR_ITEM = "  - line {lineno}: {reason}"
 FMT_IMPORT_DUPLICATE_ITEM = "  - line {lineno}: 중복 id {tx_id} — 건너뜀"
-MSG_IMPORT_DUPLICATE_HINT = "[힌트] 중복은 이미 저장된 거래입니다. 다시 넣으려면 `--on-duplicate new-id` 를 쓰세요."
+MSG_IMPORT_DUPLICATE_HINT = (
+    "[힌트] 중복은 이미 저장된 거래입니다. 다시 넣으려면 `--on-duplicate new-id` 를 쓰세요."
+)
 
 # backup
 MSG_BACKUP_DONE = "[백업 완료] {dest}"

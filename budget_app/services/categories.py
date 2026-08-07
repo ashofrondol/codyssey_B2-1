@@ -6,12 +6,10 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
-
-from . import messages
 from ..domain import validators
 from ..errors import AppError
 from ..storage.repositories import CategoryStore, TransactionRepository
+from . import messages
 
 
 class CategoryService:
@@ -24,7 +22,7 @@ class CategoryService:
     def add(self, name: str) -> bool:
         return self.cats.add(name)
 
-    def list_names(self) -> List[str]:
+    def list_names(self) -> list[str]:
         return self.cats.list_names()
 
     def exists(self, name: str) -> bool:
@@ -37,7 +35,7 @@ class CategoryService:
         """
         return self.cats.exists(name)
 
-    def remove(self, name: str, replace_with: Optional[str] = None) -> int:
+    def remove(self, name: str, replace_with: str | None = None) -> int:
         """카테고리 삭제. 사용 중이라면:
 
         - ``replace_with`` 지정 시 → 해당 카테고리로 일괄 재지정 후 삭제
@@ -74,7 +72,7 @@ class CategoryService:
         self.cats.remove(target)
         return reassigned
 
-    def _reassign_before_remove(self, name: str, replace_with: Optional[str]) -> int:
+    def _reassign_before_remove(self, name: str, replace_with: str | None) -> int:
         """두 인자는 **이미 정규화된 값**이어야 한다(``remove`` 가 책임진다)."""
         if not replace_with:
             raise AppError(

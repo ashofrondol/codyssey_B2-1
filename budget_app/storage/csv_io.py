@@ -24,16 +24,16 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional
 
-from . import config, messages
 from ..domain import config as domain_config
 from ..domain import validators
 from ..domain.entities import Transaction
 from ..domain.tx_id import TransactionId
 from ..errors import AppError
+from . import config, messages
 
 
 @dataclass(frozen=True)
@@ -44,14 +44,13 @@ class ParsedRow:
     만들 수 없다. 그 마지막 한 조각을 채우는 것은 중복 정책을 아는 서비스의 몫이다.
     """
 
-    lineno: int
-    tx_id: Optional[TransactionId]
+    tx_id: TransactionId | None
     type: str
     date: str
     amount: int
     category: str
     memo: str
-    tags: List[str]
+    tags: list[str]
 
     def to_transaction(self, tx_id: TransactionId) -> Transaction:
         return Transaction(
@@ -70,7 +69,7 @@ class ParsedRow:
 # ============================================================
 
 
-def read_rows(path: Path) -> Iterator[tuple[int, Dict[str, str]]]:
+def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
     """CSV 를 읽어 ``(줄번호, 원시 dict)`` 를 yield 한다.
 
     헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며
@@ -83,11 +82,12 @@ def read_rows(path: Path) -> Iterator[tuple[int, Dict[str, str]]]:
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
         _check_header(path, reader.fieldnames)
-        for lineno, row in enumerate(reader, start=config.CSV_DATA_START_LINE):
-            yield lineno, row
+        # ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,
+        # 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
+        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
 
 
-def _check_header(path: Path, fieldnames: Optional[Iterable[str]]) -> None:
+def _check_header(path: Path, fieldnames: Iterable[str] | None) -> None:
     names = list(fieldnames or [])
     if not names:
         raise AppError(
@@ -104,7 +104,7 @@ def _check_header(path: Path, fieldnames: Optional[Iterable[str]]) -> None:
         )
 
 
-def parse_row(lineno: int, row: Dict[str, str]) -> ParsedRow:
+def parse_row(row: dict[str, str]) -> ParsedRow:
     """원시 CSV 행을 검증한다 — 실패 시 ``ValidationError``.
 
     필드 규칙은 ``validators`` 를 그대로 쓴다. CSV 경로라고 해서 별도의 검증 코드를
@@ -112,7 +112,6 @@ def parse_row(lineno: int, row: Dict[str, str]) -> ParsedRow:
     """
     raw_id = (row.get(config.CSV_ID_COLUMN) or "").strip()
     return ParsedRow(
-        lineno=lineno,
         # 빈 id 는 "발급해 달라"는 뜻이므로 오류가 아니다. 값이 있으면 형식을 강제한다.
         tx_id=TransactionId.parse(raw_id) if raw_id else None,
         type=validators.parse_type(row["type"]),
@@ -149,8 +148,8 @@ def write_transactions(path: Path, txs: Iterable[Transaction], *, include_id: bo
     return count
 
 
-def _to_row(tx: Transaction, include_id: bool) -> Dict[str, object]:
-    row: Dict[str, object] = {
+def _to_row(tx: Transaction, include_id: bool) -> dict[str, object]:
+    row: dict[str, object] = {
         "date": tx.date,
         "type": tx.type,
         "category": tx.category,

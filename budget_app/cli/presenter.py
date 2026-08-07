@@ -17,12 +17,11 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Iterator, List, Optional, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 
 from ..domain.entities import Transaction
 from ..domain.results import ImportReport, MonthlySummary
 from . import messages
-
 
 # ============================================================
 # 거래 표
@@ -40,7 +39,7 @@ def tx_line(tx: Transaction) -> str:
     )
 
 
-def tx_table(rows: Iterable[Transaction], limit: Optional[int] = None) -> Iterator[str]:
+def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
     """거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.
 
     제너레이터인 이유: 상류(``stream_sorted``)가 제너레이터이므로 여기서 리스트로
@@ -116,7 +115,7 @@ def import_result_line(report: ImportReport, mode: str) -> str:
     )
 
 
-def import_problem_lines(report: ImportReport) -> List[str]:
+def import_problem_lines(report: ImportReport) -> list[str]:
     """건너뛴 줄의 사유 — 결과가 아니라 진단이므로 호출자가 stderr 로 보낸다.
 
     오류와 중복을 따로 보여 준다. 사용자가 해야 할 일이 다르기 때문이다
@@ -126,7 +125,7 @@ def import_problem_lines(report: ImportReport) -> List[str]:
     완성해 넘겼다. 지금 서비스가 넘기는 것은 ``(줄번호, 사유)`` 뿐이고, 그것을
     어떤 문장으로 보여 줄지는 화면의 결정이다.
     """
-    lines: List[str] = []
+    lines: list[str] = []
     if report.errors:
         lines.append(messages.MSG_IMPORT_ERROR_HEADER)
         lines.extend(

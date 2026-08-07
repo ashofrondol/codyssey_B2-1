@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import Callable
+from collections.abc import Callable
 
-from . import config, messages
 from ..errors import AppError, ValidationError
-from . import output
+from . import config, messages, output
 
 logger = logging.getLogger(config.LOGGER_NAME)
 

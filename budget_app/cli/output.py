@@ -22,7 +22,7 @@
 이전에는 stdout 쪽에 래퍼를 두지 않았다. "``print()`` 가 이미 stdout 이 기본이니
 관례에서 벗어나는 쪽에만 이름을 붙인다"는 논리였는데, 그 결과 **이 모듈의 첫 줄이
 선언한 규칙("채널은 여기서만 정한다")이 실제로는 지켜지지 않았다.** 결과 출력
-``print()`` 26곳이 ``cli.py`` 에 흩어져 있었기 때문이다.
+``print()`` 26곳이 분리 전의 단일 CLI 모듈에 흩어져 있었기 때문이다.
 
 지금은 두 채널 모두 이름이 있다. ``grep 'output\\.'`` 한 번이면 프로그램이 밖으로
 내보내는 모든 글자의 목록이 나오고, 테스트에서 채널을 갈아 끼우는 것도 한 곳에서
@@ -34,7 +34,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 from . import config, messages
 

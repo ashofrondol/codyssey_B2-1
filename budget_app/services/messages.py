@@ -7,7 +7,9 @@
 
 # 카테고리 / 거래
 ERR_CATEGORY_NOT_REGISTERED = "등록되지 않은 카테고리입니다: {name}"
-HINT_CATEGORY_ADD_OR_LIST = "`category add` 로 먼저 등록하거나 `category list` 로 목록을 확인하세요."
+HINT_CATEGORY_ADD_OR_LIST = (
+    "`category add` 로 먼저 등록하거나 `category list` 로 목록을 확인하세요."
+)
 HINT_CATEGORY_ADD = "`category add` 로 먼저 등록하세요."
 ERR_TX_NOT_FOUND = "해당 id 의 거래를 찾을 수 없습니다: {tx_id}"
 HINT_LIST_ID = "`list` 로 id 를 확인하세요."

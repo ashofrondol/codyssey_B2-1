@@ -67,7 +67,7 @@ argparse 옵션이라 어차피 CLI 를 고쳐야 하고, 그러면 위 표의 �
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from . import validators
 from .entities import Transaction
@@ -81,13 +81,13 @@ class Spec(ABC):
 
     # ---------- 조합 ----------
 
-    def __and__(self, other: "Spec") -> "Spec":
+    def __and__(self, other: Spec) -> Spec:
         return And(self, other)
 
-    def __or__(self, other: "Spec") -> "Spec":
+    def __or__(self, other: Spec) -> Spec:
         return Or(self, other)
 
-    def __invert__(self) -> "Spec":
+    def __invert__(self) -> Spec:
         return Not(self)
 
 

@@ -14,9 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
-from . import config, messages
 from ..domain.entities import Category, Transaction
 from ..domain.queries import SearchFilter
 from ..domain.results import DuplicateRow, ImportReport, RejectedRow
@@ -26,6 +24,7 @@ from ..storage import csv_io
 from ..storage.ids import IdAllocator
 from ..storage.repositories import CategoryStore, TransactionRepository
 from ..storage.unit_of_work import UnitOfWork
+from . import config, messages
 
 
 @dataclass
@@ -36,12 +35,12 @@ class _Batch:
     전에 모든 행의 판정이 끝나 있어야 "전혀 반영 안 됨"이 가능하다.
     """
 
-    transactions: List[Transaction] = field(default_factory=list)
-    new_categories: List[str] = field(default_factory=list)
+    transactions: list[Transaction] = field(default_factory=list)
+    new_categories: list[str] = field(default_factory=list)
     skipped: int = 0
     duplicated: int = 0
-    errors: List[RejectedRow] = field(default_factory=list)
-    duplicates: List[DuplicateRow] = field(default_factory=list)
+    errors: list[RejectedRow] = field(default_factory=list)
+    duplicates: list[DuplicateRow] = field(default_factory=list)
 
     def note_error(self, lineno: int, reason: object) -> None:
         """세는 것은 전부, 사유를 남기는 것은 앞의 몇 건만.
@@ -109,7 +108,7 @@ class ImportExportService:
 
         for lineno, row in csv_io.read_rows(in_path):
             try:
-                parsed = csv_io.parse_row(lineno, row)
+                parsed = csv_io.parse_row(row)
             except (ValidationError, KeyError) as exc:
                 if atomic:
                     # 전수 롤백: 준비 단계에서 즉시 중단, 파일은 손대지 않는다.
@@ -133,12 +132,12 @@ class ImportExportService:
 
     def _resolve_id(
         self,
-        csv_id: Optional[TransactionId],
+        csv_id: TransactionId | None,
         lineno: int,
         allocator: IdAllocator,
         on_duplicate: str,
         batch: _Batch,
-    ) -> Optional[TransactionId]:
+    ) -> TransactionId | None:
         """이 행이 쓸 id 를 정한다. ``None`` 이면 "이 행은 저장하지 않는다".
 
         ``allocator`` 가 이미 파일에 있는 id 와 **이번 CSV 에서 앞서 소비한 id** 를

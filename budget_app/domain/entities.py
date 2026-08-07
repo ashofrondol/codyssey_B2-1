@@ -14,11 +14,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from . import validators
 from .tx_id import TransactionId
-
 
 # ============================================================
 # 저장 엔티티
@@ -64,7 +63,7 @@ class Transaction:
     amount: int
     category: str
     memo: str = ""
-    tags: Tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         # TransactionId 를 받든 문자열을 받든 같은 결과가 되게 한다
@@ -79,10 +78,6 @@ class Transaction:
         _set(self, "category", validators.parse_category(self.category))
         _set(self, "memo", validators.parse_memo(self.memo))
         _set(self, "tags", tuple(validators.parse_tags(self.tags)))
-
-    @property
-    def id_number(self) -> int:
-        return self.id.number
 
     def to_dict(self) -> dict:
         """JSONL 한 줄이 될 dict.
@@ -102,7 +97,7 @@ class Transaction:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Transaction":
+    def from_dict(cls, data: dict) -> Transaction:
         # 필수 키는 하드 접근(누락 시 KeyError → 저장소가 손상 줄로 처리).
         # 검증·정규화는 __post_init__ 이 일괄 수행하므로 여기서는 형태만 넘긴다.
         return cls(
@@ -115,7 +110,7 @@ class Transaction:
             tags=data.get("tags"),
         )
 
-    def with_patch(self, patch: "TransactionPatch") -> "Transaction":
+    def with_patch(self, patch: TransactionPatch) -> Transaction:
         """부분 변경을 적용한 **새 Transaction** 을 만든다.
 
         수정이 도메인 연산인 이유: 이전에는 저장소가
@@ -139,16 +134,20 @@ class TransactionPatch:
     dataclass 로 바꾸면 오타가 ``TypeError`` 로 즉시 드러나고 타입체커도 잡는다.
     """
 
-    date: Optional[str] = None
-    type: Optional[str] = None
-    category: Optional[str] = None
-    amount: Optional[int] = None
-    memo: Optional[str] = None
-    tags: Optional[List[str]] = None
+    date: str | None = None
+    type: str | None = None
+    category: str | None = None
+    amount: int | None = None
+    memo: str | None = None
+    tags: list[str] | None = None
 
-    def changed_fields(self) -> Dict[str, Any]:
+    def changed_fields(self) -> dict[str, Any]:
         """``None`` 이 아닌 필드만 골라 dict 로 준다."""
-        return {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name) is not None}
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if getattr(self, f.name) is not None
+        }
 
     @property
     def is_empty(self) -> bool:
@@ -170,7 +169,7 @@ class Budget:
         return {"month": self.month, "amount": self.amount}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Budget":
+    def from_dict(cls, data: dict) -> Budget:
         return cls(month=data["month"], amount=data["amount"])
 
 
@@ -187,5 +186,5 @@ class Category:
         return {"name": self.name}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Category":
+    def from_dict(cls, data: dict) -> Category:
         return cls(name=data["name"])

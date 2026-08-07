@@ -11,10 +11,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from .entities import Budget
-
 
 # ============================================================
 # 결과 모델 (읽기 전용 계산 결과)
@@ -33,16 +31,16 @@ class MonthlySummary:
     month: str
     income: int
     expense: int
-    top_expense: Tuple[Tuple[str, int], ...]
+    top_expense: tuple[tuple[str, int], ...]
     has_data: bool
-    budget: Optional[Budget] = None
+    budget: Budget | None = None
 
     @property
     def balance(self) -> int:
         return self.income - self.expense
 
     @property
-    def usage_pct(self) -> Optional[float]:
+    def usage_pct(self) -> float | None:
         if self.budget is None or self.budget.amount <= 0:
             return None
         return round((self.expense / self.budget.amount) * 100, 1)
@@ -95,9 +93,5 @@ class ImportReport:
     imported: int = 0
     skipped: int = 0
     duplicated: int = 0
-    errors: Tuple[RejectedRow, ...] = ()
-    duplicates: Tuple[DuplicateRow, ...] = ()
-
-    @property
-    def has_problems(self) -> bool:
-        return bool(self.errors or self.duplicates)
+    errors: tuple[RejectedRow, ...] = ()
+    duplicates: tuple[DuplicateRow, ...] = ()

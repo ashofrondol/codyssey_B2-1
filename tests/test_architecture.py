@@ -17,20 +17,19 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Dict, List, Set
 
 import pytest
 
 PACKAGE = Path(__file__).resolve().parent.parent / "budget_app"
 
 #: 숫자가 작을수록 아래 계층. 같은 계층끼리는 허용한다.
-LAYERS: Dict[str, int] = {"domain": 0, "storage": 1, "services": 2, "cli": 3}
+LAYERS: dict[str, int] = {"domain": 0, "storage": 1, "services": 2, "cli": 3}
 
 #: 계층에 속하지 않는 루트 모듈 — 아무나 써도 되는 공용 어휘
 ROOT_MODULES = {"errors", "config", "decorators", "context", "__main__"}
 
 
-def _modules() -> List[Path]:
+def _modules() -> list[Path]:
     return sorted(p for p in PACKAGE.rglob("*.py") if "__pycache__" not in p.parts)
 
 
@@ -39,7 +38,7 @@ def _layer_of(path: Path) -> str:
     return rel.parts[0] if len(rel.parts) > 1 else "<root>"
 
 
-def _imported_layers(path: Path) -> Set[str]:
+def _imported_layers(path: Path) -> set[str]:
     """이 파일이 **패키지 안에서** 어느 계층을 import 하는지.
 
     상대 import 만 본다. ``from ..storage.repositories import X`` 는 level=2,
@@ -47,7 +46,7 @@ def _imported_layers(path: Path) -> Set[str]:
     ``from . import config`` 처럼 같은 패키지 안을 가리키는 것은 자기 계층이다.
     """
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: Set[str] = set()
+    found: set[str] = set()
     here = _layer_of(path)
     for node in ast.walk(tree):
         if not isinstance(node, ast.ImportFrom) or not node.level:

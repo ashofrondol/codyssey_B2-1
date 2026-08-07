@@ -3,11 +3,16 @@
 ## 왜 핸들러 함수 대신 문자열 키를 두는가
 
 이전에는 각 서브파서가 ``set_defaults(func=cmd_category)`` 로 **함수 객체**를 직접
-들고 있었다. 그러면 파서 정의와 핸들러 구현이 같은 파일에 있어야 하거나
-(``cli.py`` 512줄의 한 원인), 나누면 순환 import 가 생긴다.
+들고 있었다. 그러면 파서 정의와 핸들러 구현이 같은 파일에 있어야 한다(분리 전
+512줄짜리 CLI 모듈의 한 원인이었다).
+
+정직하게: 나누기만 하면 곧바로 순환이 생기는 것은 아니다. ``parser`` 가
+``handlers`` 를 import 하는 한 방향이면 순환이 아니다. 진짜 문제는 **방향이 생긴다**는
+것이다 — 문법을 고치려고 여는 파일이 핸들러 구현 전체를 끌고 들어오고, 핸들러가
+나중에 파서의 상수 하나라도 필요해지는 순간 순환이 된다.
 
 지금은 파서가 ``handler="category.add"`` 라는 **문자열 키**만 남기고, 키→함수 대응은
-``cli.py`` 의 레지스트리가 갖는다. 파서는 핸들러를 모르고 핸들러는 파서를 모른다.
+``app`` 의 레지스트리가 갖는다. 파서는 핸들러를 모르고 핸들러는 파서를 모른다.
 
 부수 효과로 죽은 코드가 사라졌다. 예전에는 ``category`` 의 세 하위 명령이 한
 핸들러로 들어와 ``if sub == "add" ... elif ...`` 로 갈라졌고, 맨 끝에 "알 수 없는
@@ -20,9 +25,9 @@ from __future__ import annotations
 
 import argparse
 
-from . import config, messages
-from ..services import config as services_config
 from ..domain import config as domain_config
+from ..services import config as services_config
+from . import config, messages
 
 DEBUG_HELP = "디버그 로그 활성화 — 예기치 못한 오류의 스택트레이스를 stderr 로 출력"
 
@@ -167,7 +172,9 @@ def _add_category(sub) -> None:
     p_remove = cat.add_parser("remove", help="카테고리 삭제")
     _add_shared_options(p_remove)
     p_remove.add_argument("--name", required=True, help="삭제할 카테고리")
-    p_remove.add_argument("--replace-with", dest="replace_with", help="사용 중일 때 대체할 카테고리")
+    p_remove.add_argument(
+        "--replace-with", dest="replace_with", help="사용 중일 때 대체할 카테고리"
+    )
     p_remove.set_defaults(handler="category.remove")
 
 

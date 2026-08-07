@@ -25,24 +25,46 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, List
+from typing import Any
 
-from . import config, messages
 from ..errors import ValidationError
+from . import config, messages
+
+#: 금액으로 받아들일 표기 — ``\d`` 가 아니라 ``[0-9]`` 인 것이 중요하다(아래 참조)
+_INTEGER = re.compile(r"^[+-]?[0-9]+$")
 
 
 def parse_amount(value: Any) -> int:
     """금액을 양의 정수로 검증·정규화한다.
 
-    ``int(str(value).strip())`` 인 이유: CSV 는 문자열 ``"1000"``, 대화형 입력도
-    문자열, argparse ``type=int`` 는 이미 int 로 온다. 세 경로를 한 규칙으로
-    받으려면 문자열로 정규화한 뒤 한 번에 파싱하는 편이 분기가 없다.
+    문자열을 거쳐 파싱하는 이유: CSV 는 문자열 ``"1000"``, 대화형 입력도 문자열,
+    argparse ``type=int`` 는 이미 int 로 온다. 세 경로를 한 규칙으로 받으려면
+    문자열로 정규화한 뒤 한 번에 파싱하는 편이 분기가 없다.
+
+    **``int()`` 에 곧바로 맡기지 않는 이유**: 그 함수는 검증기로 쓰기에는 너무
+    관대하다. 아래 셋을 전부 오류 없이 받아 준다.
+
+    ==============  =======  ==========================================
+    입력            ``int``  왜 문제인가
+    ==============  =======  ==========================================
+    ``"1_000"``     1000     파이썬 소스 문법이지 사용자가 친 금액이 아니다.
+                             오타 ``1_00`` 이 100 으로 조용히 통과한다.
+    ``"١٢٣"``       123      ``\\d`` 는 유니코드 숫자를 전부 포함한다. 저장된
+                             값과 화면에 보이는 글자가 달라진다.
+    ``"+100"``      100      부호를 붙인 표기가 CSV 마다 섞이면 왕복이 흔들린다.
+    ==============  =======  ==========================================
+
+    그래서 ``[0-9]`` 만으로 이뤄진 표기인지 먼저 본다. 부호는 통과시키되 값 검사
+    (``n <= 0``)에서 걸리게 두는데, 그래야 음수에 "정수가 아니다" 대신
+    "양수여야 한다"는 **맞는 이유**가 나간다.
     """
-    try:
-        n = int(str(value).strip())
-    except (TypeError, ValueError) as exc:
-        raise ValidationError(messages.ERR_AMOUNT_NOT_INT) from exc
+    text = str(value).strip()
+    if not _INTEGER.match(text):
+        raise ValidationError(messages.ERR_AMOUNT_NOT_INT)
+    n = int(text)
     if n <= 0:
         raise ValidationError(messages.ERR_AMOUNT_NOT_POSITIVE)
     return n
@@ -103,7 +125,7 @@ def parse_memo(value: Any) -> str:
     return str(value or "").strip()
 
 
-def parse_tags(value: Any) -> List[str]:
+def parse_tags(value: Any) -> list[str]:
     """리스트 또는 쉼표 구분 문자열을 태그 리스트로 정규화한다.
 
     빈 항목은 버린다(``"a,,b"`` → ``["a", "b"]``). 태그 없음은 오류가 아니다.
@@ -116,12 +138,24 @@ def parse_tags(value: Any) -> List[str]:
 
     **중복은 순서를 지키며 제거한다.** ``"a,b,a"`` → ``["a", "b"]``. 같은 태그가
     두 번 붙어 있으면 ``HasTag`` 판정은 같은데 표시만 지저분해진다.
+
+    입력은 세 모양으로 들어온다 — CSV/대화형의 **쉼표 문자열**, JSON 의 **리스트**,
+    그리고 엔티티가 이미 정규화해 둔 **튜플**(``Transaction.tags``). 앞의 둘만
+    처리하고 "리스트가 아니면 문자열" 로 떨어뜨리면, 튜플이 ``str(("a","b"))`` 로
+    찍혀 ``["('a'", "'b')"]`` 같은 것이 된다. 기본값 ``()`` 도 마찬가지로
+    ``["()"]`` 가 된다 — 오류 없이 데이터가 바뀌는 부류라 특히 위험하다.
+    그래서 **문자열만 나누고, 나머지 순회 가능한 것은 그대로** 받는다.
     """
     if value is None:
         return []
-    items = value if isinstance(value, list) else str(value).split(config.TAG_SEPARATOR)
+    if isinstance(value, str):
+        items: Iterable[Any] = value.split(config.TAG_SEPARATOR)
+    elif isinstance(value, Iterable):
+        items = value
+    else:
+        items = [value]
 
-    seen: List[str] = []
+    seen: list[str] = []
     for item in items:
         tag = str(item).strip()
         if not tag:

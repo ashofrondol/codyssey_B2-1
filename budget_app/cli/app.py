@@ -15,18 +15,17 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
 
-from . import config
 from ..context import AppContext
-from . import handlers, output, parser as parser_module
+from . import config, handlers, output
+from . import parser as parser_module
 from .error_handler import handle_errors
-
 
 Handler = Callable[[AppContext, argparse.Namespace], int]
 
-HANDLERS: Dict[str, Handler] = {
+HANDLERS: dict[str, Handler] = {
     "add": handlers.cmd_add,
     "list": handlers.cmd_list,
     "search": handlers.cmd_search,
@@ -82,7 +81,7 @@ def _dispatch(args: argparse.Namespace) -> int:
     return HANDLERS[args.handler](ctx, args)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
         # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가

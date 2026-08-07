@@ -15,7 +15,6 @@ from budget_app.errors import AppError
 from budget_app.services.budgets import BudgetService
 from budget_app.services.categories import CategoryService
 
-
 # ============================================================
 # 0-1. 날짜 정규화 — strptime 은 비패딩을 통과시킨다
 # ============================================================

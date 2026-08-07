@@ -36,10 +36,10 @@ from __future__ import annotations
 import functools
 import re
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
-from . import config, messages
 from ..errors import ValidationError
+from . import config, messages
 
 #: 전체가 이 형식이어야 한다 — 검증용
 _EXACT = re.compile(config.TX_ID_PATTERN)
@@ -97,17 +97,17 @@ class TransactionId:
     # ---------- 생성 ----------
 
     @classmethod
-    def of(cls, number: int) -> "TransactionId":
+    def of(cls, number: int) -> TransactionId:
         """번호로부터 만든다 — ``7`` → ``TX-000007``."""
         return cls(config.TX_ID_FORMAT.format(number))
 
     @classmethod
-    def parse(cls, value: Any) -> "TransactionId":
+    def parse(cls, value: Any) -> TransactionId:
         """검증하며 만든다. 실패는 ``ValidationError``."""
         return cls(str(value or "").strip())
 
     @classmethod
-    def scan(cls, raw_text: str) -> Optional["TransactionId"]:
+    def scan(cls, raw_text: str) -> TransactionId | None:
         """줄 원문에서 id 를 발굴한다 — 찾지 못하면 ``None``.
 
         JSON 파싱조차 실패한 줄에도 id 는 들어 있을 수 있고, 그 번호는 **이미 쓰인

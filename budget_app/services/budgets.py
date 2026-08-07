@@ -7,16 +7,14 @@
 
 from __future__ import annotations
 
-from typing import Dict
-
-from ..domain import config as domain_config
-from . import config
 from ..decorators import measure_time
+from ..domain import config as domain_config
 from ..domain import validators
 from ..domain.entities import Budget
 from ..domain.queries import SearchFilter
 from ..domain.results import MonthlySummary
 from ..storage.repositories import BudgetStore, TransactionRepository
+from . import config
 
 
 class BudgetService:
@@ -42,7 +40,7 @@ class BudgetService:
 
         income_total = 0
         expense_total = 0
-        per_category: Dict[str, int] = {}
+        per_category: dict[str, int] = {}
         has_data = False
 
         for tx in self.txs.stream():

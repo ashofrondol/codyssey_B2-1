@@ -22,9 +22,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterable, Iterator, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from ..errors import ValidationError
 from . import config, messages
@@ -101,9 +102,9 @@ class RawLine:
 
     lineno: int
     text: str
-    data: Optional[dict] = None
-    entity: Optional[Any] = None
-    error: Optional[str] = None
+    data: dict | None = None
+    entity: Any | None = None
+    error: str | None = None
 
     @property
     def is_valid(self) -> bool:
@@ -118,7 +119,7 @@ class RewritePlan:
     정보다. 나중에 다시 계산하려면 파일을 한 번 더 읽어야 한다.
     """
 
-    lines: List[str]
+    lines: list[str]
     changed: bool
 
 
@@ -216,7 +217,7 @@ class JsonlStore(Generic[T]):
         self._append_lines([self._encode(e) for e in entities])
         return len(entities)
 
-    def _append_lines(self, lines: List[str]) -> None:
+    def _append_lines(self, lines: list[str]) -> None:
         """줄을 파일 끝에 이어 쓴다 — 이어 쓰기의 두 가지 위험을 함께 막는다.
 
         1. **찢어진 꼬리**: 마지막 줄에 개행이 없는 파일(쓰다 만 흔적, 손으로 편집한
@@ -262,7 +263,7 @@ class JsonlStore(Generic[T]):
 
     def plan_rewrite(
         self,
-        transform: Callable[[T], Optional[T]],
+        transform: Callable[[T], T | None],
         *,
         extra: Iterable[T] = (),
     ) -> RewritePlan:
@@ -282,7 +283,7 @@ class JsonlStore(Generic[T]):
         ``exists()`` 로 확인하고, 정작 재작성은 해석된 엔티티만 훑었다.
         지금은 한 번 훑으면서 "바뀐 것이 있는가"를 같이 안다.
         """
-        lines: List[str] = []
+        lines: list[str] = []
         changed = False
         preserved = 0
         for raw in self.iter_raw():
@@ -311,7 +312,7 @@ class JsonlStore(Generic[T]):
 
     def rewrite(
         self,
-        transform: Callable[[T], Optional[T]],
+        transform: Callable[[T], T | None],
         *,
         extra: Iterable[T] = (),
     ) -> bool:

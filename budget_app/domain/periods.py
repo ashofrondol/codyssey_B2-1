@@ -13,13 +13,11 @@ from __future__ import annotations
 
 import calendar
 from datetime import datetime
-from typing import Tuple
 
-from . import config
-from . import validators
+from . import config, validators
 
 
-def month_range(month: str) -> Tuple[str, str]:
+def month_range(month: str) -> tuple[str, str]:
     """``'YYYY-MM'`` → ``('YYYY-MM-01', 'YYYY-MM-<그 달의 말일>')``.
 
     모든 달을 31일로 가정하면 2월·30일 달에서 범위가 어긋난다. ``calendar`` 로

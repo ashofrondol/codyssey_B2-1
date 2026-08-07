@@ -22,13 +22,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from . import config, messages
 from ..context import AppContext
 from ..domain import validators
 from ..domain.entities import TransactionPatch
 from ..domain.queries import SearchFilter
 from ..errors import AppError
-from . import output, presenter, prompts
+from . import config, messages, output, presenter, prompts
 
 
 def cmd_add(ctx: AppContext, args: argparse.Namespace) -> int:

@@ -51,9 +51,10 @@ rename 두 번 사이에 전원이 끊기면 여전히 한쪽만 반영될 수 �
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Callable, Iterable, List, Optional, Tuple, Type
+from typing import Any
 
 from . import config, messages
 from .jsonl import RewritePlan, commit_staged, stage_lines
@@ -84,14 +85,14 @@ class UnitOfWork:
     """
 
     def __init__(self) -> None:
-        self._staged: List[Tuple[Path, Path]] = []
+        self._staged: list[tuple[Path, Path]] = []
 
     # ---------- 준비 ----------
 
     def stage(
         self,
         store,
-        transform: Callable[[Any], Optional[Any]] = _keep,
+        transform: Callable[[Any], Any | None] = _keep,
         *,
         extra: Iterable[Any] = (),
     ) -> bool:
@@ -141,7 +142,7 @@ class UnitOfWork:
         이전에는 셋 다 하지 않았다. 예외가 ``__exit__`` 밖으로 나가면서 ``.tmp`` 가
         남고, 사용자는 "어느 파일이 반영됐는지" 알 방법이 없었다.
         """
-        done: List[str] = []
+        done: list[str] = []
         try:
             while self._staged:
                 tmp, target = self._staged[0]
@@ -165,14 +166,14 @@ class UnitOfWork:
 
     # ---------- 컨텍스트 매니저 ----------
 
-    def __enter__(self) -> "UnitOfWork":
+    def __enter__(self) -> UnitOfWork:
         return self
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
     ) -> None:
         if exc_type is None:
             self.commit()

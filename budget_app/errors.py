@@ -2,7 +2,7 @@
 
 왜 별도 모듈인가:
 
-리팩터 전에는 ``ValidationError`` 가 ``models.py``, ``AppError`` 가 ``decorators.py``
+리팩터 전에는 ``ValidationError`` 가 모델 모듈에, ``AppError`` 가 ``decorators.py``
 에 흩어져 있었다. 그래서 서비스 계층이 ``AppError`` 하나를 쓰려고 ``decorators`` 를
 import 했고, ``decorators`` 는 다시 출력 채널 모듈(``output``)을 import 했다.
 결과적으로 **서비스 계층이 프레젠테이션 모듈에 전이적으로 의존**하는 역류가 생겼다.
@@ -10,9 +10,11 @@ import 했고, ``decorators`` 는 다시 출력 채널 모듈(``output``)을 imp
 예외는 모든 계층이 공유하는 어휘이므로, 어느 계층에도 속하지 않는 이 모듈에 둔다.
 이제 의존 방향은 한 방향으로만 흐른다::
 
-    cli → services → repository → models → validators → errors
-                                                        ↑
-    decorators / output / presenter ────────────────────┘
+    cli → services → storage → domain → errors
+
+``decorators`` 와 ``context`` 도 계층에 속하지 않는 루트 모듈이라 같은 자리에 있다.
+이 방향은 ``tests/test_architecture.py`` 가 AST 로 매 실행 검증한다 — 문서에만 적힌
+의존 규칙은 다음 커밋에 조용히 깨진다.
 
 두 예외의 차이:
 

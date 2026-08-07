@@ -12,8 +12,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, List, Optional, TypeVar
+from typing import TypeVar
 
 from ..domain import validators
 from ..errors import AppError, ValidationError
@@ -45,7 +46,7 @@ class TransactionInput:
     category: str
     amount: int
     memo: str
-    tags: List[str]
+    tags: list[str]
 
 
 def ask(prompt: str) -> str:
@@ -120,7 +121,7 @@ def ask_transaction(cat_service: CategoryService) -> TransactionInput:
     )
 
 
-def ask_category_name(given: Optional[str]) -> str:
+def ask_category_name(given: str | None) -> str:
     """``--name`` 이 있으면 검증만, 없으면 물어본다."""
     if given is not None:
         return validators.parse_category(given)

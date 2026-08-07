@@ -51,6 +51,33 @@ def test_tags_are_immutable_too():
         tx.tags.append("b")
 
 
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        (None, ()),
+        ((), ()),                    # 기본값 — 튜플이다
+        (("a", "b"), ("a", "b")),    # 이미 정규화된 엔티티에서 되돌아온 값
+        (["a", "b"], ("a", "b")),    # JSON 에서 온 값
+        ("a,b", ("a", "b")),         # CSV/대화형에서 온 값
+    ],
+)
+def test_tags_accept_every_shape_they_arrive_in(given, expected):
+    """tags 를 튜플로 바꾸면서 생긴 구멍의 회귀.
+
+    ``parse_tags`` 가 "리스트가 아니면 문자열" 로 떨어뜨리고 있어서, 튜플이
+    ``str(("a","b"))`` 로 찍혀 ``["('a'", "'b')"]`` 가 됐다. 기본값 ``()`` 는
+    ``("()",)`` 가 됐다 — 오류가 나지 않아 테스트가 없으면 그대로 저장된다.
+    """
+    assert _tx(1, tags=given).tags == expected
+
+
+def test_default_transaction_has_no_tags():
+    """가장 흔한 생성 경로(태그 없음)가 조용히 쓰레기 태그를 만들지 않는다."""
+    tx = _tx(1)
+    assert tx.tags == ()
+    assert tx.to_dict()["tags"] == []
+
+
 def test_transaction_is_hashable():
     """frozen 이 만들어 주는 __hash__ 는 필드가 전부 해시 가능해야 동작한다."""
     assert len({_tx(1), _tx(1), _tx(2)}) == 2
