@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08. 서비스 계층 — `services/` 패키지 — budget_app 학습 문서</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html" class="current"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
+<main>
+<h1 id="08-서비스-계층-services-패키지">08. 서비스 계층 — <code>services/</code> 패키지</h1>
+<p>저장소와 CLI 사이에서 <strong>판단</strong>만 담당하는 계층입니다. 이 패키지의 어느 파일에도 <code>open()</code> 도 <code>print()</code> 도 없습니다 — <code>grep -rn "open(" budget_app/services/</code> 의 유일한 결과는 <code>services/__init__.py:4</code> 의 docstring 한 줄이고 <code>print(</code> 는 0건입니다. 검색·요약·카테고리 보호·CSV 가져오기의 정책을 다룹니다.</p>
+<blockquote>
+<p><strong>난이도</strong>: 🟡 중급 ~ 🔴 고급</p>
+<p><strong>먼저 읽으면 좋은 문서</strong>: <a href="05-config-and-models.html">05. 설정·검증·모델</a>, <a href="07-repository.html">07. 저장소 계층</a></p>
+<p><strong>문법·표준 라이브러리 사전</strong>: 아래 🔎/⚙️ 노트는 <a href="12-syntax-and-stdlib.html">12. 문법과 표준 라이브러리</a>의 해당 절로 이어집니다.</p>
+</blockquote>
+<hr>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#1-계약-판단만-한다">1. 계약 — &quot;판단만 한다&quot;</a></li><li><a href="#2-transactionservice-거래-유스케이스">2. TransactionService — 거래 유스케이스</a></li><li><a href="#3-budgetservice-단일-패스-집계">3. BudgetService — 단일 패스 집계</a></li><li><a href="#4-categoryservice-사용-중-카테고리-보호">4. CategoryService — 사용 중 카테고리 보호</a></li><li><a href="#5-importexportservice-세-가지-정책">5. ImportExportService — 세 가지 정책</a></li><li><a href="#6-두-정책-축-실패와-중복은-독립이다">6. 두 정책 축 — 실패와 중복은 독립이다</a></li><li><a href="#7-정리-과제-방어용-요약">7. 정리 — 과제 방어용 요약</a></li></ul></details><h2 id="1-계약-판단만-한다">1. 계약 — "판단만 한다"</h2>
+<p>budget_app/services/<strong>init</strong>.py:1-15</p>
+<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;서비스 계층 — 유스케이스와 정책.</span>
+
+<span class="sd">저장소(파일 I/O)와 CLI(화면) 사이에서 **판단**만 담당한다. 이 패키지에는</span>
+<span class="sd">``open()`` 이 하나도 없다. 파일을 여는 일은 ``storage`` 가, 글자를 내는 일은</span>
+<span class="sd">``cli.presenter`` 가 한다.</span>
+
+<span class="sd">- ``transactions`` : 거래 추가·수정·삭제·정렬 조회</span>
+<span class="sd">- ``budgets``      : 예산 설정 + 월별 요약(단일 패스 집계)</span>
+<span class="sd">- ``categories``   : 카테고리 관리 + 참조 무결성 보호</span>
+<span class="sd">- ``importexport`` : CSV 가져오기/내보내기 정책 (실패 축 × 중복 축)</span>
+
+<span class="sd">**재수출하지 않는다** — ``from ..services.budgets import BudgetService`` 처럼 소유</span>
+<span class="sd">모듈을 명시한다. 서비스가 넷뿐이라 어느 파일에 있는지 외우기 어렵지 않고,</span>
+<span class="sd">import 문이 곧 &quot;이 모듈이 어느 유스케이스를 쓰는가&quot;의 목록이 된다.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+</code></pre></div>
+
+<p>docstring 이 나열하는 네 개의 유스케이스 서비스에, 폴더 단위 작업을 맡는 <code>BackupService</code> 가 하나 더 있습니다. 리팩터로 파일이 쪼개져서 <strong>클래스마다 소유 모듈이 다릅니다</strong> — 아래 표가 "어느 파일을 열어야 하는가"의 지도입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>클래스</th>
+<th>위치</th>
+<th>담당</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TransactionService</code></td>
+<td><code>services/transactions.py:20-91</code></td>
+<td>거래 추가/수정/삭제/조회</td>
+</tr>
+<tr>
+<td><code>BudgetService</code></td>
+<td><code>services/budgets.py:20-66</code></td>
+<td>예산 설정 + 월별 요약</td>
+</tr>
+<tr>
+<td><code>CategoryService</code></td>
+<td><code>services/categories.py:15-89</code></td>
+<td>카테고리 추가/조회/삭제 (사용 중 보호)</td>
+</tr>
+<tr>
+<td><code>ImportExportService</code></td>
+<td><code>services/importexport.py:61-206</code></td>
+<td>CSV 가져오기/내보내기 정책</td>
+</tr>
+<tr>
+<td><code>BackupService</code></td>
+<td><code>services/maintenance.py:29-37</code></td>
+<td>데이터 폴더 백업 (얇은 위임)</td>
+</tr>
+</tbody>
+</table></div>
+<p>여기에 준비 단계 누적 상태를 담는 <code>_Batch</code>(<code>services/importexport.py:30-58</code>)가 있습니다.</p>
+<p><strong>모든 서비스가 저장소를 생성자로 받습니다</strong> — 서비스가 <code>TransactionRepository</code> 를 스스로 만들지 않고 <code>__init__</code> 으로 건네받으므로, 테스트에서 가짜 저장소를 끼워 넣을 수 있습니다(의존성 주입 — <a href="04-architecture.html">04 §6</a>).</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — 위 인용은 <code>services/__init__.py</code> 즉 <strong>패키지 초기화 모듈</strong>입니다(<code>import budget_app.services.budgets</code> 는 파이썬이 <code>services/__init__.py</code> 를 먼저 실행하게 만들며, 여기 docstring 뿐이라는 사실이 곧 "어느 서비스를 쓰든 추가 비용이 없다"는 뜻입니다). 그리고 각 서비스가 쓰는 <code>from ..storage.repositories import CategoryStore</code> 의 점 두 개는 <strong>명시적 상대 import</strong>(PEP 328)로, 파이썬 3 에서 <code>import repositories</code> 식의 암묵적 상대 import 가 사라지면서 남은 유일한 상대 표기입니다. 점의 개수가 곧 올라갈 단계라서(<code>.</code> = <code>services</code>, <code>..</code> = <code>budget_app</code>), <code>from . import config, messages</code> 는 <strong>서비스 계층의</strong> config 를 가리키지 루트 <code>budget_app/config.py</code> 가 아닙니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<hr>
+<h2 id="2-transactionservice-거래-유스케이스">2. <code>TransactionService</code> — 거래 유스케이스</h2>
+<h3 id="21-add-서비스가-판단하는-것은-하나뿐">2.1 <code>add</code> — 서비스가 판단하는 것은 하나뿐</h3>
+<p>budget_app/services/transactions.py:27-35</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@log_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">date</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">type_</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">amount</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">memo</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">tags</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>list[str] | None</code> 에는 두 개의 새 문법이 겹쳐 있습니다. 내장 타입을 바로 첨자로 쓰는 <code>list[str]</code> 는 PEP 585(파이썬 3.9)가 <code>typing.List[str]</code> 를 대신하게 한 것이고, <code>A | None</code> 은 PEP 604(파이썬 3.10)가 <code>Optional[str]</code> 를 대신하게 한 것입니다. 예전 표기로 쓰면 <code>from typing import List, Optional</code> 뒤 <code>Optional[List[str]]</code> 입니다. 파일 맨 위 <code>from __future__ import annotations</code>(PEP 563)가 어노테이션을 <strong>평가하지 않고 문자열로 보관</strong>하므로, 이 표기는 런타임에 해석되지 않고 타입 검사기와 사람만 읽습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>⚙️ 내부 동작</strong> — 기본값 <code>memo: str = ""</code> 과 <code>tags: ... = None</code> 은 <strong>함수가 정의될 때 한 번</strong> 평가되어 함수 객체의 <code>__defaults__</code> 튜플에 박힙니다. 확인해 보면 <code>TransactionService.add.__wrapped__.__defaults__</code> → <code>('', None)</code> 입니다(<code>@log_call</code> 이 감싸고 있어 <code>__wrapped__</code> 를 거칩니다). 기본값이 호출마다 새로 만들어지지 않기 때문에 <code>tags: list[str] = []</code> 라고 썼다면 <strong>모든 호출이 같은 리스트 하나를 공유</strong>합니다. 그래서 <code>None</code> 을 기본값으로 두고 실제 빈 리스트 처리는 <code>Transaction</code> 쪽에 맡깁니다. 같은 함정을 dataclass 가 아예 <code>ValueError</code> 로 막는 사례는 아래 §5.7 에 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<p><strong>서비스가 판단하는 것은 "카테고리가 등록되어 있는가" 하나입니다.</strong> 날짜 형식·금액 부호 같은 필드 규칙은 <code>Transaction.__post_init__</code> 이 처리하므로 여기서 손대지 않습니다.</p>
+<p>이 구분이 <a href="05-config-and-models.html">05 §1.2</a>의 <code>ValidationError</code> vs <code>AppError</code> 와 정확히 대응합니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>판단</th>
+<th>필요한 것</th>
+<th>어디서</th>
+<th>예외</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"2024-13-45"</code> 는 날짜인가</td>
+<td>값 하나</td>
+<td><code>validators</code></td>
+<td><code>ValidationError</code></td>
+</tr>
+<tr>
+<td><code>"food"</code> 는 등록된 카테고리인가</td>
+<td><strong>저장된 상태</strong></td>
+<td>서비스</td>
+<td><code>AppError</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>budget_app/services/transactions.py:89-91</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_require_registered_category</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">ERR_CATEGORY_NOT_REGISTERED</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — 시그니처 가운데 홀로 선 <code>*</code> 는 <strong>키워드 전용 인자</strong> 표시입니다(PEP 3102, 파이썬 3.0). <code>*</code> 뒤의 이름은 위치로 넘길 수 없어서 <code>self._require_registered_category(category, messages.HINT_CATEGORY_ADD)</code> 는 <code>TypeError: ... takes 2 positional arguments but 3 were given</code> 이 되고, 반드시 <code>hint=...</code> 라고 써야 합니다. 두 인자가 모두 <code>str</code> 이라 순서를 바꿔도 타입 검사에 걸리지 않는데, <code>*</code> 한 글자가 그 사고를 문법 차원에서 막습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<p><strong>⚙️ 내부 동작</strong> — <code>messages.ERR_CATEGORY_NOT_REGISTERED.format(name=name)</code> 의 <code>str.format</code> 은 PEP 3101 이 들여온 포맷 미니 언어입니다. 문자열을 훑어 <code>{name}</code> 같은 치환 필드를 찾고, 각 값에 대해 내장 <code>format(값, 스펙)</code> → 값의 <code>__format__</code> 을 호출한 결과를 이어 붙입니다. 문구는 <code>services/messages.py:9</code> 에 두고 값만 나중에 끼우는 이 구조 덕분에 <strong>문장은 messages 에, 값은 서비스에</strong> 남습니다 — f-문자열로 썼다면 문구와 값이 한 줄에 붙어 이 분리가 불가능합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<p><strong><code>hint</code> 를 인자로 받는 것</strong>이 작은 설계입니다. 같은 오류라도 문맥에 따라 안내가 달라야 합니다.</p>
+<ul>
+<li><code>add</code> 에서는 <code>HINT_CATEGORY_ADD_OR_LIST</code>("등록하거나 목록을 확인하세요")</li>
+<li><code>update</code> 에서는 <code>HINT_CATEGORY_ADD</code>("등록하세요")</li>
+</ul>
+<p><code>update</code> 를 하는 사용자는 이미 목록을 봤을 가능성이 높기 때문입니다.</p>
+<h3 id="22-update-조회-도메인-변환-저장">2.2 <code>update</code> — 조회 → 도메인 변환 → 저장</h3>
+<p>budget_app/services/transactions.py:52-70</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@log_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="n">TransactionPatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Transaction</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;부분 수정 — 도메인이 새 객체를 만들고, 저장소는 그것을 쓰기만 한다.</span>
+
+<span class="sd">        이전에는 저장소가 ``to_dict → dict.update → from_dict`` 로 변경을 해석했다.</span>
+<span class="sd">        지금 순서는 조회 → ``with_patch`` (도메인) → ``replace`` (저장)다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">patch</span><span class="o">.</span><span class="n">category</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_require_registered_category</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_CATEGORY_ADD</span><span class="p">)</span>
+
+        <span class="n">current</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tx_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">current</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">ERR_TX_NOT_FOUND</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tx_id</span><span class="o">=</span><span class="n">tx_id</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_LIST_ID</span>
+            <span class="p">)</span>
+
+        <span class="n">updated</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="n">with_patch</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tx_id</span><span class="p">,</span> <span class="n">updated</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">updated</span>
+</code></pre></div>
+
+<p><strong>세 단계가 각각 다른 계층의 일입니다.</strong></p>
+<div class="codehilite"><pre><span></span><code>1) self.txs.get(tx_id)          저장소  — 현재 상태 조회
+2) current.with_patch(patch)    도메인  — 변경 적용 + 불변식 재검증
+3) self.txs.replace(tx_id, ...) 저장소  — 완성품 저장
+</code></pre></div>
+
+<p>리팩터 전에는 1~3이 전부 <code>repository.update</code> 안에 있었습니다. 저장소가 도메인 변환을 수행한 것입니다(<a href="07-repository.html">07 §5.2</a>).</p>
+<p><strong>검사 순서도 의도적입니다.</strong> 카테고리 검사가 거래 조회보다 <strong>먼저</strong> 옵니다. 없는 카테고리로 없는 거래를 수정하려 하면 "카테고리가 등록되지 않았습니다"가 먼저 나오는데, 사용자가 고쳐야 할 것이 둘 다이므로 어느 쪽을 먼저 알려도 되지만 <strong>저장소 접근을 줄이는 쪽</strong>이 낫습니다.</p>
+<h3 id="23-delete-저장소의-bool-을-오류로-승격">2.3 <code>delete</code> — 저장소의 bool 을 오류로 승격</h3>
+<p>budget_app/services/transactions.py:72-76</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@log_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">tx_id</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">ERR_TX_NOT_FOUND</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tx_id</span><span class="o">=</span><span class="n">tx_id</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_LIST_ID</span>
+</code></pre></div>
+
+<p><strong>저장소는 "없었다"는 사실만 보고, 서비스가 그것을 "오류"로 판정합니다.</strong> 이 분리가 유용한 이유는 "id 가 없다"가 항상 오류인 것은 아니기 때문입니다 — 멱등 삭제를 추가한다면 저장소는 그대로 두고 서비스만 바꾸면 됩니다.</p>
+<h3 id="24-stream_sorted-정렬이-필요한-조회">2.4 <code>stream_sorted</code> — 정렬이 필요한 조회</h3>
+<p>budget_app/services/transactions.py:79-87</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">stream_sorted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flt</span><span class="p">:</span> <span class="n">SearchFilter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;최신순 정렬된 거래를 yield 한다.</span>
+
+<span class="sd">        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).</span>
+<span class="sd">        그러나 메모리 사용량은 &#39;필터 통과 항목&#39;으로 제한된다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">tx</span> <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">()</span> <span class="k">if</span> <span class="n">flt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">)]</span>
+        <span class="n">items</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">date</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">yield from</span> <span class="n">items</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — 세 줄에 세 시대의 문법이 있습니다. <code>[tx for tx in ... if ...]</code> 는 리스트 컴프리헨션(PEP 202, 파이썬 2.0)으로, <code>items = []</code> 뒤 <code>for</code>/<code>if</code>/<code>append</code> 세 줄을 한 식으로 접은 것입니다. <code>lambda t: (...)</code> 는 이름 없는 함수식이고, <code>yield from items</code>(PEP 380, 파이썬 3.3)는 이 자리에서는 <code>for v in items: yield v</code> 와 같습니다(PEP 380 이 더한 <code>send</code>·예외 위임 기능은 여기서 쓰이지 않습니다). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>⚙️ 내부 동작</strong> — 함수 몸통에 <code>yield</code> 가 있으므로 <code>stream_sorted(...)</code> 를 <strong>호출해도 한 줄도 실행되지 않습니다.</strong> 파이썬은 컴파일 시점에 이 함수를 제너레이터 함수로 표시하고, 호출은 제너레이터 객체만 돌려줍니다. 정렬은 호출자가 첫 항목을 꺼내는 순간(<code>for</code> 문의 첫 <code>__next__</code>)에야 시작됩니다. 그래서 "정렬 때문에 전체를 읽는다"는 비용도 실제로 결과를 소비할 때 발생합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>⚙️ 내부 동작</strong> — <code>items.sort(...)</code> 는 <code>sorted(items)</code> 와 달리 <strong>새 리스트를 만들지 않고 제자리에서</strong> 정렬하고 <code>None</code> 을 돌려줍니다. 방금 컴프리헨션으로 만든 리스트라 아무도 공유하지 않으므로 제자리 정렬이 안전하고 사본 하나를 아낍니다. <code>key</code> 함수는 비교할 때마다가 아니라 <strong>항목당 정확히 한 번</strong> 호출되어 결과가 따로 보관됩니다. 그리고 <code>(t.date, t.id)</code> 튜플 비교는 날짜가 같을 때 <code>t.id</code> 까지 내려가므로 <code>TransactionId</code> 에 순서 비교가 필요합니다 — 그래서 <code>domain/tx_id.py:51-52</code> 가 <code>@functools.total_ordering</code> + <code>@dataclass(frozen=True)</code> 로 <code>__lt__</code> 하나에서 나머지 비교 연산을 자동 생성해 둡니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<p><strong>정렬은 본질적으로 전체를 봐야 하는 연산</strong>입니다. 스트리밍의 예외이며, docstring 이 그 사실과 완화책(필터 통과분만 모음)을 명시합니다.</p>
+<p><code>list</code> 와 <code>search</code> 가 이 하나를 공유합니다 — <code>list</code> 는 <code>flt=None</code>, <code>search</code> 는 조건을 넘깁니다. 정렬 규칙(최신순)이 한 곳에만 있습니다.</p>
+<hr>
+<h2 id="3-budgetservice-단일-패스-집계">3. <code>BudgetService</code> — 단일 패스 집계</h2>
+<p>budget_app/services/budgets.py:30-66</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@measure_time</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">monthly_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">top_n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_TOP_N</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonthlySummary</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;월별 요약을 계산해 ``MonthlySummary`` 로 돌려준다.</span>
+
+<span class="sd">        &quot;이 달에 속하는가&quot;의 판정을 ``SearchFilter.for_month`` 에 위임한 것이 핵심이다.</span>
+<span class="sd">        이전에는 요약은 ``date.startswith(month + &quot;-&quot;)``, 내보내기는 CLI 가 계산한</span>
+<span class="sd">        말일 범위를 써서 **같은 개념이 두 알고리즘으로** 구현돼 있었다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_month</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+        <span class="n">flt</span> <span class="o">=</span> <span class="n">SearchFilter</span><span class="o">.</span><span class="n">for_month</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+
+        <span class="n">income_total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">expense_total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">per_category</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">has_data</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">has_data</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">tx</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">domain_config</span><span class="o">.</span><span class="n">TYPE_INCOME</span><span class="p">:</span>
+                <span class="n">income_total</span> <span class="o">+=</span> <span class="n">tx</span><span class="o">.</span><span class="n">amount</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">expense_total</span> <span class="o">+=</span> <span class="n">tx</span><span class="o">.</span><span class="n">amount</span>
+                <span class="n">per_category</span><span class="p">[</span><span class="n">tx</span><span class="o">.</span><span class="n">category</span><span class="p">]</span> <span class="o">=</span> <span class="n">per_category</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tx</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">tx</span><span class="o">.</span><span class="n">amount</span>
+
+        <span class="n">top_expense</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">sorted</span><span class="p">(</span><span class="n">per_category</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)[:</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">top_n</span><span class="p">)]</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">MonthlySummary</span><span class="p">(</span>
+            <span class="n">month</span><span class="o">=</span><span class="n">target</span><span class="p">,</span>
+            <span class="n">income</span><span class="o">=</span><span class="n">income_total</span><span class="p">,</span>
+            <span class="n">expense</span><span class="o">=</span><span class="n">expense_total</span><span class="p">,</span>
+            <span class="n">top_expense</span><span class="o">=</span><span class="n">top_expense</span><span class="p">,</span>
+            <span class="n">has_data</span><span class="o">=</span><span class="n">has_data</span><span class="p">,</span>
+            <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budgets</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">),</span>
+        <span class="p">)</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>per_category[tx.category] = per_category.get(tx.category, 0) + tx.amount</code> 는 "없으면 0부터"를 한 줄로 쓰는 표준 누적 관용구입니다. <code>dict.get(key, default)</code> 는 <code>dict[key]</code> 와 달리 키가 없어도 <code>KeyError</code> 를 던지지 않고 두 번째 인자를 돌려줍니다(내부적으로는 같은 해시 탐색을 하되 실패를 예외 대신 기본값으로 바꿉니다). 표준 라이브러리에는 같은 일을 하는 <code>collections.defaultdict(int)</code> 와 <code>collections.Counter</code> 가 있지만 <strong>이 소스는 둘 다 쓰지 않습니다.</strong> <code>defaultdict</code> 는 나중에 오타 난 키를 읽어도 조용히 0 을 만들어 버리고, <code>Counter</code> 는 "개수 세기"라는 이름이 "금액 합계"라는 실제 의미와 어긋납니다. 평범한 <code>dict</code> + <code>get</code> 이 의존성도 늘리지 않고 의미도 정확합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<p><strong>⚙️ 내부 동작</strong> — <code>sorted(per_category.items(), key=lambda kv: kv[1], reverse=True)</code> 에서 <code>dict.items()</code> 는 리스트가 아니라 <strong>뷰 객체</strong>(<code>dict_items</code>)로, 원본 dict 를 그대로 들여다봅니다. <code>sorted</code> 는 그것을 리스트로 받아 <strong>Timsort</strong> 로 정렬하는데 이 정렬은 <strong>안정(stable)</strong> 입니다 — 키가 같은 항목의 원래 순서가 보존되고, <code>reverse=True</code> 여도 보존됩니다(결과를 뒤집는 것이 아니라 비교 방향만 뒤집기 때문입니다). 실제로 확인하면:</p>
+<p>```</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>sorted([('a',5),('b',5),('c',9)], key=lambda kv: kv[1], reverse=True)
+[('c', 9), ('a', 5), ('b', 5)]
+sorted([('b',5),('a',5),('c',9)], key=lambda kv: kv[1], reverse=True)
+[('c', 9), ('b', 5), ('a', 5)]
+```</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<p>지출 금액이 같은 카테고리 둘의 순서는 곧 <strong>dict 의 삽입 순서</strong>, 즉 그 달에 먼저 등장한 거래의 카테고리 순서가 됩니다(파이썬 3.7부터 dict 는 삽입 순서를 유지합니다). 무작위가 아니라 "먼저 나온 쪽이 앞"이라는 뜻이고, 같은 파일을 두 번 요약하면 결과가 같습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<h3 id="31-단일-패스의-의미">3.1 단일 패스의 의미</h3>
+<p>파일을 <strong>한 번만</strong> 순회하며 네 가지를 동시에 누적합니다.</p>
+<div class="codehilite"><pre><span></span><code>for tx in stream():        ← 파일 1회 순회
+    ├─ has_data            (이 달에 거래가 있는가)
+    ├─ income_total        (수입 합계)
+    ├─ expense_total       (지출 합계)
+    └─ per_category[...]   (카테고리별 지출)
+</code></pre></div>
+
+<p>각각 따로 구했다면 파일을 4번 읽어야 합니다.</p>
+<h3 id="32-파생값을-계산하지-않습니다">3.2 파생값을 계산하지 않습니다</h3>
+<p><code>balance</code>, <code>usage_pct</code>, <code>over_budget</code> 이 이 함수에 없습니다. 전부 <code>MonthlySummary</code> 의 <code>@property</code> 입니다(<a href="05-config-and-models.html">05 §5.7</a>).</p>
+<p><strong>리팩터 전후 대조:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 리팩터 전 — 서비스가 파생값까지 계산해 dict 에 담음</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;month&quot;</span><span class="p">:</span> <span class="n">target</span><span class="p">,</span> <span class="s2">&quot;income&quot;</span><span class="p">:</span> <span class="n">income_total</span><span class="p">,</span> <span class="s2">&quot;expense&quot;</span><span class="p">:</span> <span class="n">expense_total</span><span class="p">,</span>
+            <span class="s2">&quot;balance&quot;</span><span class="p">:</span> <span class="n">income_total</span> <span class="o">-</span> <span class="n">expense_total</span><span class="p">,</span>       <span class="c1"># ← 파생값</span>
+            <span class="s2">&quot;has_data&quot;</span><span class="p">:</span> <span class="n">has_data</span><span class="p">,</span> <span class="s2">&quot;top_expense&quot;</span><span class="p">:</span> <span class="n">top_expense</span><span class="p">,</span>
+            <span class="s2">&quot;budget&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;usage_pct&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;over_budget&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">budget</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">budgets</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">budget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;budget&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">budget</span>
+            <span class="k">if</span> <span class="n">budget</span><span class="o">.</span><span class="n">amount</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">pct</span> <span class="o">=</span> <span class="p">(</span><span class="n">expense_total</span> <span class="o">/</span> <span class="n">budget</span><span class="o">.</span><span class="n">amount</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;usage_pct&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">pct</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>          <span class="c1"># ← 파생값</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;over_budget&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">expense_total</span> <span class="o">&gt;</span> <span class="n">budget</span><span class="o">.</span><span class="n">amount</span>   <span class="c1"># ← 파생값</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+<span class="c1"># 리팩터 후 — 원자료만 담고 넘김</span>
+        <span class="k">return</span> <span class="n">MonthlySummary</span><span class="p">(</span>
+            <span class="n">month</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">income</span><span class="o">=</span><span class="n">income_total</span><span class="p">,</span> <span class="n">expense</span><span class="o">=</span><span class="n">expense_total</span><span class="p">,</span>
+            <span class="n">top_expense</span><span class="o">=</span><span class="n">top_expense</span><span class="p">,</span> <span class="n">has_data</span><span class="o">=</span><span class="n">has_data</span><span class="p">,</span>
+            <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budgets</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">),</span>
+        <span class="p">)</span>
+</code></pre></div>
+
+<p>파생값을 모델로 옮겨서 얻은 것이 셋입니다.</p>
+<ol>
+<li><strong>일관성</strong> — <code>balance</code> 를 저장하면 <code>income</code> 과 어긋날 수 있지만 property 는 항상 맞습니다.</li>
+<li><strong>오타 안전</strong> — <code>result["usage_pct"]</code> 는 런타임 <code>KeyError</code>, <code>summary.usage_pct</code> 는 IDE 가 잡습니다.</li>
+<li><strong>규칙의 소속</strong> — "예산이 0이면 사용률이 무의미하다"는 도메인 규칙이 화면 코드가 아니라 모델에 있습니다.</li>
+</ol>
+<h3 id="33-top_n-방어">3.3 <code>top_n</code> 방어</h3>
+<p><code>[: max(0, top_n)]</code> 의 <code>max(0, ...)</code> 가 없으면 <code>--top -3</code> 이 <code>[:-3]</code>(뒤 3개 제외)이라는 전혀 다른 의미가 됩니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>seq[a:b]</code> 슬라이스는 파이썬 1.x 부터 있던 문법으로, <code>seq.__getitem__(slice(a, b))</code> 로 풀립니다. 인덱스 하나를 꺼내는 <code>seq[i]</code> 와 규칙이 정반대라는 점이 핵심입니다 — <strong>슬라이스는 범위를 벗어나도 예외를 내지 않고 조용히 잘립니다.</strong></p>
+<p>```</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>[1,2,3][:99]     # 3개뿐인데 99개를 달라고 해도
+[1, 2, 3]
+[1,2,3][:0]
+[]
+[1,2,3][3]       # 인덱스는 다르다
+IndexError: list index out of range
+```</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<p>그래서 <code>--top 1000</code> 은 방어가 없어도 안전합니다. 위험한 것은 오직 <strong>음수</strong>인데, 음수가 IndexError 가 아니라 "끝에서부터"라는 <strong>정상적이지만 다른 의미</strong>로 해석되기 때문입니다. <code>max(0, top_n)</code> 는 그 한 가지 경우만 0 으로 눌러 빈 튜플이 나오게 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<p><strong>개선안(현재 코드에 없음)</strong>: 이 방어는 사실 CLI 의 입력 정제 책임에 가깝습니다. argparse 에 <code>type=</code> 커스텀 함수를 두어 음수를 파싱 단계에서 거부하는 편이 계층상 더 정확합니다. 지금은 서비스가 방어하되, 그 사실을 알고 있는 것이 중요합니다.</p>
+</blockquote>
+<hr>
+<h2 id="4-categoryservice-사용-중-카테고리-보호">4. <code>CategoryService</code> — 사용 중 카테고리 보호</h2>
+<p>budget_app/services/categories.py:38-73</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">replace_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;카테고리 삭제. 사용 중이라면:</span>
+<span class="sd">        ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">replacement</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">replace_with</span><span class="p">)</span> <span class="k">if</span> <span class="n">replace_with</span> <span class="k">else</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">ERR_CATEGORY_NOT_EXIST</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">target</span><span class="p">),</span>
+                <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_CATEGORY_LIST</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="n">reassigned</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">category_in_use</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
+            <span class="n">reassigned</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reassign_before_remove</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">replacement</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">reassigned</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>validators.parse_category(replace_with) if replace_with else None</code> 은 <strong>조건 표현식</strong>(PEP 308, 파이썬 2.5)입니다. <code>if</code> 문과 달리 값을 낳는 <em>식</em>이라 대입 오른쪽에 바로 놓을 수 있습니다. 조건이 <code>replace_with is not None</code> 이 아니라 그냥 <code>replace_with</code> 인 것도 의도적입니다 — 빈 문자열 <code>""</code> 도 거짓이므로 <code>--replace-with ""</code> 처럼 빈 값이 와도 <code>None</code> 으로 떨어집니다. 파이썬은 <code>bool</code> 이 아닌 값에 <code>__bool__</code>(없으면 <code>__len__</code>)을 물어 참·거짓을 정하고, <code>str</code> 은 길이가 0일 때 거짓입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<h3 id="41-참조-무결성referential-integrity-보호">4.1 참조 무결성(referential integrity) 보호</h3>
+<p>이 서비스가 지키는 규칙은 <strong>"거래가 참조하는 카테고리는 사라지면 안 된다"</strong> 입니다. 관계형 DB 의 외래 키 제약을 코드로 구현한 것과 같습니다.</p>
+<div class="codehilite"><pre><span></span><code>사용 중이 아님        → 그냥 삭제
+사용 중 + 대체 지정   → 일괄 재지정 후 삭제
+사용 중 + 대체 없음   → AppError 로 차단  (&quot;카테고리 &#39;food&#39; 는 거래에서 사용 중입니다&quot;)
+</code></pre></div>
+
+<h3 id="42-검사-순서가-곧-정책">4.2 검사 순서가 곧 정책</h3>
+<p><code>_reassign_before_remove</code> 의 세 검사 순서를 보세요.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>검사</th>
+<th>왜 이 순서인가</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>replace_with</code> 가 있는가</td>
+<td>없으면 나머지를 볼 필요가 없음</td>
+</tr>
+<tr>
+<td>2</td>
+<td>자기 자신인가</td>
+<td><strong>파일을 읽지 않고</strong> 판단 가능</td>
+</tr>
+<tr>
+<td>3</td>
+<td>등록된 카테고리인가</td>
+<td>파일을 읽어야 함</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>싼 검사부터 하는 것</strong>이 원칙입니다. 2번(문자열 비교)이 3번(파일 순회)보다 앞에 있는 이유입니다.</p>
+<h3 id="43-메서드를-나눈-이유">4.3 메서드를 나눈 이유</h3>
+<p><code>remove</code> 본문이 "존재 확인 → 사용 중이면 재지정 → 삭제" 세 줄로 읽힙니다. 재지정 조건 검사 3개를 인라인으로 두면 이 흐름이 묻힙니다. <strong>공개 메서드는 시나리오를, private 메서드는 세부 규칙을</strong> 담당하는 분업입니다.</p>
+<hr>
+<h2 id="5-importexportservice-세-가지-정책">5. <code>ImportExportService</code> — 세 가지 정책</h2>
+<h3 id="51-이-클래스가-아는-것">5.1 이 클래스가 아는 것</h3>
+<p>budget_app/services/importexport.py:61-69</p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ImportExportService</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;CSV 가져오기/내보내기 정책.</span>
+
+<span class="sd">    스키마는 ``csv_io`` 가 안다. 이 클래스가 아는 것은 **정책** 셋이다.</span>
+
+<span class="sd">    1. 실패 정책   — 부분 성공(기본) vs 원자적 전수 롤백(``--atomic``)</span>
+<span class="sd">    2. 중복 정책   — 이미 있는 id 를 만나면 건너뛸까/새로 발급할까/막을까</span>
+<span class="sd">    3. 부수 효과   — 처음 보는 카테고리는 자동 등록한다</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+
+<p><strong>"스키마는 csv_io 가 안다"</strong> 는 첫 문장이 경계를 선언합니다. 이 클래스에는 <code>"date"</code>, <code>"amount"</code> 같은 컬럼명이 <strong>한 번도 등장하지 않습니다.</strong></p>
+<h3 id="52-내보내기-제너레이터를-그대로-넘김">5.2 내보내기 — 제너레이터를 그대로 넘김</h3>
+<p>budget_app/services/importexport.py:77-84</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">export_csv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">flt</span><span class="p">:</span> <span class="n">SearchFilter</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">include_id</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;필터를 통과한 거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
+
+<span class="sd">        ``include_id=True`` 가 기본인 이유는 **왕복 안전성**이다. id 가 없으면 내보낸</span>
+<span class="sd">        파일을 다시 가져올 때 같은 거래가 새 id 로 한 번 더 저장된다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">(</span><span class="n">tx</span> <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">()</span> <span class="k">if</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">csv_io</span><span class="o">.</span><span class="n">write_transactions</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">include_id</span><span class="o">=</span><span class="n">include_id</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>두 줄입니다.</strong> <code>(tx for tx in ...)</code> 는 제너레이터 식이라 필터 통과분이 메모리에 모이지 않습니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>(tx for tx in ... if ...)</code> 는 <strong>제너레이터 표현식</strong>(PEP 289, 파이썬 2.4)입니다. 대괄호를 쓴 리스트 컴프리헨션(<code>[tx for tx in ...]</code>)과 글자 하나 차이지만 결과가 다릅니다 — 대괄호는 <strong>리스트를 다 만들어</strong> 돌려주고, 소괄호는 <strong>아직 아무것도 만들지 않은 제너레이터 객체</strong>를 돌려줍니다. 파이썬은 이것을 익명의 제너레이터 함수로 컴파일하며, 첫 <code>for ... in</code> 의 대상(<code>self.txs.stream()</code>)만 그 자리에서 평가하고 나머지는 소비 시점으로 미룹니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>⚙️ 내부 동작</strong> — 그 게으름이 계층을 넘어 유지되는 경로가 이 함수의 요점입니다. <code>csv_io.write_transactions</code>(<code>storage/csv_io.py:131-148</code>)의 인자 타입은 <code>Iterable[Transaction]</code> 이고 본문은 <code>for tx in txs:</code> 로 <strong>한 건 꺼내 한 줄 쓰고 다시 꺼냅니다.</strong> 그래서 파일 → <code>stream()</code> → 제너레이터 식 필터 → <code>csv.DictWriter.writerow</code> 가 한 줄짜리 파이프라인으로 이어지고, 거래가 10만 건이어도 메모리에 있는 <code>Transaction</code> 은 항상 한 건입니다. 만약 여기서 <code>rows = [tx for tx in ...]</code> 라고 대괄호를 썼다면 <code>write_transactions</code> 코드는 한 글자도 바뀌지 않은 채 <strong>전 건이 리스트로 메모리에 올라갑니다</strong> — 스트리밍이 깨지는 지점이 호출부 괄호 한 쌍이라는 뜻입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<p><code>include_id=True</code> 가 기본인 이유가 이 리팩터의 출발점이었습니다 — id 컬럼이 없으면 내보낸 CSV 를 다시 넣을 때 모든 행이 새 id 를 받아 같은 거래가 두 벌이 됩니다. 자세한 버그 재현은 <a href="07-repository.html">07 §8.2</a>에 있습니다.</p>
+<h3 id="53-가져오기-준비와-커밋">5.3 가져오기 — 준비와 커밋</h3>
+<p>budget_app/services/importexport.py:88-102</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">import_csv</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">in_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">atomic</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">on_duplicate</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_ON_DUPLICATE</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImportReport</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;CSV 거래 일괄 등록.</span>
+
+<span class="sd">        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다.</span>
+<span class="sd">        카테고리 자동 등록과 ID 발급도 커밋 단계에서 한 번에 일어나므로, 원자</span>
+<span class="sd">        모드에서 준비 중 중단되면 카테고리·거래 어느 쪽도 남지 않는다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">in_path</span><span class="p">),</span> <span class="n">atomic</span><span class="o">=</span><span class="n">atomic</span><span class="p">,</span> <span class="n">on_duplicate</span><span class="o">=</span><span class="n">on_duplicate</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_commit</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">atomic</span><span class="o">=</span><span class="n">atomic</span><span class="p">)</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>in_path</code> 다음에 홀로 선 <code>*</code> 가 <code>atomic</code> 과 <code>on_duplicate</code> 를 <strong>키워드 전용</strong>으로 만듭니다(PEP 3102). 그래서 호출부는 반드시 <code>import_csv(path, atomic=True, on_duplicate="new-id")</code> 라고 씁니다. 여기서 이 강제가 특히 값어치를 하는 이유는 <code>atomic</code> 이 <strong>불리언 인자</strong>이기 때문입니다 — <code>import_csv(path, True, "new-id")</code> 를 읽는 사람은 그 <code>True</code> 가 무엇의 스위치인지 알 수 없고("boolean trap"), 나중에 두 인자의 순서가 바뀌어도 조용히 컴파일됩니다. <code>*</code> 는 그 두 위험을 한꺼번에 없애면서, 덤으로 <strong>인자 순서를 나중에 바꿔도 기존 호출부가 깨지지 않게</strong> 만듭니다. 같은 패턴이 <code>export_csv(..., *, include_id=True)</code> 와 <code>_prepare(..., *, atomic, on_duplicate)</code> 에도 그대로 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<p><strong>본문이 두 줄</strong>입니다. 리팩터 전 이 메서드는 80줄이었고, 파일 열기·헤더 검증·행 검증·오류 누적·두 실패 정책·카테고리 자동 등록·ID 발급·커밋 8가지를 담고 있었습니다.</p>
+<p>이름이 곧 구조 설명이 됩니다 — <strong>준비하고, 커밋한다.</strong></p>
+<h3 id="54-준비-단계">5.4 준비 단계</h3>
+<p>budget_app/services/importexport.py:104-131</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">atomic</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">on_duplicate</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_Batch</span><span class="p">:</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="n">_Batch</span><span class="p">()</span>
+        <span class="n">allocator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">id_allocator</span><span class="p">()</span>
+        <span class="n">known_categories</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="o">.</span><span class="n">name_set</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">csv_io</span><span class="o">.</span><span class="n">read_rows</span><span class="p">(</span><span class="n">in_path</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">csv_io</span><span class="o">.</span><span class="n">parse_row</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">ValidationError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">atomic</span><span class="p">:</span>
+                    <span class="c1"># 전수 롤백: 준비 단계에서 즉시 중단, 파일은 손대지 않는다.</span>
+                    <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span>
+                        <span class="n">messages</span><span class="o">.</span><span class="n">ERR_ATOMIC_IMPORT_FAILED</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">lineno</span><span class="o">=</span><span class="n">lineno</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="n">exc</span><span class="p">),</span>
+                        <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_ATOMIC_IMPORT</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+                <span class="n">batch</span><span class="o">.</span><span class="n">note_error</span><span class="p">(</span><span class="n">lineno</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">tx_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_id</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">tx_id</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">allocator</span><span class="p">,</span> <span class="n">on_duplicate</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">tx_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>  <span class="c1"># 중복 — 건너뛰기 정책</span>
+
+            <span class="n">batch</span><span class="o">.</span><span class="n">transactions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">to_transaction</span><span class="p">(</span><span class="n">tx_id</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">category</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">known_categories</span><span class="p">:</span>
+                <span class="n">known_categories</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">category</span><span class="p">)</span>
+                <span class="n">batch</span><span class="o">.</span><span class="n">new_categories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">category</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">batch</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>except (ValidationError, KeyError) as exc:</code> 의 괄호는 <strong>여러 예외 타입을 한 튜플로</strong> 잡는 표기입니다. 그리고 <code>as exc</code> 로 묶인 이름은 <code>except</code> 블록이 끝나는 순간 파이썬이 <strong>자동으로 <code>del</code> 합니다</strong>(PEP 3110). 예외 객체가 트레이스백을 통해 프레임을 참조해 순환 참조가 생기는 것을 막기 위해서인데, 그 결과 <code>except</code> 블록 밖에서 <code>exc</code> 를 쓰면 <code>UnboundLocalError</code>(<code>NameError</code> 의 하위 클래스)가 납니다 — 이 코드가 <code>exc</code> 를 블록 안에서 <code>raise ... from exc</code> 와 <code>note_error(lineno, exc)</code> 로 다 소비하는 것이 우연이 아닙니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>⚙️ 내부 동작</strong> — <code>raise AppError(...) from exc</code> 의 <code>from</code> 은 <strong>예외 연쇄</strong>(PEP 3134, 파이썬 3.0)입니다. 파이썬은 새 예외의 <code>__cause__</code> 에 <code>exc</code> 를 넣고 <code>__suppress_context__</code> 를 <code>True</code> 로 세워, 트레이스백을 "The above exception was the direct cause of the following exception"으로 출력합니다. <code>from</code> 을 빼도 <code>__context__</code> 에 자동으로 원인이 들어가지만 그것은 "처리 중에 또 터졌다"는 뉘앙스이고, <code>from</code> 은 "번역했다"는 <strong>의도적 승격</strong>을 남깁니다. 실행으로 확인하면 새 예외의 <code>__cause__</code> 가 원래 <code>ValidationError</code> 객체 그대로이고 <code>__suppress_context__</code> 가 <code>True</code> 입니다.</p>
+<p>이 자리에서의 뜻: <strong><code>atomic</code> 일 때만</strong> 값 오류(<code>ValidationError</code>)가 상황 오류(<code>AppError</code>)로 승격되어 <code>_prepare</code> 밖으로 빠져나갑니다. 그러면 <code>import_csv</code> 의 둘째 줄 <code>self._commit(...)</code> 은 <strong>실행 자체가 되지 않고</strong>, 파일은 손대지 않은 상태로 남습니다. 예외가 곧 "여기서 멈춘다"는 정책의 실행 수단입니다. <code>atomic</code> 이 아니면 같은 예외를 <code>batch.note_error</code> 로 기록하고 <code>continue</code> 로 다음 행을 봅니다 — 한 줄의 <code>if</code> 가 두 실패 정책을 가릅니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<p><strong>루프 시작 전에 파일을 두 번 훑습니다</strong> — <code>id_allocator()</code>(거래 파일)와 <code>name_set()</code>(카테고리 파일). 이 두 스냅숏 덕분에 <strong>행마다 파일을 다시 읽지 않습니다.</strong></p>
+<div class="codehilite"><pre><span></span><code>[리팩터 전]                        [리팩터 후]
+행마다 cats.exists()  → M회 스캔    시작 시 name_set()   → 1회 스캔
+커밋 시 cats.add() 반복 → M회 스캔  커밋 시 add_many()   → 1회 스캔
+</code></pre></div>
+
+<p><strong><code>known_categories</code> 와 <code>new_categories</code> 를 나란히 쓰는 이유</strong>는 자료구조의 성질이 다르기 때문입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>변수</th>
+<th>타입</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>known_categories</code></td>
+<td><code>set</code></td>
+<td>빠른 소속 검사 (<code>in</code>)</td>
+</tr>
+<tr>
+<td><code>batch.new_categories</code></td>
+<td><code>list</code></td>
+<td><strong>등록 순서 유지</strong></td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>parsed.category not in known_categories</code> 의 비용이 이 표의 전부입니다. <code>set</code> 은 해시 테이블이라 <code>in</code> 이 <strong>평균 O(1)</strong> 입니다 — 파이썬은 <code>hash(문자열)</code> 로 버킷을 바로 찾아가고, 후보와 <code>==</code> 를 한두 번 해 봅니다. 반면 <code>list</code> 에 대한 <code>in</code> 은 앞에서부터 하나씩 <code>==</code> 를 해 보는 <strong>O(n)</strong> 입니다. CSV 가 N 행이고 카테고리가 M 개일 때, <code>list</code> 였다면 N×M 번의 문자열 비교가 되지만 <code>set</code> 이면 N 번입니다. <code>set</code> 을 만든 <code>storage/repositories.py:240-242</code> 의 <code>{c.name for c in self.stream()}</code> 도 집합 컴프리헨션 한 줄이며, 여기 들어가는 값은 <code>str</code> 이라 이미 불변·해시 가능합니다(같은 이유로 <code>IdAllocator._taken</code> 은 <code>TransactionId</code> 의 집합인데, 그것이 <code>@dataclass(frozen=True)</code> 인 덕분에 파이썬이 <code>__hash__</code> 를 자동으로 만들어 줍니다).</p>
+<p>반대로 <code>new_categories</code> 가 <code>list</code> 인 이유도 같은 성질의 뒷면입니다. <code>set</code> 은 <strong>순서를 보관하지 않으므로</strong> 그것으로 커밋하면 카테고리 파일에 쓰이는 줄 순서가 실행마다 달라질 수 있습니다. "빠른 조회"와 "안정된 출력 순서"는 한 자료구조가 동시에 주지 않아서 둘을 나란히 씁니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<h3 id="55-중복-정책-_resolve_id">5.5 중복 정책 — <code>_resolve_id</code></h3>
+<p>budget_app/services/importexport.py:133-140</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_id</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">csv_id</span><span class="p">:</span> <span class="n">TransactionId</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">allocator</span><span class="p">:</span> <span class="n">IdAllocator</span><span class="p">,</span>
+        <span class="n">on_duplicate</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="n">_Batch</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionId</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</code></pre></div>
+
+<p><strong>결정 트리:</strong></p>
+<div class="codehilite"><pre><span></span><code>csv_id 가 없다(빈 셀 / 컬럼 없음)
+    └─▶ allocator.next()                     새 id 발급
+
+csv_id 가 있고 아직 안 쓰였다
+    └─▶ reserve() 후 그대로 사용              원본 id 복원 (왕복 무손실)
+
+csv_id 가 있고 이미 쓰였다  ── on_duplicate ──┬─ &quot;new-id&quot; → allocator.next()
+                                              ├─ &quot;error&quot;  → AppError
+                                              └─ &quot;skip&quot;   → None (이 행 버림)
+</code></pre></div>
+
+<p><strong><code>allocator</code> 하나가 두 종류의 중복을 동시에 잡습니다.</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>중복 종류</th>
+<th>어떻게 잡히나</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>파일 간 (이미 저장된 거래)</td>
+<td><code>id_allocator()</code> 가 파일에서 읽은 <code>taken</code></td>
+</tr>
+<tr>
+<td>파일 내 (같은 CSV 에 같은 id 두 번)</td>
+<td>첫 번째 행에서 <code>reserve()</code> 한 것</td>
+</tr>
+</tbody>
+</table></div>
+<p>두 경우를 따로 처리하는 코드가 필요 없다는 것이 이 설계의 장점입니다.</p>
+<p><strong><code>None</code> 반환이 "이 행은 저장하지 않는다"</strong> 를 뜻한다는 계약이 반환 타입 <code>TransactionId | None</code> 과 docstring(<code>importexport.py:141</code>)에 명시되어 있습니다. 호출부(<code>importexport.py:123</code>)가 <code>if tx_id is None:</code> 으로 그 계약을 받습니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — 여기서 <code>== None</code> 이 아니라 <code>is None</code> 인 것이 관례가 아니라 정확성입니다. <code>is</code> 는 두 이름이 <strong>같은 객체를 가리키는가</strong>(CPython 에서는 주소 비교)를 묻고, <code>None</code> 은 인터프리터 전체에 <strong>딱 하나만 존재하는 싱글턴</strong>이라 이 비교가 항상 옳습니다. <code>==</code> 는 <code>__eq__</code> 를 부르므로 클래스가 그것을 재정의하면 <code>None</code> 과 같다고 우길 수 있습니다. <code>TransactionId</code> 는 dataclass 라 실제로 <code>__eq__</code> 가 자동 생성되어 있으므로, <code>is</code> 를 쓰는 편이 그 경로를 아예 지나지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<h3 id="56-커밋-단계-모드에-따라-갈린다">5.6 커밋 단계 — 모드에 따라 갈린다</h3>
+<p>budget_app/services/importexport.py:168-177</p>
+<div class="codehilite"><pre><span></span><code>        <span class="n">imported</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_commit_atomic</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span> <span class="k">if</span> <span class="n">atomic</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_commit_appending</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ImportReport</span><span class="p">(</span>
+            <span class="n">imported</span><span class="o">=</span><span class="n">imported</span><span class="p">,</span>
+            <span class="n">skipped</span><span class="o">=</span><span class="n">batch</span><span class="o">.</span><span class="n">skipped</span><span class="p">,</span>
+            <span class="n">duplicated</span><span class="o">=</span><span class="n">batch</span><span class="o">.</span><span class="n">duplicated</span><span class="p">,</span>
+            <span class="n">errors</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">errors</span><span class="p">),</span>
+            <span class="n">duplicates</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">duplicates</span><span class="p">),</span>
+        <span class="p">)</span>
+</code></pre></div>
+
+<p><strong>여기서 처음 파일이 바뀝니다.</strong> 준비 단계는 파일을 읽기만 했습니다.</p>
+<p><code>tuple(batch.errors)</code> 로 리스트를 튜플로 굳히는 것도 의도적입니다 — <code>ImportReport</code> 가 frozen dataclass 라 담기는 값도 불변인 편이 일관됩니다(<a href="05-config-and-models.html">05 §5.7</a>). <code>frozen=True</code> 는 필드 재대입만 막고 담긴 리스트의 내용 변경은 못 막으므로, 굳히는 일은 이렇게 넣는 쪽이 해야 합니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>tuple(어떤_이터러블)</code> 은 인자를 처음부터 끝까지 순회해 <strong>새 튜플을 만듭니다</strong>(리스트를 튜플로 "바꾸는" 것이 아니라 복사입니다). 그래서 이 줄 이후에 <code>batch.errors</code> 에 무엇을 더 넣어도 <code>ImportReport</code> 안의 튜플은 변하지 않습니다. <code>ImportReport</code> 의 기본값이 <code>errors: tuple[RejectedRow, ...] = ()</code> 인 것도 같은 맥락입니다 — 빈 튜플은 불변이라 dataclass 가 기본값으로 받아 주지만, 빈 리스트 <code>[]</code> 였다면 아래 §5.7 이 보여 주는 <code>ValueError</code> 가 납니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<p><strong>원자 모드는 <code>UnitOfWork</code> 로 두 파일을 한 단위로 커밋합니다.</strong></p>
+<p>budget_app/services/importexport.py:188-206</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_commit_atomic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">batch</span><span class="p">:</span> <span class="n">_Batch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;원자 모드 — 두 파일을 **한 단위로** 커밋한다.</span>
+<span class="sd">        ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fresh_categories</span> <span class="o">=</span> <span class="p">[</span><span class="n">Category</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">batch</span><span class="o">.</span><span class="n">new_categories</span><span class="p">]</span>
+        <span class="c1"># 파일을 저장소 밖(UoW)에서 쓰므로 id 워터마크는 여기서 명시적으로 알린다.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">remember_ids</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">transactions</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">UnitOfWork</span><span class="p">()</span> <span class="k">as</span> <span class="n">uow</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">fresh_categories</span><span class="p">:</span>
+                <span class="n">uow</span><span class="o">.</span><span class="n">stage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="n">fresh_categories</span><span class="p">)</span>
+            <span class="n">uow</span><span class="o">.</span><span class="n">stage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="n">batch</span><span class="o">.</span><span class="n">transactions</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">transactions</span><span class="p">)</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>with UnitOfWork() as uow:</code> 는 PEP 343(파이썬 2.5)의 <code>with</code> 문입니다. 파이썬은 이것을 대략 이렇게 풉니다.</p>
+<p><code>python
+_mgr = UnitOfWork()
+uow = _mgr.__enter__()
+try:
+    ...본문...
+except:
+    if not _mgr.__exit__(*sys.exc_info()):
+        raise
+else:
+    _mgr.__exit__(None, None, None)</code></p>
+<p>그래서 <code>as uow</code> 에 담기는 것은 <code>UnitOfWork()</code> 인스턴스 자체가 아니라 <strong><code>__enter__</code> 의 반환값</strong>입니다(<code>storage/unit_of_work.py:169-170</code> 이 <code>return self</code> 라서 여기서는 결과가 같습니다). <code>if fresh_categories:</code> 로 감싼 <code>stage</code> 는 준비만 하고, 실제 반영은 블록을 정상적으로 빠져나갈 때 <code>__exit__</code> 이 부르는 <code>commit()</code> 에서 일어납니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>⚙️ 내부 동작</strong> — <code>__exit__</code>(<code>storage/unit_of_work.py:172-181</code>)의 반환 타입이 <code>-&gt; None</code> 인 것이 이 블록의 안전장치입니다. 파이썬은 <code>__exit__</code> 의 <strong>반환값이 참일 때만 예외를 삼킵니다.</strong> <code>None</code> 은 거짓이므로, <code>stage</code> 도중에 <code>OSError</code> 가 나면 <code>__exit__</code> 이 <code>rollback()</code> 으로 <code>.tmp</code> 를 치운 뒤 <strong>예외를 그대로 다시 올립니다</strong>. 뒷정리는 하되 실패를 감추지는 않는다는 뜻이고, 호출자인 <code>_commit_atomic</code> 의 <code>return len(...)</code> 은 실행되지 않으므로 CLI 가 성공으로 착각할 수 없습니다. <code>try/finally</code> 로도 뒷정리는 되지만, "정상 종료면 커밋 / 예외면 롤백"이라는 <strong>분기</strong>는 <code>__exit__</code> 이 받는 <code>exc_type</code> 인자가 있어야 쓸 수 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<p>이전에는 카테고리를 먼저 쓰고 거래를 나중에 써서, 그 사이에 죽으면 <strong>쓰이지 않는 카테고리만 남았습니다</strong>. <code>UnitOfWork</code> 는 두 파일의 최종 내용을 각각 <code>.tmp</code> 로 먼저 쓴 뒤 <code>os.replace</code> 두 번을 연달아 실행해, 취약 구간을 "파일 쓰기 2회 사이"에서 "rename 2회 사이"로 줄입니다. 자세한 동작은 <a href="07-repository.html">07 §9</a>에 있습니다.</p>
+<p>부분 성공 모드는 append O(1) 특성을 지키려고 그대로 뒀습니다 — "가능한 만큼 최대한 넣는다"는 정책이라 그 위험을 감수합니다.</p>
+<h3 id="57-_batch-준비-단계의-누적-상태">5.7 <code>_Batch</code> — 준비 단계의 누적 상태</h3>
+<p>budget_app/services/importexport.py:30-58</p>
+<div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_Batch</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;가져오기 준비 단계의 누적 상태.</span>
+
+<span class="sd">    준비(prepare)와 커밋(commit)을 나누는 것이 원자성의 뼈대다. 파일에 손대기</span>
+<span class="sd">    전에 모든 행의 판정이 끝나 있어야 &quot;전혀 반영 안 됨&quot;이 가능하다.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">transactions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">new_categories</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">skipped</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">duplicated</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RejectedRow</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">duplicates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DuplicateRow</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">note_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">reason</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;세는 것은 전부, 사유를 남기는 것은 앞의 몇 건만.</span>
+
+<span class="sd">        수천 줄짜리 CSV 가 통째로 잘못됐을 때 사유를 전부 모으면 메모리와 화면이</span>
+<span class="sd">        같이 터진다. 숫자(``skipped``)는 정확하고, 목록은 표본이다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">config</span><span class="o">.</span><span class="n">MAX_IMPORT_ERRORS</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">RejectedRow</span><span class="p">(</span><span class="n">lineno</span><span class="o">=</span><span class="n">lineno</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">reason</span><span class="p">)))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">note_duplicate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="n">TransactionId</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">duplicated</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">duplicates</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">config</span><span class="o">.</span><span class="n">MAX_IMPORT_ERRORS</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">duplicates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DuplicateRow</span><span class="p">(</span><span class="n">lineno</span><span class="o">=</span><span class="n">lineno</span><span class="p">,</span> <span class="n">tx_id</span><span class="o">=</span><span class="n">tx_id</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>@dataclass</code>(PEP 557, 파이썬 3.7)는 <strong>클래스 본문의 어노테이션을 읽어 코드를 생성하는 데코레이터</strong>입니다. 위 여섯 줄만 보고 <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code> 의 소스를 문자열로 조립해 <code>exec</code> 로 컴파일한 뒤 클래스에 붙입니다. 그래서 <code>_Batch()</code> 라고만 써도 여섯 필드가 전부 초기화됩니다. 실제 생성된 시그니처를 보면 이렇습니다.</p>
+<p>```</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>import inspect; from budget_app.services.importexport import _Batch
+inspect.signature(_Batch)
+(transactions: 'list[Transaction]' = <factory>, new_categories: 'list[str]' = <factory>,
+ skipped: 'int' = 0, duplicated: 'int' = 0, errors: 'list[RejectedRow]' = <factory>,
+ duplicates: 'list[DuplicateRow]' = <factory>) -&gt; None
+```</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<p>→ <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<p><strong>⚙️ 내부 동작</strong> — <code>field(default_factory=list)</code> 가 여기 있는 이유는 <strong><code>= []</code> 를 쓸 수 없기 때문</strong>입니다. dataclass 는 기본값이 해시 불가능한 객체(리스트·딕셔너리·집합 등)이면 클래스를 만드는 시점에 아예 거부합니다. 관례가 아니라 실행 시 오류입니다.</p>
+<p>```</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>@dataclass
+... class Bad:
+...     items: list = []
+ValueError: mutable default <class 'list'> for field items is not allowed: use default_factory
+```</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<p>이유는 위 §2.1 의 함수 기본값과 같습니다 — 클래스 본문의 <code>[]</code> 는 <strong>클래스가 정의될 때 한 번만</strong> 만들어지므로, 허용됐다면 모든 <code>_Batch()</code> 인스턴스가 같은 리스트 하나를 공유해 이번 가져오기의 오류가 다음 가져오기에 섞여 들어갑니다. <code>default_factory=list</code> 는 그 리스트를 만드는 <strong>함수 자체</strong>(내장 <code>list</code>)를 넘겨 두는 것이고, 생성된 <code>__init__</code> 은 인자가 안 왔을 때만 <code>list()</code> 를 새로 호출합니다. 그래서 <code>a, b = _Batch(), _Batch()</code> 일 때 <code>a.transactions is b.transactions</code> 가 <code>False</code> 입니다. <code>skipped: int = 0</code> 이 <code>field()</code> 없이 그냥 <code>0</code> 인 것도 같은 규칙의 뒷면입니다 — <code>int</code> 는 불변이라 공유돼도 문제가 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<p><strong>개수는 전부 세고, 메시지만 자릅니다.</strong> <code>self.skipped += 1</code> 은 무조건, <code>errors.append</code> 는 <code>MAX_IMPORT_ERRORS</code>(<code>services/config.py:16</code>, 값 5) 미만일 때만. 1만 줄이 전부 깨져도 화면에는 5줄만 나오지만 <code>skipped=10000</code> 은 정확합니다.</p>
+<p><strong><code>_</code> 로 시작하는 이름</strong>은 모듈 내부용이라는 관례 표시입니다. 이 클래스는 <code>ImportExportService</code> 의 구현 세부이고 밖에서 알 필요가 없습니다. 다만 이것은 PEP 8 의 <strong>관례일 뿐 접근 제어가 아닙니다</strong> — 파이썬은 <code>_Batch</code> 를 밖에서 import 하는 것을 막지 않고, 언어가 실제로 하는 일은 <code>from module import *</code> 가 <code>_</code> 로 시작하는 이름을 건너뛰는 것뿐입니다(이름을 실제로 뭉개는 것은 밑줄 <strong>두 개</strong>로 시작하는 클래스 속성입니다).</p>
+<hr>
+<h2 id="6-두-정책-축-실패와-중복은-독립이다">6. 두 정책 축 — 실패와 중복은 독립이다</h2>
+<p><code>--atomic</code> 과 <code>--on-duplicate</code> 는 <strong>다른 것을 다룹니다.</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>축</th>
+<th>다루는 것</th>
+<th>옵션</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>실패 정책</td>
+<td>데이터가 <strong>잘못된</strong> 줄</td>
+<td><code>--atomic</code></td>
+</tr>
+<tr>
+<td>중복 정책</td>
+<td>이미 <strong>저장된</strong> 거래</td>
+<td><code>--on-duplicate</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>조합이 6가지 가능하고, 전부 의미가 있습니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>--atomic</code></th>
+<th><code>--on-duplicate</code></th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>없음</td>
+<td><code>skip</code>(기본)</td>
+<td>깨진 줄 건너뛰고, 중복도 건너뜀 — <strong>가장 관대</strong></td>
+</tr>
+<tr>
+<td>없음</td>
+<td><code>new-id</code></td>
+<td>깨진 줄만 건너뛰고, 중복은 새 id 로 복제</td>
+</tr>
+<tr>
+<td>없음</td>
+<td><code>error</code></td>
+<td>깨진 줄은 건너뛰되, 중복을 만나면 전체 중단</td>
+</tr>
+<tr>
+<td>있음</td>
+<td><code>skip</code></td>
+<td>깨진 줄이 있으면 전체 중단, 중복은 조용히 건너뜀</td>
+</tr>
+<tr>
+<td>있음</td>
+<td><code>new-id</code></td>
+<td>깨진 줄이 있으면 중단, 중복은 복제</td>
+</tr>
+<tr>
+<td>있음</td>
+<td><code>error</code></td>
+<td>깨진 줄도 중복도 허용 안 함 — <strong>가장 엄격</strong></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="61-왜-skipped-와-duplicated-를-나누나">6.1 왜 <code>skipped</code> 와 <code>duplicated</code> 를 나누나</h3>
+<p>budget_app/domain/results.py:74-91</p>
+<div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ImportReport</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;CSV 가져오기 결과.</span>
+<span class="sd">    ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+
+<p><strong>실제 출력 비교:</strong></p>
+<div class="codehilite"><pre><span></span><code># 정상 왕복 (내보낸 파일을 다시 넣음)
+[완료] mode=부분 성공, imported=0, duplicated=3, skipped=0
+  → &quot;0건 저장, 3건 이미 있음&quot; = 정상
+
+# 만약 합쳤다면
+[완료] mode=부분 성공, imported=0, skipped=3
+  → &quot;0건 저장, 3건 실패&quot; 처럼 읽힘 = 오해
+</code></pre></div>
+
+<p>프레젠터도 둘을 구분해 보여 줍니다.</p>
+<p>budget_app/cli/presenter.py:118-141</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">import_problem_lines</span><span class="p">(</span><span class="n">report</span><span class="p">:</span> <span class="n">ImportReport</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;건너뛴 줄의 사유 — 결과가 아니라 진단이므로 호출자가 stderr 로 보낸다.</span>
+<span class="sd">    ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">MSG_IMPORT_ERROR_HEADER</span><span class="p">)</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="n">messages</span><span class="o">.</span><span class="n">FMT_IMPORT_ERROR_ITEM</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">lineno</span><span class="o">=</span><span class="n">e</span><span class="o">.</span><span class="n">lineno</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="n">e</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">errors</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">duplicates</span><span class="p">:</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="n">messages</span><span class="o">.</span><span class="n">FMT_IMPORT_DUPLICATE_ITEM</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">lineno</span><span class="o">=</span><span class="n">d</span><span class="o">.</span><span class="n">lineno</span><span class="p">,</span> <span class="n">tx_id</span><span class="o">=</span><span class="n">d</span><span class="o">.</span><span class="n">tx_id</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">duplicates</span>
+        <span class="p">)</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">MSG_IMPORT_DUPLICATE_HINT</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">lines</span>
+</code></pre></div>
+
+<p>여기 <code>lines.extend(... for e in report.errors)</code> 는 §5.2 와 같은 제너레이터 표현식입니다 — 인자가 하나뿐일 때는 함수 호출 괄호가 제너레이터 식의 괄호를 겸하므로 <code>extend((...))</code> 처럼 겹쳐 쓰지 않아도 되고, <code>list.extend</code> 가 그것을 순회하며 밀어 넣으므로 중간 리스트가 생기지 않습니다.</p>
+<p>중복 목록 뒤에는 <strong>"고칠 필요 없다"는 안내</strong>가 붙습니다.</p>
+<p>budget_app/cli/messages.py:98-100</p>
+<div class="codehilite"><pre><span></span><code><span class="n">MSG_IMPORT_DUPLICATE_HINT</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">&quot;[힌트] 중복은 이미 저장된 거래입니다. 다시 넣으려면 `--on-duplicate new-id` 를 쓰세요.&quot;</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<h3 id="62-원자성은-어떻게-보장되는가">6.2 원자성은 어떻게 보장되는가</h3>
+<div class="codehilite"><pre><span></span><code>원자 모드 (--atomic)
+
+  [준비 단계]  파일을 읽기만 함
+      │
+      ├─ 행 1 검증 OK → batch 에 적재 (메모리)
+      ├─ 행 2 검증 OK → batch 에 적재 (메모리)
+      ├─ 행 3 검증 실패 → AppError 발생!
+      │                      │
+      │                      ▼
+      │              함수가 예외로 빠져나감
+      │              → _commit 이 실행되지 않음
+      │              → 파일은 처음 상태 그대로 ✅
+      ▼
+  [커밋 단계]  도달하지 않음
+</code></pre></div>
+
+<p><strong>"파일에 손대기 전에 모든 판정이 끝나 있다"</strong> 가 원자성의 뼈대입니다. 커밋 단계 자체도 <code>rewrite</code> → <code>os.replace</code> 라 원자적입니다 — 새 내용을 <code>.tmp</code> 에 다 쓰고 <code>fsync</code> 로 디스크에 밀어 넣은 뒤 이름만 바꾸므로, 어느 시점에 죽어도 원본 아니면 새 파일이지 반쯤 쓰인 파일은 없습니다(<a href="07-repository.html">07 §3.6</a>).</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>os.replace</code> 는 POSIX 에서 <code>rename(2)</code>, Windows 에서 <code>MoveFileExW(MOVEFILE_REPLACE_EXISTING)</code> 로 내려갑니다. 원자성은 <strong>같은 파일시스템 안에서 디렉터리 엔트리를 교체하는 것</strong>에 대해서만 보장되며, 내용이 디스크에 도달했다는 뜻은 아닙니다(그래서 앞에 <code>fsync</code> 가 필요합니다). 서비스 계층 코드에는 이 호출이 한 번도 등장하지 않는다는 점도 같이 보세요 — 원자성의 <em>정책</em>(언제 전부/전무인가)은 여기가 정하고, 그것을 실현하는 <em>기법</em>은 <code>storage</code> 안에 있습니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+</blockquote>
+<p><strong>부수 효과까지 롤백됩니다.</strong> 카테고리 자동 등록도 커밋 단계에 있으므로, 준비 중 실패하면 카테고리도 남지 않습니다. 실제로 검증한 결과:</p>
+<div class="codehilite"><pre><span></span><code>$ python -m budget_app import --from mixed.csv --atomic --data-dir ./d5
+[오류] 원자적 가져오기 실패 — line 3: ...  (반영된 항목 없음)
+$ wc -l &lt; ./d5/transactions.jsonl
+0                                              ← 거래 0건
+$ python -m budget_app category list --data-dir ./d5 | wc -l
+5                                              ← 기본 5개 그대로 (salary 안 늘어남)
+</code></pre></div>
+
+<hr>
+<h2 id="7-정리-과제-방어용-요약">7. 정리 — 과제 방어용 요약</h2>
+<p><strong>Q. 서비스 계층의 책임이 뭔가요?</strong></p>
+<p><strong>판단</strong>입니다. 파일을 열지 않고(저장소가 함) 글자를 내지 않으며(프레젠터가 함), "카테고리가 등록되어 있는가", "사용 중인 카테고리를 지워도 되는가", "중복 id 를 어떻게 처리할까" 같은 정책만 결정합니다. <code>budget_app/services/</code> 전체에 <code>open(</code> 이 <code>__init__.py:4</code> 의 docstring 한 줄 외에 없고 <code>print(</code> 는 0건이라는 것으로 검증됩니다.</p>
+<p><strong>Q. import CSV 에 일부 깨진 행이 섞이면 어떻게 처리하나요?</strong></p>
+<p><strong>두 축</strong>으로 답합니다. 데이터가 잘못된 줄은 <code>--atomic</code> 이 없으면 그 줄만 건너뛰고(<code>skipped</code>), 있으면 첫 오류에서 전체를 중단합니다. 이미 저장된 거래(중복 id)는 <code>--on-duplicate</code> 로 정하며 기본은 건너뛰기(<code>duplicated</code>)입니다. <strong>두 숫자를 나눠 보고하는 이유</strong>는 사용자가 해야 할 일이 정반대이기 때문입니다 — <code>skipped</code> 는 CSV 를 고쳐야 하고 <code>duplicated</code> 는 아무것도 안 해도 됩니다.</p>
+<p><strong>Q. 원자적 가져오기(<code>--atomic</code>)를 어떻게 구현했나요?</strong></p>
+<p>준비와 커밋을 나눴습니다. 준비 단계는 파일을 읽기만 하고 모든 행을 검증·판정해 메모리(<code>_Batch</code>)에 모읍니다. 한 행이라도 실패하면 그 자리에서 예외를 던져 커밋 단계에 <strong>도달하지 않습니다</strong>. 커밋 자체도 <code>os.replace</code> 라 원자적입니다. 카테고리 자동 등록도 커밋 단계에 있어 부수 효과까지 함께 롤백됩니다.</p>
+<p><strong>Q. export 한 파일을 다시 import 하면 어떻게 되나요?</strong></p>
+<p>중복이 생기지 않습니다. export 가 <code>id</code> 컬럼을 포함하고 import 가 그것을 인식해 이미 있는 id 는 건너뛰기 때문입니다. 리팩터 전에는 CSV 에 id 가 없어서 같은 거래가 새 id 를 받아 복제됐습니다.</p>
+<p><strong>Q. 성능상 신경 쓴 부분이 있나요?</strong></p>
+<p>배치 작업에서 파일 재스캔을 없앴습니다. 가져오기는 시작 시 <code>id_allocator()</code> 와 <code>name_set()</code> 으로 스냅숏을 한 번씩만 만들고, 커밋 시 <code>add_many()</code> / <code>append_many()</code> 로 한 번에 씁니다. 리팩터 전에는 행마다 <code>cats.exists()</code> 를, 커밋 시 카테고리마다 <code>cats.add()</code> 를 불러 파일을 여러 번 훑었습니다. 요약도 단일 패스로 네 값을 동시에 누적합니다.</p>
+<hr>
+<p><strong>다음 문서</strong>: <a href="09-cli.html">09. CLI 계층</a> — argparse, 대화형 입력, 프레젠터, 출력 채널.</p>
+<div class="pager"><span><a href="07-repository.html">← 07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></span><span><a href="09-cli.html">09. CLI 계층 — cli/ 패키지 여섯 모듈 →</a></span></div>
+<footer>docs/08-services.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+</main>
+</div>
+</body>
+</html>

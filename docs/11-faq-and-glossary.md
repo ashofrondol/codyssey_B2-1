@@ -1,0 +1,790 @@
+# 11. 설계 FAQ & 용어집
+
+"왜 이렇게 만들었나?"에 대한 30문답과, 이 시리즈에 나오는 용어 51개의 사전입니다. 용어마다 **"어디서 온 말인가"**(PEP 번호·책·연도)를 함께 적어 두었으므로, 구술 방어에서 "그건 어디서 나온 개념인가요?"를 받았을 때 바로 대답할 수 있습니다.
+
+> **난이도**: 🟢 초보
+>
+> **사용법**: 처음부터 읽어도 되고, 모르는 용어가 나올 때 사전처럼 찾아봐도 됩니다.
+>
+> **문법·라이브러리를 더 깊이 보려면**: 이 문서의 🔎/⚙️ 상자는 **압축 노트**입니다.
+> 같은 주제의 전체 설명은 [12. 문법과 표준 라이브러리 레퍼런스](./12-syntax-and-stdlib.md)에 있습니다.
+
+---
+
+## 제1부. 설계 FAQ
+
+### 빠른 찾아보기
+
+**기본 선택**
+[Q1 표준 라이브러리만](#q1-왜-외부-라이브러리-없이-표준-라이브러리만-쓰나) ·
+[Q2 JSONL vs CSV](#q2-왜-내부-저장은-jsonl-이고-교환은-csv-인가) ·
+[Q3 dataclass](#q3-왜-dataclass-를-쓰나) ·
+[Q18 테스트 부재](#q18-왜-테스트-코드가-저장소에-없나) ·
+[Q24 `__init__.py`](#q24-__init__py-는-없어도-python--m-으로-실행되는데-왜-두었나)
+
+**구조·계층**
+[Q4 검증 위치](#q4-왜-검증이-서비스가-아니라-모델-생성자__post_init__에-있나) ·
+[Q5 데코레이터 분리](#q5-왜-예외-처리를-데코레이터로-분리했나) ·
+[Q7 config/messages 분리](#q7-왜-상수는-configpy-문구는-messagespy-인가) ·
+[Q25 모듈 43개](#q25-모듈이-43개나-되는데-너무-잘게-나눈-것-아닌가) ·
+[Q26 파서와 핸들러](#q26-왜-파서가-핸들러-함수-대신-문자열-키를-갖나)
+
+**데이터 안전**
+[Q6 제너레이터](#q6-왜-읽기는-전부-제너레이터인가) ·
+[Q20 손상 줄 경고](#q20-왜-손상된-줄을-조용히-버리지-않나) ·
+[Q21 append vs 원자적 교체](#q21-왜-append-는-그냥-쓰고-updatedelete-는-원자적-교체인가) ·
+[Q27 읽기 경로 둘](#q27-왜-읽기-경로가-iter_raw-와-stream-둘인가) ·
+[Q28 ID 재발급](#q28-왜-id-스캔이-검증-실패-줄까지-보나)
+
+**도메인 규칙**
+[Q11 정수 금액](#q11-왜-amount-는-정수만-허용하나) ·
+[Q12 날짜 문자열](#q12-왜-date-를-date-객체가-아닌-문자열로-저장비교하나) ·
+[Q13 ID 재사용](#q13-왜-삭제된-id-를-재사용하지-않나) ·
+[Q14 카테고리 보호](#q14-왜-category-remove-에---replace-with-가-있나) ·
+[Q15 예산 덮어쓰기](#q15-왜-같은-월-예산은-덮어쓰나) ·
+[Q29 TransactionPatch](#q29-왜-수정-요청을-dict-가-아니라-dataclass-로-받나)
+
+**CLI·UX**
+[Q8 update 옵션 방식](#q8-왜-update-는-대화형이-아니라-옵션-방식인가) ·
+[Q9 export 기간 필수](#q9-왜-export-는-기간-지정이-필수인가) ·
+[Q10 종료 코드 8종](#q10-왜-종료-코드를-8종으로-세분화했나) ·
+[Q16 오류 5건 제한](#q16-왜-import-오류는-5건까지만-보여주나) ·
+[Q17 BOM 없는 UTF-8](#q17-왜-csv-는-bom-없는-utf-8-인가) ·
+[Q19 %-스타일 로깅](#q19-왜-로깅-메시지는--스타일인가) ·
+[Q22 EOF 처리](#q22-왜-대화형-입력은-eof-에서-즉시-중단하나) ·
+[Q23 BrokenPipe](#q23-왜-brokenpipeerror-는-오류로-취급하지-않나) ·
+[Q30 CSV id 컬럼](#q30-왜-csv-에-id-컬럼을-추가했나)
+
+---
+
+### Q1. 왜 외부 라이브러리 없이 표준 라이브러리만 쓰나?
+
+과제 제약이자 실용적 선택입니다. `pyproject.toml:12` 의 `dependencies = []` 가 이를 선언합니다.
+
+`argparse`(파싱), `json`(저장), `csv`(교환), `dataclasses`(모델), `pathlib`(경로), `logging`(로그), `calendar`(달력), `re`(정규식)만으로 이 앱이 필요한 기능이 전부 커버됩니다. 의존성이 0이면 Python 3.10 이상만 있으면 `pip install` 없이 즉시 실행되고, 버전 충돌이나 공급망 위험도 없습니다.
+
+> **🔎 문법의 출처** — 여기 쓰인 표준 라이브러리는 대부분 PEP 로 채택된 것입니다.
+> `logging` 은 PEP 282(파이썬 2.3), `csv` 는 PEP 305(2.3), `pathlib` 은 PEP 428(3.4),
+> `argparse` 는 PEP 389(3.2, `optparse` 를 대체), `dataclasses` 는 PEP 557(3.7)입니다.
+> "표준 라이브러리만"이라는 제약이 곧 "20년 치 PEP 논의를 그대로 물려받는다"는 뜻입니다.
+> → [12 §2-A](./12-syntax-and-stdlib.md), [12 §2-B](./12-syntax-and-stdlib.md)
+
+### Q2. 왜 내부 저장은 JSONL 이고 교환은 CSV 인가?
+
+**역할이 다르기 때문**입니다.
+
+| 관점 | 내부 저장 (JSONL) | 외부 교환 (CSV) |
+|---|---|---|
+| 요구사항 | 타입 보존, append O(1), 손상 격리 | 상호운용성 (Excel·구글시트) |
+| `tags` | 리스트 그대로 | 쉼표 문자열로 인코딩 |
+| `amount` | 정수 | 문자열 (읽을 때 파싱) |
+
+특히 **손상 격리**가 결정적입니다. 단일 JSON 파일이면 한 글자만 깨져도 전체를 못 읽지만, JSONL 은 한 줄만 영향받고 나머지가 살아 있습니다. 단일 JSON 배열은 append 할 때 닫는 `]` 를 지우고 다시 붙여야 해서 O(파일 크기)가 되는 반면 JSONL 은 끝에 한 줄 붙이면 끝이라는 점까지 포함한 비교가 [10 §5](./10-advanced-design.md)에 있습니다.
+
+> **⚙️ 내부 동작** — JSONL 한 줄을 만드는 `json.dumps(..., ensure_ascii=False)`(`storage/jsonl.py:207-208`)
+> 에서 `ensure_ascii` 는 기본값이 `True` 이고, 그대로 두면 한글이 `가` 같은
+> 이스케이프로 나갑니다. 파일은 여전히 올바른 JSON 이지만 사람이 못 읽습니다.
+> 반대로 읽는 쪽 `json.loads` 는 C 로 구현된 스캐너(`_json`)를 쓰고, 실패하면
+> 위치 정보를 담은 `JSONDecodeError`(`ValueError` 의 자식)를 던집니다 — 그 위치 정보가
+> `RawLine.error` 에 그대로 실려 사용자 경고가 됩니다.
+> → [12 §2-A](./12-syntax-and-stdlib.md)
+
+### Q3. 왜 dataclass 를 쓰나?
+
+"필드 선언"만으로 `__init__`/`__repr__`/`__eq__` 를 자동 생성해 보일러플레이트를 없애고, **필드 계약과 검증 로직만 남기기** 위해서입니다.
+
+이 프로젝트는 dataclass 를 네 가지 목적으로 씁니다.
+
+| 목적 | 예 | `frozen` |
+|---|---|---|
+| 저장 엔티티 | `Transaction`, `Budget`, `Category` | 아니오 (`__post_init__` 이 덮어씀) |
+| 변경 요청 | `TransactionPatch` | 예 |
+| 질의 조건 | `SearchFilter` | 아니오 |
+| 계산 결과 | `MonthlySummary`, `ImportReport`, `RawLine`, `ParsedRow` | 예 |
+
+`frozen=True` 는 "만들어진 뒤에는 못 바꾼다"는 뜻이고, 그래서 값이 도중에 변할 걱정 없이 다른 자료구조의 키나 집합 원소로 쓸 수 있습니다 — 자세한 해설은 [03 §1](./03-python-advanced.md).
+
+> **🔎 문법의 출처** — `@dataclass` 는 PEP 557 로 파이썬 3.7 에 들어왔습니다. 그 전에는
+> `collections.namedtuple` 을 쓰거나 `__init__`/`__repr__`/`__eq__` 를 손으로 적었고,
+> 외부 라이브러리 **attrs** 가 사실상 표준이었습니다. PEP 557 은 그 attrs 의 설계를
+> 표준 라이브러리로 들여온 것이라고 스스로 밝힙니다.
+> → [12 §1-B](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작** — `@dataclass` 는 마법이 아니라 **소스 코드 생성기**입니다. 클래스의
+> `__annotations__` 를 읽어 `def __init__(self, id, type, ...)` 같은 문자열을 조립한 뒤
+> `exec` 로 실행해 함수를 만들고 클래스에 붙입니다. `frozen=True` 면 추가로
+> `__setattr__`/`__delattr__` 를 **그 클래스 자신의 인스턴스이거나 대입 대상 이름이
+> 필드일 때** `FrozenInstanceError` 를 던지는 함수로 덮어씁니다(그 조건에 걸리지
+> 않으면 `super().__setattr__` 로 넘겨 정상 대입합니다).
+> `Transaction.__post_init__`(`domain/entities.py:68-80`)이 대입 대신
+> `object.__setattr__` 을 쓰는 이유가 이것입니다 — 덮어쓴 `__setattr__` 을 건너뛰고
+> 원래 것을 직접 부르는 우회로입니다.
+> → [12 §1-B](./12-syntax-and-stdlib.md)
+
+### Q4. 왜 검증이 서비스가 아니라 모델 생성자(`__post_init__`)에 있나?
+
+거래 객체가 만들어지는 경로가 **네 가지**이기 때문입니다.
+
+| # | 경로 | 진입점 |
+|---|---|---|
+| 1 | CLI 대화형 입력 | `TransactionService.add` |
+| 2 | JSONL 파일 읽기 | `Transaction.from_dict` |
+| 3 | CSV 가져오기 | `ParsedRow.to_transaction` |
+| 4 | 수정 | `Transaction.with_patch` |
+
+검증을 각 경로에 흩어 놓으면 하나를 빠뜨리는 순간 불량 데이터가 들어옵니다. 네 경로 전부 `Transaction(...)` 생성자를 통과하므로, **"검증을 깜빡한 경로"가 존재할 수 없습니다.**
+
+다만 **규칙 자체는 `validators.py` 에** 있고 `__post_init__` 은 "어떤 규칙을 어떤 필드에"를 선언할 뿐입니다(`domain/entities.py:68-80`).
+
+> **⚙️ 내부 동작** — `__post_init__` 은 파이썬 언어의 특수 메서드가 아니라 **dataclasses
+> 모듈만의 약속**입니다. `@dataclass` 가 생성하는 `__init__` 은 필드를 전부 대입한
+> 다음 줄에 `self.__post_init__(...)` 호출을 넣어 주는데, 그 줄은 클래스에
+> `__post_init__` 이 정의되어 있을 때만 생성됩니다. 그래서 "생성자를 통과한 객체는
+> 반드시 검증을 거쳤다"가 성립합니다 — 객체를 만드는 다른 길이 없기 때문입니다.
+> → [12 §1-B](./12-syntax-and-stdlib.md)
+
+**한편 서비스도 검증을 합니다** — 다른 종류의 것을. "카테고리가 등록되어 있는가"는 값 하나로 판단할 수 없고 저장된 상태를 봐야 하므로 서비스의 몫이며, `AppError` 를 던집니다.
+
+### Q5. 왜 예외 처리를 데코레이터로 분리했나?
+
+CLI 핸들러 13개가 각자 `try/except` 를 갖는 것을 막기 위해서입니다. 만약 각 핸들러가 예외를 직접 처리했다면 같은 11단 except 체인이 13번 복사되고, 정책이 바뀔 때 13곳을 고쳐야 합니다.
+
+**지금은 그 방패가 한 곳에만 붙어 있습니다** — `cli/app.py:61` 의 `_dispatch` 입니다. 핸들러 13개에 각각 붙이는 대신 "핸들러를 부르는 자리"를 한 겹 감쌌기 때문에, 컨텍스트 조립(`AppContext.prepare()`)에서 나는 오류까지 같은 방패 안에 들어옵니다.
+
+**데코레이터끼리도 두 파일로 나뉘어 있습니다.** `@log_call`/`@measure_time`(관측)은 `decorators.py`, `@handle_errors`(표현)는 `error_handler.py` 입니다. 한 파일에 두면 서비스 계층이 `@log_call` 하나를 쓰려다 출력 모듈까지 끌고 들어와 **계층 역류**(아래층이 위층을 import 하는 것)가 생깁니다([06 §2.2](./06-decorators.md)).
+
+> **🔎 문법의 출처** — `@데코레이터` 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다.
+> 그 전에는 함수를 정의한 **뒤에** `cmd_add = handle_errors(cmd_add)` 라고 다시 대입해야
+> 했고, 이름이 두 번 나오는 데다 함수 본문을 다 읽고 나서야 무엇으로 감쌌는지 알 수
+> 있었습니다. `@` 표기가 하는 일은 정확히 그 재대입이며, 위치만 `def` 앞으로 올린
+> 것입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+
+### Q6. 왜 읽기는 전부 제너레이터인가?
+
+메모리 O(1) 스트리밍을 위해서입니다. `for tx in stream()` 이 동시에 들고 있는 것은 "현재 줄 하나 + 객체 하나"뿐입니다.
+
+**조기 종료의 이점**도 큽니다. `category_in_use` 는 `any()` 로 첫 일치에서 멈추므로 파일 뒷부분을 아예 읽지 않습니다. `export` 는 제너레이터 식을 CSV writer 에 그대로 넘겨 100만 건을 내보내도 메모리가 일정합니다.
+
+**예외는 `stream_sorted`** 입니다. 정렬은 본질적으로 전체를 봐야 하므로 리스트를 만듭니다. 다만 담기는 것은 "필터 통과분"뿐입니다(`services/transactions.py:79-87`).
+
+> **🔎 문법의 출처** — `yield` 로 함수를 중단·재개하는 제너레이터는 PEP 255(파이썬 2.2)
+> 입니다. `stream_sorted` 끝줄의 `yield from items`(`services/transactions.py:87`)에 쓰인
+> `yield from` 은 그보다 한참 뒤인 PEP 380(3.3)이고, 그 전에는
+> `for x in items: yield x` 라고 풀어 써야 했습니다.
+> → [12 §1-C](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작** — `def` 안에 `yield` 가 하나라도 있으면 컴파일러가 그 코드 객체에
+> 제너레이터 플래그를 붙이고, 호출하면 **본문을 한 줄도 실행하지 않은 채** 제너레이터
+> 객체만 돌려줍니다. 본문은 `next()` 가 처음 불릴 때 시작하고, `yield` 에서 프레임
+> (지역 변수와 실행 위치)을 통째로 얼려 둡니다. `for tx in stream()` 은 사실
+> `it = iter(stream()); while True: tx = next(it)` 이고, 함수가 끝나면 `StopIteration`
+> 이 올라와 루프가 종료됩니다. `any()` 가 첫 일치에서 멈추면 그 프레임은 다시 깨어나지
+> 않으므로 파일 뒷부분을 읽지 않는 것입니다.
+> → [12 §1-C](./12-syntax-and-stdlib.md)
+
+### Q7. 왜 상수는 config.py, 문구는 messages.py 인가?
+
+**바꿨을 때 일어나는 일이 다르기 때문**입니다.
+
+- `MAX_INPUT_RETRIES = 10` → 5로 바꾸면 **동작**이 달라짐 = config
+- `PROMPT_DATE = "날짜(YYYY-MM-DD): "` → 영어로 바꿔도 동작은 같음 = messages
+
+리팩터 전에는 한 파일이었고, 그래서 **엔티티 모듈(당시 이름 `models.py`)이 CLI 한국어 문구까지 들어 있는 모듈에 의존**했습니다. 도메인 계층이 화면 문구 변경에 묶이는 구조였습니다.
+
+지금은 `config.py`/`messages.py` 가 **계층마다 하나씩** 있습니다(`domain/`, `storage/`, `services/`, `cli/`). 엔티티 모듈은 이름도 `domain/entities.py` 로 바뀌었고, import 하는 것은 같은 `domain` 패키지 안의 `validators` 와 `tx_id` 둘뿐입니다(`domain/entities.py:19-20`). 검증 메시지가 필요하면 `validators` 가 `domain/messages.py`(14줄, 검증 오류 문구만)를 보고, CLI 문구는 `cli/messages.py` 에 따로 있어 도메인이 그것을 볼 일이 없습니다.
+
+### Q8. 왜 update 는 대화형이 아니라 옵션 방식인가?
+
+수정은 "이미 있는 값 중 **일부만**" 바꾸는 작업입니다. 대화형이면 안 바꿀 필드까지 전부 다시 물어야 하고, "엔터 = 유지"라는 암묵 규칙이 필요해 오히려 헷갈립니다.
+
+옵션 방식은 `--amount 16000` 처럼 **바꿀 것만 명시**하므로 의도가 분명하고, 스크립트에서 자동화하기도 쉽습니다.
+
+### Q9. 왜 export 는 기간 지정이 필수인가?
+
+전체 내보내기를 기본값으로 두면 데이터가 커졌을 때 사용자가 의도치 않게 거대한 파일을 만들 수 있습니다. `--month` 또는 `--from`/`--to` 를 요구하면 **"무엇을 내보내는지" 항상 명시적**입니다.
+
+굳이 전체가 필요하면 `--from 1900-01-01 --to 2999-12-31` 처럼 넓은 범위를 주면 됩니다 — 그 경우에도 사용자가 의도를 밝힌 것입니다.
+
+### Q10. 왜 종료 코드를 8종으로 세분화했나?
+
+셸 스크립트가 **실패의 종류에 따라 다르게 대응**할 수 있게 하기 위해서입니다.
+
+```bash
+python -m budget_app import --from data.csv
+case $? in
+  0) echo "성공" ;;
+  2) echo "입력 형식 오류 — CSV 를 확인하세요" ;;
+  3) echo "파일 문제 — 경로를 확인하세요" ;;
+  4) echo "규칙 위반 — 카테고리나 중복을 확인하세요" ;;
+  6) echo "인코딩 문제 — UTF-8 로 저장하세요" ;;
+esac
+```
+
+0/1 만 있으면 이런 분기가 불가능합니다. 130 은 유닉스 관례(128 + SIGINT 번호 2)를 따랐습니다.
+
+> **🔎 문법의 출처** — "128 + 시그널 번호"는 파이썬이 아니라 **셸(sh/bash)의 관례**입니다.
+> 시그널로 죽은 자식 프로세스에는 애초에 종료 코드가 없어서(`wait(2)` 가 돌려주는 것은
+> 종료 상태 워드입니다) 셸이 `$?` 에 담을 값을 128 에 시그널 번호를 더해 만들어 냅니다.
+> `cli/config.py:22-29` 의 상수 8개는 그 세계의 규칙에 맞춰 고른 숫자이지 파이썬이
+> 정해 준 값이 아닙니다. → [12 §3](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작** — 이 값이 OS 에 닿는 경로는 `__main__.py:8` 의
+> `sys.exit(main())` 입니다. `sys.exit(n)` 은 프로세스를 즉시 죽이는 것이 아니라
+> `SystemExit` **예외를 던지는** 함수라, 도중의 `finally` 블록과 `with` 정리는
+> 정상적으로 실행됩니다. 그 예외를 아무도 잡지 않고 인터프리터 최상단까지 올라왔을 때
+> 비로소 그 값이 프로세스 종료 코드가 됩니다.
+> → [12 §1-A](./12-syntax-and-stdlib.md)
+
+### Q11. 왜 amount 는 정수만 허용하나?
+
+**부동소수점 오차를 원천 차단**하기 위해서입니다.
+
+```python
+>>> 0.1 + 0.2
+0.30000000000000004        # 금액 계산에 float 를 쓰면 안 되는 이유
+```
+
+원 단위 통화는 소수점이 필요 없으므로 정수로 충분합니다. 소수점이 있는 통화(달러 등)를 지원한다면 **센트 단위 정수**로 저장하는 것이 정석입니다(`amount_cents`).
+
+양수만 허용하는 것은 **부호로 수입/지출을 구분하지 않기** 때문입니다. 그 구분은 `type` 필드가 담당하므로, 금액에까지 부호를 두면 "type=income 인데 amount=-1000" 같은 모순 상태가 가능해집니다.
+
+> **⚙️ 내부 동작** — 파이썬 3 의 `int` 는 **자릿수 제한이 없습니다.** C 의 64비트 정수처럼
+> 오버플로로 음수가 되는 일이 없고, 필요하면 메모리가 허락하는 만큼 자리를 늘립니다
+> (2.x 의 `int`/`long` 구분이 3.0 에서 하나로 합쳐진 결과입니다). 그래서 합계를
+> 아무리 더해도 정확하고, 금액을 정수로 두는 선택에 상한 걱정이 따라붙지 않습니다.
+> 반면 `float` 는 IEEE 754 배정밀도라 0.1 을 애초에 정확히 담지 못합니다.
+> → [12 §1-A](./12-syntax-and-stdlib.md)
+
+### Q12. 왜 date 를 `date` 객체가 아닌 문자열로 저장·비교하나?
+
+`YYYY-MM-DD`(ISO 8601)는 **사전순 비교가 날짜순 비교와 일치**합니다.
+
+```python
+"2024-01-15" < "2024-02-01"   # True — 문자열 비교인데 날짜 순서와 같다
+```
+
+그래서 문자열 그대로 비교(`SearchFilter.matches`)·정렬(`stream_sorted`)·JSON 저장이 전부 가능합니다. `datetime.date` 객체로 들고 있으면 저장할 때마다 문자열로 바꾸고 읽을 때마다 파싱해야 하는데, 얻는 것이 없습니다.
+
+검증은 `datetime.strptime` 으로 하되, **`datetime` 객체를 들고 다니지는 않고 `strftime` 으로 정규형 문자열을 다시 찍어** 돌려줍니다(`domain/validators.py:80-99`) — 파싱은 검증의 수단이고, 저장·비교에 쓰이는 것은 그 결과 문자열입니다.
+
+원문을 그대로 돌려주면 안 되는 이유가 소스 docstring 에 적혀 있습니다. `strptime` 은 **검증기이지 정규화기가 아니어서** `"2024-1-5"` 를 오류 없이 받아 줍니다. 그것을 그대로 저장하면 같은 날이 파일에 두 표기로 공존하고, 문자열 비교라는 이 프로그램의 전제가 그 순간 깨집니다.
+
+```python
+"2024-1-5" <= "2024-01-31"   # False — 1월 5일이 1월 요약에서 조용히 사라진다
+```
+
+그래서 마지막 줄이 `return dt.strftime(config.DATE_FORMAT)` 입니다. 기존 파일에 비정규 표기가 남아 있어도 읽는 순간 `__post_init__` 을 다시 지나므로 자동으로 치유됩니다.
+
+> **⚙️ 내부 동작** — `datetime.strptime` 은 C 라이브러리의 `strptime` 을 부르는 것이
+> 아니라 **순수 파이썬 모듈 `_strptime`** 입니다. 포맷 문자열 `"%Y-%m-%d"` 를 훑어
+> 지시자마다 정규식 조각을 조립해 하나의 패턴을 만들고, 그 패턴으로 입력 전체를
+> 매치시킵니다. `"%Y-%m-%d"` 가 실제로 만들어 내는 패턴은 이렇습니다.
+>
+> ```
+> (?P<Y>\d\d\d\d)-(?P<m>1[0-2]|0[1-9]|[1-9])-(?P<d>3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])
+> ```
+>
+> `%Y` 는 네 자리를 요구하지만 `%m`/`%d` 는 선택지 끝에 `[1-9]` 가 있어 **한 자리도
+> 통과**시킵니다 — `"2024-1-5"` 가 살아남는 이유가 정확히 이것입니다. 조립한 패턴은
+> 캐시되므로 반복 호출이 매번 다시 만들지는 않습니다.
+> → [12 §2-A](./12-syntax-and-stdlib.md)
+
+### Q13. 왜 삭제된 id 를 재사용하지 않나?
+
+id 는 **거래를 영구히 식별하는 이름**입니다. 재사용하면 이런 문제가 생깁니다.
+
+- 사용자가 `TX-000005` 를 메모해 뒀는데, 그것이 삭제 후 다른 거래를 가리키게 됨
+- 백업본과 현재 파일에서 같은 id 가 다른 내용을 가리킴
+- export 한 CSV 를 나중에 import 할 때 엉뚱한 거래로 인식됨
+
+`IdAllocator` 는 **최대 번호 + 1** 에서 시작하되 `taken` 집합에 있으면 건너뜁니다. 삭제로 생긴 빈 번호는 영구히 비어 있습니다.
+
+### Q14. 왜 category remove 에 `--replace-with` 가 있나?
+
+**참조 무결성**을 지키기 위해서입니다. 거래가 참조하는 카테고리를 그냥 지우면 "존재하지 않는 카테고리를 가리키는 거래"가 남습니다.
+
+세 가지 선택지 중 이 프로젝트는 (3)을 택했습니다.
+
+1. 거래도 함께 삭제 — 데이터 유실
+2. 조용히 지우고 거래는 그대로 — 무결성 깨짐
+3. **차단하되 대체 카테고리를 지정하면 재지정 후 삭제** ✅
+
+관계형 DB 의 `ON DELETE RESTRICT` / `ON DELETE SET DEFAULT` 를 코드로 구현한 것입니다.
+
+### Q15. 왜 같은 월 예산은 덮어쓰나?
+
+"2024년 1월의 예산"은 **하나뿐**인 것이 자연스럽기 때문입니다. 여러 개면 `summary` 가 어느 것을 써야 할지 모호해집니다.
+
+`BudgetStore.set` 은 `rewrite` 한 번으로 "같은 달 제거 + 새 값 추가"를 동시에 합니다. 삭제와 추가를 따로 하면 그 사이에 죽었을 때 예산이 사라진 상태가 됩니다.
+
+`get` 이 **마지막 값**을 취하는 것은 파일을 손으로 편집한 경우를 대비한 규칙입니다 — "나중에 쓴 것이 이긴다"는 JSONL 의 자연스러운 의미와 맞습니다.
+
+### Q16. 왜 import 오류는 5건까지만 보여주나?
+
+1만 줄짜리 CSV 가 전부 깨졌을 때 오류 1만 줄로 화면을 도배하지 않기 위해서입니다(`config.MAX_IMPORT_ERRORS`).
+
+**개수는 전부 셉니다.** `skipped=10000` 은 정확하고, 메시지만 앞의 5개로 자릅니다(`services/importexport.py:45-53`). 사용자는 "얼마나 잘못됐는지"와 "무엇이 잘못됐는지의 예시"를 둘 다 얻습니다. 화면뿐 아니라 **메모리도 같이 지키는** 장치입니다 — 사유 문자열 1만 개를 리스트에 쌓으면 그것부터 부담이 됩니다.
+
+### Q17. 왜 CSV 는 BOM 없는 UTF-8 인가?
+
+**왕복 안전성** 때문입니다. BOM 이 붙은 CSV 를 BOM 을 모르는 쪽에서 읽으면 헤더 첫 컬럼명이 `﻿id` 로 깨져 필수 컬럼 검사가 실패합니다.
+
+**읽기와 쓰기의 인코딩이 일부러 다릅니다**(`storage/config.py:39-40`).
+
+| 방향 | 인코딩 | 이유 |
+|---|---|---|
+| 쓰기 (`export`) | `utf-8` — BOM 없음 | 우리가 만든 파일에는 군더더기를 넣지 않는다 |
+| 읽기 (`import`) | `utf-8-sig` — BOM 흡수 | 엑셀이 저장한 CSV 에는 BOM 이 붙어 온다 |
+
+`utf-8-sig` 는 읽을 때 BOM 이 있으면 먹어 치우고 없으면 그냥 넘어가는 코덱이라, **읽기 쪽만 관대하게** 두면 두 경우를 모두 받을 수 있습니다. 반대로 쓰기까지 `utf-8-sig` 로 하면 우리 파일에도 BOM 이 생겨서, 이 프로그램 밖의 도구(BOM 을 모르는 파서)로 넘길 때 같은 사고를 남에게 물려주게 됩니다. 이것이 **"보내는 것은 엄격하게, 받는 것은 관대하게"**(Postel 의 법칙)의 전형적인 적용입니다.
+
+> **🔎 문법의 출처** — BOM(Byte Order Mark)은 유니코드 표준의 문자 **U+FEFF** 입니다.
+> 원래 목적은 UTF-16 처럼 2바이트 이상을 쓰는 인코딩에서 바이트 순서(빅/리틀 엔디언)를
+> 알리는 것이었습니다. UTF-8 은 바이트 순서라는 개념 자체가 없어 BOM 이 **불필요한데**,
+> 마이크로소프트 도구들이 "이 파일은 UTF-8 이다"라는 표식으로 전용해 쓰면서 관행이
+> 됐습니다. 파이썬은 그 관행을 `"utf-8-sig"` 라는 별도 인코딩 이름으로 지원합니다
+> (`sig` 는 signature). → [12 §3](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작** — BOM 이 왜 헤더를 깨뜨리는지가 핵심입니다. `encoding="utf-8"` 로
+> 읽으면 파일 맨 앞 3바이트 `EF BB BF` 는 오류 없이 문자 `"﻿"` 로 디코딩됩니다.
+> 그래서 첫 줄이 `"﻿id,date,..."` 가 되고, `csv.DictReader` 가 만든 첫 컬럼명은
+> `"id"` 가 아니라 `"﻿id"` 입니다 — 눈으로는 똑같아 보이는데 다른 문자열입니다.
+> 첫 컬럼이 필수 컬럼이면 `_check_header`(`storage/csv_io.py:90-104`)가 "컬럼이 없다"고
+> 막아 주지만, 첫 컬럼이 선택 컬럼인 `id` 면 **오류 없이 id 만 조용히 사라져** 왕복이
+> 거래를 복제합니다(Q30 이 고친 바로 그 증상). **오류가 나지 않고 조용히 다른 문자열이
+> 되는 것**이 이 버그가 찾기 어려운 이유입니다. → [12 §3](./12-syntax-and-stdlib.md)
+
+Excel 에서 한글이 깨져 보이면 *데이터 → 텍스트/CSV 가져오기* 에서 원본 인코딩을 UTF-8 로 지정하면 됩니다. 반대로 Excel 이 저장한(=BOM 이 붙은) CSV 를 `import` 하는 방향은 위의 `utf-8-sig` 덕분에 그냥 됩니다.
+
+### Q18. 왜 테스트 코드가 저장소에 없나?
+
+`pyproject.toml:1-5` 주석이 답합니다 — "블랙박스 계약 테스트는 별도 그레이더 저장소로 분리되었다".
+
+**블랙박스 계약 테스트**란 내부 구현을 보지 않고 실제 명령으로 실행해 **입력 → 출력·종료 코드·파일 상태**만 검증하는 테스트입니다. 소스 import 가 필요 없으므로 애플리케이션 저장소에 함께 둘 이유가 없습니다.
+
+분리하면 (1) 이 저장소가 런타임 의존성 0을 유지하고(pytest 조차 없음), (2) 채점기가 구현과 독립적으로 계약을 검증할 수 있습니다.
+
+### Q19. 왜 로깅 메시지는 %-스타일인가?
+
+**지연 포맷팅** 때문입니다.
+
+```python
+logger.debug(messages.LOG_CALL, func.__name__)   # 템플릿과 인자를 따로
+logger.debug(f"call {func.__name__}")            # 매번 문자열을 만듦
+```
+
+첫 번째는 로그가 **실제로 출력될 때만** `%` 치환을 합니다. DEBUG 가 꺼져 있으면(대부분의 실행) 문자열 조합 비용이 0입니다. 두 번째는 버려질 문자열도 매번 만듭니다.
+
+호출 빈도가 높은 저수준 로그일수록 차이가 커집니다.
+
+> **⚙️ 내부 동작** — `logger.debug(템플릿, 인자)` 가 하는 일의 순서가 이유의 전부입니다.
+> ① 먼저 `isEnabledFor(DEBUG)` 로 레벨을 검사하고, 통과하지 못하면 **그 자리에서
+> 돌아갑니다.** ② 통과했을 때만 `LogRecord` 객체를 만들어 템플릿과 인자를 `msg`,
+> `args` 에 **따로** 담습니다. ③ 실제 문자열 결합은 핸들러가 `record.getMessage()`
+> (= `self.msg % self.args`)를 부르는 마지막 순간에 일어납니다.
+> f-string 으로 미리 조립하면 ①보다 **먼저** 문자열이 만들어지므로 이 3단 지연이
+> 통째로 무의미해집니다. → [12 §2-B](./12-syntax-and-stdlib.md)
+
+> **🔎 문법의 출처** — `%` 서식은 C 의 `printf` 에서 온 파이썬의 **가장 오래된** 포맷
+> 방식입니다. 이후 `str.format`(PEP 3101, 3.0), f-string(PEP 498, 3.6)이 차례로
+> 들어왔지만 `logging` 만은 `%` 를 계속 쓰는데, 위 3단 지연이 "템플릿과 인자를 따로
+> 들고 있다가 나중에 합친다"는 구조를 요구하기 때문입니다. 실제로 이 프로젝트의
+> 사용자 화면 문구는 `str.format` 을 쓰고(`messages.MSG_ERROR_LINE.format(msg=exc)`),
+> `%` 는 로깅에만 남아 있습니다 — 두 방식이 섞인 것이 아니라 **역할이 갈린** 것입니다.
+> → [12 §1-A](./12-syntax-and-stdlib.md), [12 §2-B](./12-syntax-and-stdlib.md)
+
+### Q20. 왜 손상된 줄을 조용히 버리지 않나?
+
+**데이터 유실을 사용자가 인지해야** 하기 때문입니다. 조용히 건너뛰면 "왜 거래 수가 안 맞지?"를 영원히 알 수 없습니다.
+
+`stream()` 은 손상 줄마다 경고 로그를 남깁니다(`storage/jsonl.py:203`). 기본 로그 레벨이 WARNING 이므로 `--debug` 없이도 보입니다.
+
+리팩터에서 **경고가 두 종류로 늘었습니다.**
+
+| 상황 | 메시지 |
+|---|---|
+| 읽을 때 | `transactions.jsonl:2 손상된 줄을 건너뜁니다: ...` |
+| 다시 쓸 때 | `transactions.jsonl: 손상된 줄 1개를 해석하지 않고 원문 그대로 보존했습니다.` |
+
+두 상황에서 사용자가 알아야 할 것이 다르기 때문입니다.
+
+> **⚙️ 내부 동작** — "손상"에는 두 층이 있고, 이 코드는 **둘 다** 격리합니다.
+> ① JSON 문법이 깨진 줄은 `json.loads` 가 `JSONDecodeError` 를 던져 걸립니다.
+> ② 그보다 아래층에서 **바이트 자체가 UTF-8 이 아닌** 줄도 있는데, 이쪽은
+> `open(..., errors="surrogateescape")`(`storage/jsonl.py:162-179`)가 막습니다.
+> 기본값인 `errors="strict"` 였다면 디코딩 실패가 `UnicodeDecodeError` 로 올라와
+> **파일 읽기 전체를 죽였을** 것입니다 — 한 줄을 격리하려던 설계가 인코딩 층에서
+> 구멍이 나는 자리였습니다. `surrogateescape` 는 디코딩 못 하는 바이트를 유니코드의
+> 미사용 영역(서로게이트) 문자로 바꿔 두었다가 **같은 옵션으로 인코딩할 때 원래
+> 바이트로 정확히 되돌립니다.** 그래서 "읽어서 다시 쓰기"가 원문을 손상시키지 않습니다.
+> → [12 §3](./12-syntax-and-stdlib.md)
+
+> **🔎 문법의 출처** — `surrogateescape` 오류 처리기는 **PEP 383**(파이썬 3.1)에서
+> 왔습니다. 원래 목적은 파일명처럼 "OS 가 준 바이트인데 UTF-8 이라는 보장이 없는"
+> 값을 문자열로 다루면서도 잃지 않는 것이었고, 여기서는 그 성질을 데이터 파일에
+> 빌려 쓴 것입니다. → [12 §3](./12-syntax-and-stdlib.md)
+
+### Q21. 왜 append 는 그냥 쓰고 update/delete 는 원자적 교체인가?
+
+**바꾸는 범위가 다르기 때문**입니다.
+
+| 연산 | 파일 변화 | crash 시 |
+|---|---|---|
+| `append` | 끝에 한 줄 추가 | 기존 내용 무사, 마지막 줄이 잘릴 수 있음 |
+| `update`/`delete` | **전체 재작성** | 원자적 교체가 없으면 파일 전체가 반쪽 |
+
+append 는 O(1) 이고 기존 데이터를 건드리지 않으므로 원자적 교체가 과합니다. 반면 전체 재작성은 중간에 죽으면 **모든 데이터를 잃을 수 있어** 반드시 임시 파일 + `os.replace` 가 필요합니다.
+
+> **🔎 문법의 출처** — "같은 파일시스템 안에서 rename 은 원자적"이라는 보장은 파이썬이
+> 아니라 **POSIX 의 `rename(2)` 규격**에서 옵니다. 다만 POSIX 의 `rename` 은 대상이
+> 이미 있으면 덮어쓰는데 윈도우의 `MoveFile` 은 실패해서, 파이썬 2 시절의 `os.rename`
+> 은 플랫폼마다 동작이 달랐습니다. `os.replace` 는 그 차이를 없애려고 **파이썬 3.3 에
+> 추가된** 함수로, 어느 OS 에서도 "대상이 있어도 덮어쓴다"로 통일합니다.
+> → [12 §3](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작** — 원자적 쓰기가 세 단계인 이유가 각각 다릅니다
+> (`storage/jsonl.py:48-77`). ① `f.flush()` 는 **파이썬 쪽 버퍼**(`io` 모듈이 들고 있는
+> 바이트)를 `write(2)` 로 커널에 넘깁니다. ② `os.fsync(f.fileno())` 는 그 다음 층인
+> **커널 페이지 캐시**를 물리 디스크까지 밀어냅니다. ③ `os.replace(tmp, target)` 가
+> 이름을 바꿉니다. ②를 빼먹으면 rename 은 성공했는데 그 이름이 가리키는 내용은 아직
+> 디스크에 없는 상태가 가능하고, 전원이 끊기면 **길이가 0인 파일**이 남습니다.
+> 즉 `replace` 는 "이름이 통째로 바뀐다"만 보장하고 "내용이 남아 있다"는 `fsync` 의
+> 몫입니다. → [12 §3](./12-syntax-and-stdlib.md)
+
+### Q22. 왜 대화형 입력은 EOF 에서 즉시 중단하나?
+
+**무한 루프를 막기 위해서**입니다.
+
+```bash
+printf '2024-01-15\nexpense\n' | python -m budget_app add
+```
+
+세 번째 프롬프트에서 입력이 끝났습니다. EOF 를 처리하지 않으면:
+
+- 스택트레이스가 사용자 화면에 노출되거나
+- `input()` 이 빈 문자열을 반환 → 검증기가 거부 → 다시 물음 → 또 EOF → **영원히 반복**
+
+`InputAborted`(AppError 의 자식)로 승격하면 `handle_errors` 가 코드 추가 없이 처리해 종료 코드 4로 깔끔히 끝납니다.
+
+**두 번째 방어**로 재시도 상한도 있습니다 — `for _ in range(MAX_INPUT_RETRIES)`(`cli/prompts.py:66`). `while True` 를 쓰지 않은 것이 핵심입니다.
+
+> **⚙️ 내부 동작** — `input()` 은 EOF 에서 빈 문자열을 돌려주지 않고 **`EOFError` 를
+> 던집니다.** 그 아래층인 `sys.stdin.readline()` 은 EOF 에서 `""` 를 반환하는데,
+> `input()` 은 그 `""` 를 보고 예외로 승격합니다 — "빈 줄을 입력했다"(`"\n"`)와
+> "입력이 끝났다"(`""`)를 구분해야 하기 때문입니다. `ask`(`cli/prompts.py:52-57`)는
+> 그 `EOFError` 를 잡아 애플리케이션의 `InputAborted` 로 다시 던집니다.
+> → [12 §1-C](./12-syntax-and-stdlib.md)
+
+> **🔎 문법의 출처** — 그때 쓰는 `raise InputAborted() from exc` 의 `from` 절은
+> **PEP 3134**(파이썬 3.0)의 예외 연쇄입니다. `from` 을 붙이면 새 예외의
+> `__cause__` 에 원래 예외가 들어가고, 트레이스백이 "위의 예외가 직접적인 원인"이라고
+> 함께 출력합니다. 붙이지 않아도 `__context__` 로 암묵 연결은 되지만, `from` 은
+> **의도적인 변환**임을 명시하는 표시입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+
+### Q23. 왜 BrokenPipeError 는 오류로 취급하지 않나?
+
+`list | head` 에서 `head` 가 3줄 읽고 종료하는 것은 **정상적인 유닉스 파이프라인 동작**입니다. 하류가 "충분히 받았다"고 알린 것이지 프로그램이 실패한 게 아닙니다.
+
+대응이 세 단계로 나뉩니다.
+
+1. `handle_errors` 는 **처리하지 않고 `raise`**(`cli/error_handler.py:57-60`) — 여기서 출력하면 또 파이프가 깨지는 2차 사고
+2. `main` 이 잡아 `os.dup2` 로 stdout 을 `/dev/null` 로 갈아끼움(`cli/app.py:50-58`) — 인터프리터 종료 시 `Exception ignored` 방지
+3. 종료 코드는 **0**
+
+> **🔎 문법의 출처** — 닫힌 파이프에 쓰면 유닉스는 프로세스에 **SIGPIPE 시그널**을 보내
+> 기본 동작으로 죽여 버립니다(`head` 뒤의 명령이 조용히 사라지는 것이 이 때문입니다).
+> 파이썬은 시작할 때 SIGPIPE 를 무시(`SIG_IGN`)로 바꿔 두기 때문에 프로세스가 죽는
+> 대신 `write` 가 `EPIPE` 오류를 돌려주고, 그것이 `BrokenPipeError` 로 올라옵니다.
+> 즉 이 예외를 **볼 수 있다는 것 자체가** 파이썬이 유닉스 기본 동작을 한 번 바꿔 준
+> 결과입니다. → [12 §3](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작** — 2단계의 `os.dup2(devnull, sys.stdout.fileno())` 는 "**파일
+> 디스크립터 1번이 가리키는 대상**을 바꿔치기"하는 시스템 콜입니다. 파이썬 객체
+> `sys.stdout` 을 교체하는 것이 아니라 그 아래 OS 자원을 바꾸는 것이라, 인터프리터가
+> 종료하며 남은 버퍼를 flush 할 때 그 쓰기가 `/dev/null` 로 흘러가 아무 일도 일어나지
+> 않습니다. 이 조치가 없으면 종료 직전 flush 가 다시 `BrokenPipeError` 를 내고,
+> 그 시점에는 잡아 줄 코드가 없어 `Exception ignored in: ...` 가 stderr 에 찍힙니다 —
+> **종료 코드는 0인데 화면에는 오류가 보이는** 이상한 상태가 됩니다.
+> → [12 §3](./12-syntax-and-stdlib.md)
+
+### Q24. `__init__.py` 는 없어도 `python -m` 으로 실행되는데, 왜 두었나?
+
+**필수가 아니라 설계 선택**입니다. 파이썬 3.3+ 는 `__init__.py` 없는 폴더도 네임스페이스 패키지로 import 합니다.
+
+그래도 두는 이유 셋:
+
+1. `__version__` 과 docstring 을 담을 자리가 필요
+2. **같은 이름 폴더가 여럿일 때 동작이 다름** — 일반 패키지는 처음 찾은 하나만 쓰지만(차폐), 네임스페이스 패키지는 전부 병합합니다. 단일 애플리케이션에서는 우연한 병합이 찾기 어려운 버그가 됩니다.
+3. `find_packages()` 같은 도구 호환성
+
+일반 패키지는 `__init__.py` 를 실행한 결과가 모듈 객체가 되고, 네임스페이스 패키지는 그런 파일이 없어 `__file__` 조차 없는 특수한 모듈이 됩니다 — 자세한 비교는 [02 §1.1](./02-python-basics.md).
+
+> **⚙️ 내부 동작** — `python -m budget_app` 이 하는 일은 표준 라이브러리 **`runpy`**
+> 모듈이 담당합니다. 패키지 이름을 받으면 그 안의 `__main__` 서브모듈을 찾아,
+> `__name__` 을 `"__main__"` 으로 **설정한 새 네임스페이스에서** 실행합니다. 그래서
+> `budget_app/__main__.py:7` 의 `if __name__ == "__main__":` 이 참이 됩니다.
+> `-m` 은 또 하나 중요한 부수 효과가 있습니다 — **현재 작업 디렉터리를 `sys.path`
+> 맨 앞에 넣습니다.** 그래서 프로젝트 폴더에서 `pip install` 없이 바로 import 가
+> 됩니다. → [12 §1-A](./12-syntax-and-stdlib.md)
+
+### Q25. 모듈이 43개나 되는데 너무 잘게 나눈 것 아닌가?
+
+판단 기준은 **"이 파일을 고칠 이유가 몇 개인가"** 입니다.
+
+리팩터 전 `cli.py` 512줄은 고칠 이유가 넷이었습니다 — 명령줄 문법, 입력 정책, 화면 표시, 처리 순서. 이 넷은 서로 무관하게 바뀝니다. 한 파일에 있으면 화면 문구를 고치다가 파서를 건드리는 사고가 납니다.
+
+지금은 `.py` 파일이 43개(그중 6개는 패키지 선언용 `__init__.py`·`__main__.py`)이고 파일마다 고칠 이유가 하나입니다. 가장 큰 `storage/jsonl.py` 도 329줄이며 그중 상당 부분이 설계 설명 주석입니다. **파일 개수가 아니라 파일당 책임 개수**로 판단하세요.
+
+분할이 한 단계 더 진행됐다는 점도 기억해 두세요 — 중간 단계의 `domain/models.py`·`storage/repository.py`·`services.py` 는 이제 없고, 각각 엔티티/질의/결과, JSONL·ID·저장소·백업, 거래/예산/카테고리/가져오기로 다시 쪼개졌습니다.
+
+### Q26. 왜 파서가 핸들러 함수 대신 문자열 키를 갖나?
+
+**순환 import 를 피하기 위해서**입니다.
+
+```
+[함수 객체 직접]                  [문자열 키]
+parser.py → cli.py (핸들러 참조)   parser.py: set_defaults(handler="add")
+cli.py → parser.py (파서 호출)     cli.py: HANDLERS = {"add": cmd_add}
+   ✗ 순환                            ✅ 한 방향
+```
+
+리팩터 전에는 파서와 핸들러가 같은 파일에 있어서 순환이 없었지만, 그 대가가 512줄짜리 파일이었습니다.
+
+**부수 효과로 죽은 코드가 사라졌습니다.** 이전에는 `category` 의 세 하위 명령이 한 핸들러로 들어와 `if/elif` 로 갈라졌고, 맨 끝에 "알 수 없는 하위 명령" 분기가 있었습니다. `add_subparsers(required=True)` 가 값을 이미 제한하므로 **도달 불가능한 코드**였습니다.
+
+> **⚙️ 내부 동작** — 문자열 키를 실어 나르는 장치는 argparse 의
+> `set_defaults(handler="add")`(`cli/parser.py:111`)입니다. 서브파서가 선택되면
+> argparse 가 그 파서의 기본값들을 결과 `Namespace` 에 채워 넣으므로, `args.handler` 에
+> `"add"` 가 담긴 채로 돌아옵니다. 받는 쪽 `cli/app.py:28-42` 의 `HANDLERS` 는 그냥
+> dict 이고, `HANDLERS[args.handler](ctx, args)` 한 줄이 `if/elif` 13단을 대신합니다.
+> 키가 `"category.add"` 처럼 점을 포함하는 것은 하위 명령까지 **평평한 문자열 하나**로
+> 눌러 담기 위해서입니다. **dict 조회는
+> 항목 수와 무관하게 일정 시간**이고, 명령을 추가할 때 고칠 곳이 "표에 한 줄"로
+> 줄어드는 것이 더 큰 이득입니다. → [12 §2-B](./12-syntax-and-stdlib.md)
+
+### Q27. 왜 읽기 경로가 `iter_raw()` 와 `stream()` 둘인가?
+
+**용도마다 필요한 것이 다르기 때문**입니다.
+
+| 용도 | 필요한 것 |
+|---|---|
+| 조회(list/search/summary) | 유효한 도메인 객체만 |
+| 재작성(delete/update) | **모든 줄** — 못 읽는 줄도 보존 |
+| ID 스캔 | 검증 실패 줄에서도 id 는 건져야 |
+
+리팩터 전에는 `stream()` 하나가 셋을 다 담당했고, 그것이 손상 줄을 건너뛰었습니다. 그래서 **무관한 거래를 지우면 손상 줄이 디스크에서 영구 삭제**됐습니다.
+
+지금은 재작성이 `iter_raw()` 를 재료로 쓰므로 해석 불가 줄이 원문 그대로 살아남습니다.
+
+### Q28. 왜 ID 스캔이 검증 실패 줄까지 보나?
+
+**그 줄의 id 도 "이미 쓰인 번호"이기 때문**입니다.
+
+리팩터 전 `max_id_num()` 은 `stream()` 을 썼습니다. 그래서 `amount: 0` 같은 검증 실패 줄에 들어 있던 `TX-000009` 가 보이지 않았고, 다음 발급이 `TX-000001` 로 돌아갔습니다. 실제로 데이터 파일에 같은 id 가 두 개 생기는 일이 있었습니다.
+
+지금은 `_scan_id` 가 2단으로 발굴합니다.
+
+```
+raw.data 가 있으면      → data["id"]              (규칙 위반이지만 JSON 은 됨)
+없으면 원문 정규식       → '"id"\s*:\s*"(TX-\d+)"'  (JSON 조차 아님)
+```
+
+구현은 `storage/repositories.py:39-51`(`_scan_id`)이고, 정규식은 `domain/config.py:27`(`TX_ID_SCAN_PATTERN`)에 있습니다.
+
+> **⚙️ 내부 동작** — 그 정규식 문자열이 `r'...'`(raw 문자열)인 이유가 있습니다. 보통
+> 문자열이면 `\s`·`\d` 의 백슬래시를 **파이썬 문자열 문법이 먼저** 해석하려 들고,
+> 정규식 엔진에는 이미 한 겹 벗겨진 것이 도착합니다(그래서 예전 코드들이 `"\\d"` 처럼
+> 백슬래시를 두 번 적었습니다). `r` 접두어는 그 1차 해석을 끄는 표시이고, `re` 모듈이
+> 원문 그대로를 받습니다. 또 이 패턴은 모듈 최상단에서 `re.compile` 로 한 번만
+> 컴파일해 둡니다(`domain/tx_id.py:45, 48`) — `re` 는 내부 캐시도 갖고 있지만,
+> 미리 컴파일해 두면 그 조회조차 건너뜁니다.
+> → [12 §2-A](./12-syntax-and-stdlib.md)
+
+### Q29. 왜 수정 요청을 dict 가 아니라 dataclass 로 받나?
+
+**오타가 조용히 무시되기 때문**입니다.
+
+```python
+# 리팩터 전
+changes = {"catgeory": "food"}      # 오타!
+repo.update("TX-000001", changes)   # 오류 없음. 아무것도 안 바뀜.
+
+# 리팩터 후
+TransactionPatch(catgeory="food")
+# TypeError: __init__() got an unexpected keyword argument 'catgeory'
+```
+
+`from_dict` 가 정해진 키만 읽으므로 모르는 키는 그냥 버려졌습니다. **오류도 안 나고 수정도 안 되는** 최악의 실패였습니다.
+
+부수 효과로 `is_empty` property 가 생겨 "수정할 필드가 없습니다" 검사도 한 줄이 됐습니다(`domain/entities.py:152-154`).
+
+> **⚙️ 내부 동작** — 오타를 잡아 주는 것은 dataclass 가 **아니라** 파이썬의 함수 호출
+> 규약입니다. `@dataclass` 가 만들어 준 `__init__` 은 `def __init__(self, amount=None,
+> category=None, ...)` 처럼 **매개변수 이름이 확정된 보통 함수**이고, `**kwargs` 를
+> 받지 않습니다. 그래서 정의에 없는 키워드가 오면 호출 규약 단계에서
+> `TypeError: ... unexpected keyword argument 'catgeory'` 가 납니다 — 함수 본문은
+> 시작조차 하지 않습니다. 반대로 dict 는 어떤 키든 받아들이는 자료구조라 검사할 근거
+> 자체가 없었던 것입니다. → [12 §1-A](./12-syntax-and-stdlib.md), [12 §1-B](./12-syntax-and-stdlib.md)
+
+### Q30. 왜 CSV 에 id 컬럼을 추가했나?
+
+**export → import 왕복이 거래를 복제했기 때문**입니다.
+
+```
+$ python -m budget_app export --out rt.csv --month 2024-01
+$ python -m budget_app import --from rt.csv
+[완료] mode=부분 성공, imported=1, skipped=0     ← 같은 거래가 두 개가 됨
+```
+
+내보낸 CSV 가 원본 거래를 식별할 수단을 갖고 있지 않아서, import 가 "새 거래"로 판단해 새 id 를 발급한 것입니다.
+
+**`id` 는 선택 컬럼**이라 기존 호환성이 유지됩니다.
+
+- export 는 기본 포함 (`--no-id` 로 제외 가능)
+- import 는 있으면 복원, 없으면 발급
+- 필수 컬럼은 예전과 동일(`date,type,category,amount`)이라 외부 CSV 도 그대로 들어옴
+
+중복을 만났을 때의 처리는 `--on-duplicate {skip,new-id,error}` 로 고릅니다.
+
+---
+
+## 제2부. 용어집
+
+한글 용어를 가나다순으로 먼저, 숫자·영문을 마지막에 배치했습니다. 각 항목은 "한 줄 정의 — **어디서 온 말인가** — 이 프로젝트의 위치" 형식입니다. 출처는 확인 가능한 것만 적었습니다.
+
+**값 객체(Value Object)** — 정체성이 아니라 **값으로 같고 다름을 판단**하는 작은 객체. `TransactionId("TX-000001")` 두 개는 서로 다른 객체지만 같은 값입니다. 출처: Martin Fowler 『Patterns of Enterprise Application Architecture』(2002), Eric Evans 『Domain-Driven Design』(2003)이 함께 정착시킨 이름입니다. 위치: `domain/tx_id.py:51-127`(`TransactionId`) — `@dataclass(frozen=True)` 라 `__eq__` 가 값 비교로 자동 생성되고, 저장 경계에서는 `self.id.value` 로 원시 문자열을 풀어 내보냅니다(`domain/entities.py:82-97`).
+
+**계층형 아키텍처(layered architecture)** — 프로그램을 CLI → 서비스 → 저장소 → 도메인처럼 역할별 층으로 나누고, 각 층이 아래층에만 의존하게 하는 구조. 출처: Buschmann 외 『Pattern-Oriented Software Architecture』(1996)의 **Layers** 패턴이 표준 서술입니다. 위치: [04 §1](./04-architecture.md), 의존 방향 실증은 [04 §1.2](./04-architecture.md).
+
+**고아 데이터(orphan)** — 참조 대상이 사라져 홀로 남은 데이터. 출처: 관계형 데이터베이스의 참조 무결성 논의에서 온 말입니다. 이 프로젝트는 카테고리 삭제 시 거래가 고아가 되지 않도록 차단합니다. 위치: `services/categories.py:38-73`(Q14).
+
+**고차 함수(higher-order function)** — 함수를 인자로 받거나 함수를 반환하는 함수. 출처: 람다 계산법과 함수형 프로그래밍 전통의 용어이며, 파이썬에서는 함수가 **일급 객체**(변수에 담고 인자로 넘길 수 있는 값)라서 가능합니다. 위치: `decorators.py:37-47`(`log_call` 이 함수를 받아 함수를 반환), `cli/prompts.py:60-74`(`ask_until` 이 검증기를 받음), `storage/jsonl.py:313-329`(`rewrite` 가 `transform` 을 받음).
+
+**관심사 분리(separation of concerns)** — 서로 다른 목적의 코드를 섞지 않는 원칙. 출처: Edsger Dijkstra 가 1974년 글 "On the role of scientific thought" 에서 쓴 표현이 시초로 인용됩니다. 위치: `decorators.py:1-16`(모듈 docstring), [04 §8.1](./04-architecture.md).
+
+**국제표준 날짜(ISO 8601)** — 날짜를 `YYYY-MM-DD`, 월을 `YYYY-MM` 으로 쓰는 형식. 큰 단위부터라 문자열 정렬이 시간 순서와 일치합니다. 출처: 국제표준화기구(ISO)가 1988년에 처음 낸 표준으로, 파이썬은 `datetime.date.isoformat()`/`fromisoformat()` 로 직접 지원합니다(이 프로젝트는 포맷 문자열 `"%Y-%m-%d"` 쪽을 씁니다). 위치: `domain/config.py:21`, 검증·정규화는 `domain/validators.py:80-99`(Q12).
+
+**널 객체(Null Object)** — "아무 조건 없음", "아무것도 안 함" 같은 **비어 있는 경우를 객체 하나로** 표현해 `None` 검사를 없애는 패턴. 출처: Bobby Woolf 가 PLoP 패턴 문헌에서 제안했고, Martin Fowler 의 『Refactoring』에도 "Introduce Null Object" 로 실려 있습니다. 위치: `domain/specs.py:136-147`(`Always` — 조건이 하나도 없는 `list` 명령이 `if spec is None` 없이 같은 코드를 타게 합니다).
+
+**네임스페이스 패키지(namespace package)** — `__init__.py` 없이도 패키지로 import 되게 하는 기능. 출처: **PEP 420**(파이썬 3.3). `sys.path` 상의 같은 이름 폴더를 **병합**한다는 점이 일반 패키지와 다릅니다. 위치: Q24, [02 §1.1](./02-python-basics.md).
+
+**단일 책임 원칙(SRP)** — 한 모듈/클래스는 한 가지 이유로만 변경되어야 한다는 원칙. 출처: Robert C. Martin 이 SOLID 다섯 원칙의 첫 글자로 정리했고, 『Agile Software Development』(2002)가 널리 알려진 출처입니다. 위치: 43개 모듈 분할 자체([04 §1.1](./04-architecture.md)), Q25.
+
+**단일 출처(SSOT, Single Source of Truth)** — 같은 값·문구·규칙의 정의처를 한 곳으로 고정하는 원칙. 출처: 데이터 관리 분야의 용어가 코드 조직 원칙으로 넘어온 것으로, DRY 의 자매어입니다. 이 프로젝트에는 네 개의 단일 출처가 있습니다 — 값(`config.py`), 문구(`messages.py`), 검증 규칙(`validators.py`), 파일 처리(`JsonlStore`). 위치: [04 §8.3](./04-architecture.md).
+
+**대체 생성자(alternative constructor)** — 기본 생성자 외에 다른 형태의 입력으로 객체를 만드는 classmethod. 출처: `classmethod` 는 파이썬 2.2 의 새 스타일 클래스와 함께 들어온 내장 데코레이터이고, "첫 인자로 클래스 자신(`cls`)을 받는다"는 성질 덕분에 상속받은 하위 클래스에서도 올바른 타입을 만들어 냅니다. 위치: `Transaction.from_dict`(`domain/entities.py:99-111`), `SearchFilter.for_month`(`domain/queries.py:74-78`).
+
+**덕 타이핑(duck typing)** — 공통 조상 없이도 "같은 메서드를 갖고 있으면 같게 다룬다"는 파이썬의 다형성. 출처: "오리처럼 걷고 운다면 오리다"라는 속담에서 온 말로, 파이썬 커뮤니티에서는 Alex Martelli 가 2000년 무렵 뉴스그룹 글에서 쓴 것이 널리 인용됩니다. 위치: `storage/jsonl.py:187` — `self.entity_cls.from_dict(data)` 가 `Transaction`/`Category`/`Budget` 셋 모두에 동작합니다. 셋은 공통 부모 클래스가 **없고**, `from_dict` 라는 이름의 classmethod 를 각자 갖고 있을 뿐입니다.
+
+**데코레이터(decorator)** — `@이름` 문법으로 기존 함수를 감싸 공통 동작을 덧입히는 기법. 출처: **PEP 318**(파이썬 2.4)이 `@` 표기를 도입했습니다. GoF 의 Decorator 디자인 패턴과 이름은 같지만 다른 것으로, 파이썬 쪽은 "함수를 함수로 감싸 재대입한다"는 문법 장치입니다. 위치: `decorators.py`(관측), `error_handler.py`(표현), 적용부는 `services/transactions.py:27, 52, 72`(`@log_call`)와 `cli/app.py:61`(`@handle_errors`).
+
+**동시성(concurrency)** — 여러 프로세스가 같은 자원에 동시에 접근하는 상황. 이 프로젝트는 단일 사용자 CLI 전제라 파일 잠금이 없습니다. 위치: [10 §6](./10-advanced-design.md).
+
+**멱등성(idempotency)** — 같은 연산을 여러 번 해도 결과가 한 번 한 것과 같은 성질. 출처: 수학의 "멱등 연산"에서 온 말이며, 소프트웨어에서는 HTTP 명세가 `PUT`/`DELETE` 를 멱등으로 규정하면서 널리 쓰이게 됐습니다. 위치: export→import 왕복([10 §2.3](./10-advanced-design.md)), `budget set` 의 같은 월 덮어쓰기(`storage/repositories.py:300-308`), 이미 있는 카테고리 `add`(`storage/repositories.py:248-254`).
+
+**명세 패턴(Specification)** — 조건 하나를 객체 하나로 만들고 `&`·`|`·`~` 로 조합해 질의를 쌓아 올리는 패턴. 출처: Eric Evans 와 Martin Fowler 가 함께 쓴 "Specifications" 문서(1997년경)에서 정리됐고 Evans 의 『Domain-Driven Design』(2003)에 실렸습니다. 위치: `domain/specs.py`(`Spec` 76-91, 조합자 `And`/`Or`/`Not` 99-133, 조건 명세 6종 172-243), 조립은 `domain/queries.py:57-72`. 소스 docstring(`domain/specs.py:1-65`)이 "지금 `Or`/`Not` 은 소비자가 없다"는 한계까지 스스로 밝혀 둡니다.
+
+**무한 루프 방지(EOF 처리)** — 표준 입력이 끝났는데 재입력을 계속 요구하면 루프가 영원히 도는 문제를, EOF 를 예외(`InputAborted`)로 승격해 즉시 종료로 바꾸는 처리. 위치: `cli/prompts.py:28-37`(예외 정의), `cli/prompts.py:52-57`(`ask` 가 `EOFError` 를 잡아 승격), 재시도 상한은 `cli/config.py:14`(Q22).
+
+**방어적 프로그래밍(defensive programming)** — 잘못된 입력·상태를 미리 가정하고 대비하는 코딩 방식. 위치: 25개 항목 인덱스가 [10 §7](./10-advanced-design.md)에 있습니다.
+
+**부분 성공(partial success)** — 일괄 작업에서 실패한 항목만 건너뛰고 나머지를 반영하는 정책. import 의 기본 모드입니다. 위치: `services/importexport.py:88-102`(Q16, [08 §6](./08-services.md)).
+
+**불변식(invariant)** — 객체가 존재하는 동안 항상 참이어야 하는 조건. 출처: Bertrand Meyer 의 **계약에 의한 설계(Design by Contract)** — Eiffel 언어(1980년대 후반)가 사전조건·사후조건과 함께 클래스 불변식을 언어 기능으로 넣은 것이 출발점입니다. 이 프로젝트는 언어 기능이 없으므로 생성자(`__post_init__`)가 그 자리를 대신합니다. 위치: `domain/entities.py:68-80`(Q4, [05 §6](./05-config-and-models.md)).
+
+**사전식 비교(lexicographic comparison)** — 문자열을 앞자리부터 비교하는 방식. 출처: 사전(dictionary)이 단어를 늘어놓는 순서에서 온 이름입니다. ISO 8601 날짜는 사전식 순서 = 시간 순서입니다. 위치: `domain/specs.py:178-179`·`191-192`(범위 필터의 실제 비교), `services/transactions.py:86`(정렬 키 `(t.date, t.id)`).
+
+**스트리밍(streaming)** — 데이터 전체를 메모리에 올리지 않고 한 건씩 흘려보내며 처리하는 방식. 위치: `storage/jsonl.py:162-179`(`iter_raw`)·`193-203`(`stream`), `services/importexport.py:83`(제너레이터 식을 CSV writer 에 그대로 전달)(Q6).
+
+**역직렬화/직렬화(deserialization/serialization)** — 객체 ↔ 저장 형식 변환. 위치: 직렬화는 `to_dict` + `json.dumps`(`domain/entities.py:82-97`, `storage/jsonl.py:207-208`), 역직렬화는 `json.loads` + `from_dict`(`storage/jsonl.py:181-191`).
+
+**예외 계층(exception hierarchy)** — 예외 클래스를 상속 관계로 조직해 잡는 쪽이 굵기를 선택할 수 있게 하는 설계. 출처: 파이썬 내장 예외의 뿌리를 `BaseException` 으로 정리한 것이 **PEP 352**(2.5)이고, `except X as e` 표기는 **PEP 3110**(3.0)입니다. 위치: `errors.py:33-51`(`ValidationError`/`AppError`), `InputAborted(AppError)`(`cli/prompts.py:28-37`), 매핑은 `cli/error_handler.py:57-119` — 좁은 예외를 위에, 넓은 예외를 아래에 두는 순서 자체가 계층을 이용한 것입니다(`BrokenPipeError` 가 `OSError` 보다 위에 있어야 하는 이유).
+
+**원자성(atomicity)** — 작업이 "전부 반영" 아니면 "전혀 반영 안 됨" 둘 중 하나로만 끝나는 성질. 출처: 데이터베이스 트랜잭션의 **ACID** 네 성질 중 A 로, Jim Gray 의 트랜잭션 연구(1981)와 Härder·Reuter 의 1983년 논문이 그 약어를 정착시켰습니다. 위치: `storage/jsonl.py:48-77`(파일 하나), `storage/unit_of_work.py:125-156`(파일 여럿), `services/importexport.py:188-206`(import), [10 §1](./10-advanced-design.md).
+
+**의존성 주입(DI)** — 객체가 필요로 하는 협력자를 내부에서 만들지 않고 생성자 인자로 받는 기법. 출처: Martin Fowler 가 2004년 글 "Inversion of Control Containers and the Dependency Injection pattern" 에서 이 이름을 제안했습니다. 위치: `services/transactions.py:23-25`(저장소 둘을 인자로 받음), 조립은 `context.py:42-57`(`AppContext.__init__`).
+
+**작업 단위(Unit of Work)** — 여러 저장소에 걸친 변경을 하나의 커밋으로 묶는 패턴. 출처: Martin Fowler 『Patterns of Enterprise Application Architecture』(2002). 위치: `storage/unit_of_work.py:73-181`. **다만 소스가 이름의 한계를 직접 밝혀 둡니다**(`storage/unit_of_work.py:1-49`) — Fowler 의 UoW 는 무엇이 새로 생기고 바뀌고 지워졌는지를 **스스로 추적**하지만, 이 클래스는 호출자가 이미 아는 최종 내용을 받아 `.tmp` 로 준비했다가 `os.replace` 만 몰아 실행합니다. 정확히는 *staged commit* 입니다.
+
+**저장소 패턴(Repository)** — 도메인 객체의 보관·조회를 컬렉션처럼 다루게 감싸, 위층이 파일·SQL 같은 저장 수단을 모르게 하는 패턴. 출처: Martin Fowler 『PoEAA』(2002)와 Eric Evans 『Domain-Driven Design』(2003). 위치: `storage/repositories.py:27-214`(`TransactionRepository`), `217-280`(`CategoryStore`), `283-308`(`BudgetStore`). 이 프로젝트의 저장소는 **도메인 판단을 하지 않는다**는 규칙을 지킵니다 — "무엇으로 바꿀지"는 서비스와 도메인이 정하고, 저장소는 완성된 객체를 받아 쓰기만 합니다.
+
+**전수 롤백(all-or-nothing rollback)** — 하나라도 실패하면 전체를 없던 일로 되돌리는 정책. `import --atomic` 의 동작입니다. 위치: `services/importexport.py:188-206`(`_commit_atomic`), [10 §3](./10-advanced-design.md).
+
+**제너레이터(generator)** — `yield` 로 값을 하나씩 내어 주다가 다음 요청 때 이어서 실행되는 함수. 출처: **PEP 255**(파이썬 2.2)가 `yield` 를 도입했고, 괄호로 쓰는 제너레이터 식(`(tx for tx in ...)`)은 **PEP 289**(2.4), 하위 제너레이터에 위임하는 `yield from` 은 **PEP 380**(3.3)입니다. 세 가지가 이 소스에 모두 나옵니다. 위치: `storage/jsonl.py:162`(`iter_raw`), `services/transactions.py:79-87`(`stream_sorted` + `yield from`), `services/importexport.py:83`(제너레이터 식), `cli/presenter.py:42-55`.
+
+**제네릭(generic)** — 타입을 매개변수로 받는 클래스/함수. `TypeVar` 로 자리표시자를 만들고 `Generic[T]` 로 선언합니다. 출처: **PEP 484**(3.5)가 `typing.TypeVar`/`Generic` 을 들여왔고, `list[str]` 처럼 내장 자료형을 바로 첨자화하는 표기는 **PEP 585**(3.9)입니다. **런타임에는 지워지므로**(type erasure) 실제 클래스는 별도로 지정해야 합니다 — 그것이 `entity_cls` 클래스 속성의 존재 이유입니다. 위치: `storage/jsonl.py:35`(`T = TypeVar("T")`)·`131`(`class JsonlStore(Generic[T])`), 실제 타입 지정은 `storage/repositories.py:30, 220, 286`(`entity_cls = Transaction` 등), [03 §6](./03-python-advanced.md).
+
+**종료 코드(exit code)** — 프로세스가 OS 에 반환하는 정수. 0 은 성공, 나머지는 실패 종류. 출처: 유닉스/POSIX 의 프로세스 규약이며, "128 + 시그널 번호"(130 = 128 + SIGINT) 는 셸의 관례입니다. 위치: `cli/config.py:22-29`, 반환 경로는 `cli/error_handler.py` → `cli/app.py:61`(`_dispatch`) → `cli/app.py:84-94`(`main`) → `__main__.py:8`(`sys.exit`)(Q10).
+
+**지연 평가(lazy evaluation)** — 값이 실제로 필요해질 때까지 계산을 미루는 방식. 출처: 함수형 언어(Haskell 계열)에서 온 개념이며, 파이썬은 언어 전체가 아니라 **제너레이터·`range`·`logging` 처럼 자리를 골라** 도입했습니다. 위치: `storage/jsonl.py:193-203`(제너레이터), `decorators.py:42, 44`(%-스타일 로깅)(Q19).
+
+**참조 무결성(referential integrity)** — 참조하는 대상이 반드시 존재해야 한다는 제약. 출처: E. F. Codd 의 관계형 데이터 모델(1970)에서 온 제약으로, SQL 의 외래 키와 `ON DELETE RESTRICT` 가 그 구현입니다. 위치: `services/categories.py:38-73`(카테고리 보호), Q14.
+
+**컨텍스트 매니저(context manager)** — `with` 블록이 끝나면(예외가 나도) 자원 정리를 보장하는 프로토콜. 출처: **PEP 343**(파이썬 2.5). 객체가 `__enter__`/`__exit__` 두 메서드를 가지면 `with` 에 쓸 수 있다는 약속이고, `try/finally` 를 언어 문법으로 굳힌 것입니다. 위치: 모든 `with open(...)`, 그리고 직접 구현한 것이 하나 있습니다 — `UnitOfWork.__enter__`/`__exit__`(`storage/unit_of_work.py:169-181`)로, 블록을 예외로 빠져나가면 `rollback()` 이 `.tmp` 찌꺼기를 치웁니다.
+
+**클로저(closure)** — 자신이 만들어질 때의 바깥 변수를 기억하는 내부 함수. 출처: Peter Landin 이 1964년에 만든 용어로, 함수 본문과 그것이 참조하는 환경을 "닫아서" 한 덩어리로 본다는 뜻입니다. 위치: `cli/prompts.py:77-109`(`registered_category_validator` 가 `cat_service` 를 캡처), `storage/repositories.py:163-168`(`_drop` 이 `found` 를 `nonlocal` 로 갱신).
+
+**콜러블(callable)** — `f(...)` 처럼 호출 가능한 모든 객체. 함수뿐 아니라 클래스와 `__call__` 을 가진 인스턴스도 포함됩니다. 타입 힌트로는 `collections.abc.Callable[[인자], 반환]` 로 씁니다. 위치: `cli/prompts.py:100-107`(검증기 전달), `storage/jsonl.py:313-329`(`transform` 콜백), `cli/app.py:28-42`(`HANDLERS` 값이 전부 함수 객체).
+
+**파이프(|)와 BrokenPipe** — 한 프로세스의 stdout 을 다른 프로세스의 stdin 에 연결하는 셸 기능과, 읽는 쪽이 먼저 닫혔을 때 발생하는 예외. 출처: 파이프는 Douglas McIlroy 의 제안으로 1973년 유닉스에 들어왔고, 닫힌 파이프에 쓸 때의 `SIGPIPE`/`EPIPE` 는 POSIX 규약입니다. 위치: `cli/error_handler.py:57-60`(잡지 않고 그대로 올림), `cli/app.py:50-58`(`os.dup2` 로 마무리)(Q23).
+
+**표준 입출력(stdin/stdout/stderr)** — 프로세스에 기본 연결되는 세 통로(파일 디스크립터 0·1·2). 결과는 stdout, 진단은 stderr 로 나눕니다. 출처: 유닉스의 설계이며, stderr 가 따로 있는 이유가 정확히 이 프로젝트의 규칙과 같습니다 — stdout 을 파일이나 다음 명령으로 넘겨도 오류 메시지는 화면에 남아야 하기 때문입니다. 위치: `cli/output.py:1-30`(모듈 docstring 이 이 규칙을 설명)([09 §5](./09-cli.md)).
+
+**타입 힌트(type hint)** — 값의 타입을 코드에 적어 두되 **런타임에는 강제하지 않는** 표기. 출처: 함수에 어노테이션을 붙이는 문법 자체는 **PEP 3107**(3.0), 그것에 "타입"이라는 의미를 준 것이 **PEP 484**(3.5), 변수 어노테이션이 **PEP 526**(3.6), `list[str]` 같은 내장 제네릭이 **PEP 585**(3.9), `str | None` 유니온이 **PEP 604**(3.10)입니다. 이 소스가 `Optional[str]` 대신 `str | None` 을 쓰는 것(`domain/entities.py:137-142`)이 `requires-python = ">=3.10"` 인 이유 중 하나입니다. 타입 힌트를 쓰는 모듈 28개가 공통으로 얹은 `from __future__ import annotations` 는 **PEP 563**(3.7)으로, 어노테이션을 **실행하지 않고 문자열로** 두게 합니다. 그 덕분에 아직 정의되지 않은 이름(`def parse(cls) -> TransactionId:` 안의 `TransactionId`)을 따옴표 없이 쓸 수 있고, 실제로 이 소스에는 따옴표 친 어노테이션이 한 곳도 없습니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+
+**합성 루트(composition root)** — 애플리케이션의 모든 객체 조립이 일어나는 단 하나의 지점. 출처: Mark Seemann 이 『Dependency Injection in .NET』(2011)과 같은 해 블로그 글에서 제안한 이름입니다. 위치: `context.py:33-80`(`AppContext`) — `cli/` 밖에 있는 이유가 소스 docstring(`context.py:1-18`)에 있습니다. 나중에 웹 UI 를 붙일 때 `from .cli.app import AppContext` 를 해야 하는 모양을 피하려는 것입니다.
+
+### 숫자·영문
+
+**2단계(준비→커밋) 구조** — 일괄 작업을 "전체 검증(준비)" 후 "일괄 반영(커밋)"으로 나눠, 실패가 준비 단계에서 걸리면 파일을 전혀 건드리지 않게 하는 구조. 위치: `services/importexport.py:104-131`(`_prepare`)·`166-177`(`_commit`), [10 §3.2](./10-advanced-design.md).
+
+**BOM(Byte Order Mark)** — 텍스트 파일 맨 앞에 붙는 유니코드 문자 **U+FEFF**(UTF-8 로는 3바이트 `EF BB BF`). 출처: 유니코드 표준. 원래는 UTF-16 의 바이트 순서를 알리는 표식이었는데, 마이크로소프트 도구가 "이 파일은 UTF-8" 이라는 신호로 전용하면서 관행이 됐습니다. 파이썬은 인코딩 이름 `"utf-8-sig"` 로 지원합니다. 위치: `storage/config.py:39-40`(쓰기는 `utf-8`, 읽기만 `utf-8-sig`)(Q17).
+
+**DRY(Don't Repeat Yourself)** — 같은 **지식**을 두 곳에 적지 말라는 원칙. 코드 줄 수를 줄이라는 뜻이 아닙니다. 출처: Andrew Hunt·David Thomas 『The Pragmatic Programmer』(1999). 위치: [04 §8.3](./04-architecture.md)의 네 가지 단일 출처.
+
+**JSONL(JSON Lines)** — 한 줄에 JSON 객체 하나씩 쌓는 텍스트 형식. append 와 스트리밍, 손상 격리에 유리합니다. 출처: RFC 같은 공식 표준이 **아니라** jsonlines.org 에 정리된 관행이며, NDJSON(Newline Delimited JSON)이라는 이름으로도 불립니다. 표준이 없다는 것은 곧 "규칙이 우리 코드에만 있다"는 뜻이라, 줄 끝 문자·인코딩 같은 세부를 `storage/config.py:22-26` 이 직접 정합니다. 위치: `storage/jsonl.py` 전체, [10 §5](./10-advanced-design.md)(Q2).
+
+**`dataclass`** — 필드 선언만으로 `__init__`/`__repr__`/`__eq__` 를 생성해 주는 데코레이터. 출처: **PEP 557**(파이썬 3.7). 표준화 이전에 사실상 표준이던 외부 라이브러리 **attrs** 의 설계를 표준 라이브러리로 들여온 것이라고 PEP 자신이 밝힙니다. 위치: 저장 엔티티(`domain/entities.py`), 변경 요청(`TransactionPatch`), 질의 조건(`SearchFilter`), 계산 결과(`MonthlySummary`·`ImportReport`·`RawLine`·`ParsedRow`), 값 객체(`TransactionId`)(Q3).
+
+**`fsync`** — OS 버퍼의 내용을 물리 디스크에 강제로 기록하는 시스템 콜. 출처: 유닉스/POSIX 시스템 콜이며 파이썬은 `os.fsync` 로 그대로 노출합니다. `os.replace` 가 보장하지 않는 "내용의 내구성"을 담당합니다. 위치: `storage/jsonl.py:71`(`atomic_write_lines` 경로), `247`(append 경로), [10 §1](./10-advanced-design.md).
+
+**`nonlocal`** — 중첩 함수가 바깥 함수의 지역 변수에 **대입**할 수 있게 하는 선언. 읽기만 할 때는 필요 없습니다. 출처: **PEP 3104**(파이썬 3.0). 그 전의 파이썬 2 에는 이 선언이 없어서, 같은 일을 하려면 리스트 한 칸(`found = [False]` → `found[0] = True`)에 담아 우회해야 했습니다. 위치: `storage/repositories.py:164, 185, 207, 273`.
+
+**`os.replace`** — 대상이 있어도 덮어쓰는 이름 교체. 같은 파일시스템 안에서 원자적입니다. 출처: 원자성 보장 자체는 POSIX `rename(2)` 규격에서 오고, 함수 `os.replace` 는 윈도우와 POSIX 의 동작 차이를 없애려고 **파이썬 3.3** 에 추가됐습니다. 위치: `storage/jsonl.py:77`(Q21).
+
+**`surrogateescape`** — 디코딩할 수 없는 바이트를 유니코드 미사용 영역에 숨겨 두었다가 인코딩할 때 **원래 바이트로 정확히 되돌리는** 오류 처리기. 출처: **PEP 383**(파이썬 3.1). 위치: `storage/config.py:25`(`FILE_ERRORS`), 사용은 `storage/jsonl.py:162-179`(Q20).
+
+**`SUPPRESS`(argparse)** — "값이 명시되지 않으면 namespace 에 속성을 만들지 마라"는 특수 기본값. 하위 파서가 상위 파서의 값을 덮어쓰는 것을 막습니다. 출처: `argparse` 모듈 자체가 **PEP 389**(3.2)로 표준에 들어왔고, `SUPPRESS` 는 그 이전 `optparse` 시절부터 있던 관용구입니다. 위치: `cli/parser.py:75-76`, 실제 기본값은 `cli/parser.py:84` 아래 한 곳에만([09 §2.4](./09-cli.md)).
+
+---
+
+## 읽기 순서 제안
+
+```
+[초보]   01 ──▶ 02 ──▶ 05 ──▶ 11 (이 문서)
+                                │
+[중급]   03 ──▶ 04 ──▶ 06 ──▶ 09
+                                │
+[고급]   07 ──▶ 08 ──▶ 10 ─────┘
+                                │
+[사전]   12 (필요할 때 찾아보기) ┘
+```
+
+**[12. 문법과 표준 라이브러리 레퍼런스](./12-syntax-and-stdlib.md)** 는 순서대로 읽는 문서가 아니라 **찾아보는 문서**입니다. 01~11 을 읽다가 "이 문법은 어디서 온 거지?", "이 표준 라이브러리 호출이 안에서 뭘 하지?"가 걸릴 때 해당 절로 건너뛰면 됩니다. 절 구성은 다음과 같습니다.
+
+| 절 | 내용 |
+|---|---|
+| §1-A | 모듈·실행 모델·함수 시그니처·문자열/포맷 |
+| §1-B | 클래스·dataclass·특수 메서드·연산자 오버로딩 |
+| §1-C | 제너레이터·데코레이터/클로저·예외·컨텍스트 매니저·타입 힌트 |
+| §2-A | `json` / `csv` / `re` / `datetime` / `calendar` / `time` |
+| §2-B | `logging` / `argparse` / `pathlib` / `errno` / `typing` |
+| §3 | 운영체제 계층 — 버퍼링·fsync·`os.replace`·인코딩·파이프 |
+
+**과제 방어가 임박했다면** 다음 세 편만 정독해도 핵심을 말할 수 있습니다.
+
+1. [04. 아키텍처](./04-architecture.md) — 계층을 왜 나눴는지, 리팩터 전후 대조표(§9)
+2. [10 §9](./10-advanced-design.md) — 방어 질문 대비 핵심 문장 6개
+3. 이 문서의 Q4·Q21·Q27·Q28·Q30 — 검증 위치, 원자적 교체, 읽기 경로 둘, ID 불변식, CSV id 컬럼
+
+문법 질문("왜 `str | None` 이죠?", "`@dataclass` 가 실제로 뭘 만드나요?")이 예상되면 이 문서의 용어집 출처 표기와 [12](./12-syntax-and-stdlib.md)를 함께 훑어 두세요.

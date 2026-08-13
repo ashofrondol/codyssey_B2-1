@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04. 아키텍처 — 계층 구조와 설계 원칙 — budget_app 학습 문서</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html" class="current"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
+<main>
+<h1 id="04-아키텍처-계층-구조와-설계-원칙">04. 아키텍처 — 계층 구조와 설계 원칙</h1>
+<p>이 문서는 budget_app 이 왜 43개 파일(구현 38 + 패키지 선언 <code>__init__.py</code> 5)로 나뉘어 있는지, 명령 하나가 파일 저장까지 어떤 경로를 지나가는지, 그리고 그 구조가 어떤 설계 원칙과 리팩터링 과정을 거쳐 만들어졌는지를 코드로 실증합니다.</p>
+<blockquote>
+<p><strong>난이도</strong>: 🟡 중급</p>
+<p><strong>먼저 읽으면 좋은 문서</strong>: 없음 — 이 편은 전체 코드의 "지도" 역할을 하므로 시리즈의 다른 편보다 먼저 읽어도 됩니다. 개별 기법(데코레이터, dataclass, 제너레이터 등)의 상세는 <a href="03-python-advanced.html">03. 파이썬 중·고급 기법</a>에서, 각 문법이 <strong>어느 PEP·어느 버전에서 왔고 파이썬이 그것을 무엇으로 바꾸는지</strong>와 표준 라이브러리 호출의 내부 동작은 <a href="12-syntax-and-stdlib.html">12. 문법·표준 라이브러리 레퍼런스</a>에서 다룹니다. 이 문서 곳곳의 🔎/⚙️ 블록이 그 요약이자 링크입니다.</p>
+</blockquote>
+<hr>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#1-전체-그림-계층-다이어그램">1. 전체 그림 — 계층 다이어그램</a></li><li><a href="#2-각-계층의-책임과-금지사항">2. 각 계층의 책임과 금지사항</a></li><li><a href="#3-실행-흐름-완전-추적-1-쓰기-경로-python-m-budget_app-add">3. 실행 흐름 완전 추적 1 — 쓰기 경로 (python -m budget_app add)</a></li><li><a href="#4-실행-흐름-완전-추적-2-읽기-경로-summary-month-2024-01">4. 실행 흐름 완전 추적 2 — 읽기 경로 (summary --month 2024-01)</a></li><li><a href="#5-실행-흐름-완전-추적-3-가장-복잡한-경로-import">5. 실행 흐름 완전 추적 3 — 가장 복잡한 경로 (import)</a></li><li><a href="#6-appcontext-수동-의존성-주입di과-부작용-분리">6. AppContext — 수동 의존성 주입(DI)과 부작용 분리</a></li><li><a href="#7-오류-처리-아키텍처-예외의-발생지와-변환지">7. 오류 처리 아키텍처 — 예외의 발생지와 변환지</a></li><li><a href="#8-설계-원칙-정리-이-코드가-지키고-있는-것">8. 설계 원칙 정리 — 이 코드가 지키고 있는 것</a></li><li><a href="#9-설계의-진화-리팩터-전후-대조표">9. 설계의 진화 — 리팩터 전후 대조표</a></li><li><a href="#10-요약-과제-방어용-문답-정리">10. 요약 — 과제 방어용 문답 정리</a></li></ul></details><h2 id="1-전체-그림-계층-다이어그램">1. 전체 그림 — 계층 다이어그램</h2>
+<p>budget_app 은 "명령을 받는 곳(CLI) → 규칙을 판단하는 곳(서비스) → 파일을 읽고 쓰는 곳(저장소) → 데이터가 무엇인지 정의하는 곳(도메인)" 순서로 <strong>한 방향으로만 의존하는</strong> 구조입니다.</p>
+<div class="codehilite"><pre><span></span><code> 사용자 터미널
+      │  python -m budget_app add ...
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│  __main__.py        엔트리포인트 — main() 호출, 종료 코드 전달  │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  cli/               CLI 계층                                   │
+│    app.py           HANDLERS 레지스트리 + main                  │
+│    handlers.py      cmd_* 13개 (오케스트레이션만)               │
+│    parser.py        argparse 문법 정의                          │
+│    prompts.py       대화형 입력 (재입력 루프 / EOF)             │
+│    presenter.py     도메인 → 화면 문자열 (반환만, 출력 안 함)    │
+│    output.py        채널 결정 — stdout / stderr / logging       │
+│    error_handler.py 예외 → 사용자 메시지 → 종료 코드            │
+│    config/messages  이 계층 전용 상수·문구                       │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  context.py         합성 루트 — 저장소·서비스 조립 (계층 밖)     │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  services/          서비스 계층 — 판단만 (open() 이 0개)        │
+│    transactions / budgets / categories / importexport         │
+│    config/messages  중복 정책·한도, AppError 문구               │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  storage/           저장소 계층 — open() 은 전부 여기           │
+│    jsonl.py         JsonlStore / RawLine / stage·commit        │
+│    ids.py           IdAllocator                                │
+│    repositories.py  거래·카테고리·예산 저장소                    │
+│    csv_io.py        CSV 경계 어댑터                             │
+│    unit_of_work.py  UnitOfWork — 다중 파일 커밋                 │
+│    backup.py        데이터 폴더 백업                            │
+│    config/messages  파일명·인코딩·CSV 스키마, 로그 문구          │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  domain/            도메인 계층 — I/O 를 전혀 모름              │
+│    tx_id.py         TransactionId 값 객체                       │
+│    entities.py      Transaction / Budget / Category / Patch    │
+│    specs.py         Specification — 조합 가능한 조건            │
+│    queries.py       SearchFilter (명세 조립 어댑터)             │
+│    results.py       MonthlySummary / ImportReport              │
+│    periods.py       month_range                                │
+│    validators.py    규칙 하나 = 함수 하나                        │
+│    config/messages  타입·날짜 형식·id 패턴, 검증 오류 문구       │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  (루트)             횡단 — 어느 계층에도 속하지 않음             │
+│    errors.py        ValidationError / AppError (import 0개)    │
+│    config.py        앱 정체성(로거 이름)                        │
+│    decorators.py    @log_call / @measure_time                  │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│  data/*.jsonl       transactions / categories / budgets        │
+└──────────────────────────────────────────────────────────────┘
+</code></pre></div>
+
+<p><strong>폴더 이름이 곧 계층입니다.</strong> 평평하게 두면 알파벳순이 계층을 흩뜨립니다 — <code>cli(L6) config(L0) csv_io(L3) decorators(L3) error_handler(L5) errors(L0) …</code> 처럼 계층 번호가 뒤죽박죽 나열됩니다. 횡단 4개만 폴더 없이 루트에 두어 "이들은 계층이 아니다"를 위치로 표현합니다.</p>
+<p>핵심 규칙은 <strong>화살표가 아래로만 향한다</strong>는 것입니다. <code>storage/</code> 는 <code>services/</code> 를 모르고, <code>services/</code> 는 <code>cli/</code> 를 모릅니다. 아래 계층은 위 계층이 누구인지 신경 쓰지 않으므로, 예를 들어 나중에 CLI 대신 웹 UI 를 붙여도 <code>services/</code> 이하는 한 줄도 바꿀 필요가 없습니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — 맨 위의 <code>python -m budget_app</code> 은 셸이 <code>budget_app</code> 이라는 파일을 찾는 것이 아닙니다. <code>-m</code> 은 인터프리터가 <code>runpy</code> 모듈로 넘어가라는 지시이고, <code>runpy</code> 는 이름이 패키지면 그 안의 <code>__main__.py</code> 를 찾아 <strong><code>__name__</code> 을 <code>"__main__"</code> 으로 바꿔 실행</strong>합니다. 그래서 이 프로젝트에는 <code>budget_app/__main__.py</code> 가 8줄짜리로 존재합니다. <code>sys.path[0]</code> 이 현재 디렉터리가 되므로 <code>budget_app</code> 패키지가 import 가능해지고, 아래에서 설명할 상대 import 가 전부 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<h3 id="11-왜-이렇게-잘게-나눴나-파일-하나-책임-하나">1.1 왜 이렇게 잘게 나눴나 — "파일 하나 = 책임 하나"</h3>
+<p>구현 파일이 38개(패키지 선언 <code>__init__.py</code> 5개 제외, 전체 4,203줄)인 것이 많아 보일 수 있습니다. 판단 기준은 <strong>"이 파일을 고칠 이유가 몇 개인가"</strong> 입니다.</p>
+<p>리팩터 전의 <code>cli.py</code> 는 512줄이었고, 고칠 이유가 네 개였습니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>고칠 이유</th>
+<th>예</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>명령줄 문법이 바뀔 때</td>
+<td>새 옵션 추가</td>
+</tr>
+<tr>
+<td>대화형 입력 정책이 바뀔 때</td>
+<td>재입력 횟수 변경</td>
+</tr>
+<tr>
+<td>화면 표시가 바뀔 때</td>
+<td>표 컬럼 순서 변경</td>
+</tr>
+<tr>
+<td>명령 처리 순서가 바뀔 때</td>
+<td>검증 시점 이동</td>
+</tr>
+</tbody>
+</table></div>
+<p>지금은 각각 <code>cli/parser.py</code> / <code>cli/prompts.py</code> / <code>cli/presenter.py</code> / <code>cli/handlers.py</code> 로 나뉘어 파일마다 이유가 하나입니다(<code>cli/app.py</code> 는 그 넷을 엮는 레지스트리와 진입점만 남았습니다). 파일 크기도 함께 줄었습니다.</p>
+<p>아래는 상위 파일들의 실제 줄 수입니다(주석·docstring 포함).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>줄 수</th>
+<th>파일</th>
+<th>줄 수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>storage/jsonl.py</td>
+<td>329</td>
+<td>domain/validators.py</td>
+<td>169</td>
+</tr>
+<tr>
+<td>storage/repositories.py</td>
+<td>308</td>
+<td>storage/csv_io.py</td>
+<td>163</td>
+</tr>
+<tr>
+<td>domain/specs.py</td>
+<td>243</td>
+<td>cli/presenter.py</td>
+<td>141</td>
+</tr>
+<tr>
+<td>cli/parser.py</td>
+<td>243</td>
+<td>domain/tx_id.py</td>
+<td>132</td>
+</tr>
+<tr>
+<td>services/importexport.py</td>
+<td>206</td>
+<td>cli/prompts.py</td>
+<td>128</td>
+</tr>
+<tr>
+<td>domain/entities.py</td>
+<td>190</td>
+<td>cli/messages.py</td>
+<td>121</td>
+</tr>
+<tr>
+<td>cli/handlers.py</td>
+<td>190</td>
+<td>cli/error_handler.py</td>
+<td>121</td>
+</tr>
+<tr>
+<td>storage/unit_of_work.py</td>
+<td>181</td>
+<td>storage/ids.py</td>
+<td>116</td>
+</tr>
+</tbody>
+</table></div>
+<p>나머지 22개 구현 파일은 전부 100줄 이하입니다(<code>cli/output.py</code> 100, <code>cli/app.py</code> 98, <code>domain/results.py</code> 97, <code>services/transactions.py</code> 91, <code>services/categories.py</code> 89, <code>domain/queries.py</code> 82, <code>context.py</code> 80, <code>services/budgets.py</code> 66, <code>decorators.py</code> 66, <code>errors.py</code> 51, <code>storage/backup.py</code> 47, … 가장 작은 <code>__main__.py</code> 8).</p>
+<p>가장 큰 <code>storage/jsonl.py</code> 329줄 중에서도 설명 주석·docstring 이 상당 부분을 차지합니다. 실제 로직은 어느 파일도 한 화면을 크게 벗어나지 않습니다.</p>
+<blockquote>
+<p><strong>분할을 어떻게 끝냈나.</strong> 이 표는 <strong>분할이 끝난 뒤</strong>의 값입니다. 재배치 단계에서는 파일을 폴더로 <strong>이동만</strong> 했고(<code>git mv</code> 는 이력이 이어지지만 분할은 "전부 삭제 + 전부 추가"로 보여서, 두 가지를 한 커밋에 섞으면 리뷰가 불가능해집니다), 분할은 그다음 커밋에서 했습니다. 쪼갠 축은 넷입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>분할 전</th>
+<th>분할 후</th>
+<th>나눈 축</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storage/repository.py</code> (528줄)</td>
+<td><code>jsonl.py</code>(JSONL 공통 처리) / <code>ids.py</code>(ID 발급) / <code>repositories.py</code>(엔티티별 저장소) / <code>backup.py</code>(폴더 복사)</td>
+<td>기술적 관심사</td>
+</tr>
+<tr>
+<td><code>services.py</code> (342줄)</td>
+<td><code>transactions.py</code> / <code>budgets.py</code> / <code>categories.py</code> / <code>importexport.py</code> (+ <code>maintenance.py</code>)</td>
+<td>유스케이스 = 클래스 = 파일</td>
+</tr>
+<tr>
+<td><code>domain/models.py</code> (305줄)</td>
+<td><code>entities.py</code>(Transaction·Budget·Category·Patch) / <code>queries.py</code>(SearchFilter) / <code>results.py</code>(MonthlySummary·ImportReport) / <code>periods.py</code>(month_range)</td>
+<td>값의 역할 — 저장되는 것 / 묻는 것 / 답인 것</td>
+</tr>
+<tr>
+<td>루트 <code>config.py</code>·<code>messages.py</code></td>
+<td>계층마다 하나씩(<code>domain/config.py</code>, <code>storage/messages.py</code>, <code>cli/config.py</code>, …) + 루트에는 앱 이름만</td>
+<td>누가 쓰는가(§2.7)</td>
+</tr>
+</tbody>
+</table></div>
+<p>분할 뒤 새로 생긴 <code>storage/unit_of_work.py</code>·<code>domain/specs.py</code>·<code>domain/tx_id.py</code> 는 이동이 아니라 신설입니다.</p>
+</blockquote>
+<h3 id="12-의존-방향을-import-문으로-실증하기">1.2 의존 방향을 import 문으로 실증하기</h3>
+<p>다이어그램은 그림일 뿐이므로, 각 파일의 실제 import 문으로 화살표 방향을 확인합니다. 아래는 소스의 상대 import(<code>from . ...</code> / <code>from .. ...</code>)만 추출한 결과입니다. 표준 라이브러리 import(<code>json</code>, <code>argparse</code> 등)는 계층 구조와 무관하므로 뺐습니다.</p>
+<div class="codehilite"><pre><span></span><code>  L0 (잎)  config                -&gt; (없음)
+  L0 (잎)  errors                -&gt; (없음)
+  L0 (잎)  domain.config         -&gt; (없음)
+  L0 (잎)  domain.messages       -&gt; (없음)
+  L0 (잎)  storage.messages      -&gt; (없음)
+  L0 (잎)  services.config       -&gt; (없음)
+  L0 (잎)  services.messages     -&gt; (없음)
+  L0 (잎)  cli.messages          -&gt; (없음)
+
+  L1 domain.tx_id               -&gt; domain.config, domain.messages, errors
+  L1 domain.validators          -&gt; domain.config, domain.messages, errors
+  L1 domain.entities            -&gt; domain.tx_id, domain.validators
+  L1 domain.periods             -&gt; domain.config, domain.validators
+  L1 domain.specs               -&gt; domain.entities, domain.validators
+  L1 domain.queries             -&gt; domain.entities, domain.periods, domain.specs
+  L1 domain.results             -&gt; domain.entities
+
+  L2 storage.config             -&gt; config
+  L2 storage.messages           -&gt; (없음)
+  L2 storage.backup             -&gt; storage.config
+  L2 storage.jsonl              -&gt; errors, storage.config, storage.messages
+  L2 storage.ids                -&gt; domain.tx_id, storage.config, storage.jsonl,
+                                   storage.messages
+  L2 storage.unit_of_work       -&gt; storage.config, storage.jsonl, storage.messages
+  L2 storage.csv_io             -&gt; domain.config, domain.entities, domain.tx_id,
+                                   domain.validators, errors, storage.config,
+                                   storage.messages
+  L2 storage.repositories       -&gt; domain.entities, domain.tx_id, domain.validators,
+                                   storage.config, storage.ids, storage.jsonl
+
+  L3 services.maintenance       -&gt; storage.backup
+  L3 services.categories        -&gt; domain.validators, errors, services.messages,
+                                   storage.repositories
+  L3 services.transactions      -&gt; decorators, domain.entities, domain.queries, errors,
+                                   services.messages, storage.repositories
+  L3 services.budgets           -&gt; decorators, domain.config, domain.entities,
+                                   domain.queries, domain.results, domain.validators,
+                                   services.config, storage.repositories
+  L3 services.importexport      -&gt; domain.entities, domain.queries, domain.results,
+                                   domain.tx_id, errors, services.config,
+                                   services.messages, storage.csv_io, storage.ids,
+                                   storage.repositories, storage.unit_of_work
+
+  L4 cli.config                 -&gt; config
+  L4 cli.output                 -&gt; cli.config, cli.messages
+  L4 cli.presenter              -&gt; cli.messages, domain.entities, domain.results
+  L4 cli.parser                 -&gt; cli.config, cli.messages, domain.config,
+                                   services.config
+  L4 cli.error_handler          -&gt; cli.config, cli.messages, cli.output, errors
+  L4 cli.prompts                -&gt; cli.config, cli.messages, cli.output,
+                                   domain.validators, errors, services.categories,
+                                   services.messages
+  L4 cli.handlers               -&gt; cli.config, cli.messages, cli.output, cli.presenter,
+                                   cli.prompts, context, domain.entities,
+                                   domain.queries, domain.validators, errors
+  L4 cli.app                    -&gt; cli.config, cli.error_handler, cli.handlers,
+                                   cli.output, cli.parser, context
+
+  (횡단) decorators             -&gt; config
+  (횡단) context                -&gt; services.budgets, services.categories,
+                                   services.importexport, services.maintenance,
+                                   services.transactions, storage.repositories
+  (진입) __main__               -&gt; cli
+
+  [위로 향하는 의존] : 없음
+</code></pre></div>
+
+<p>다섯 가지를 확인할 수 있습니다.</p>
+<ol>
+<li><strong>레벨 번호가 절대 거꾸로 가지 않습니다.</strong> L3(<code>services.*</code>)가 L4(<code>cli.*</code>)를 import 하는 일은 없고, L1(<code>domain.*</code>)은 <code>errors</code> 외에는 자기 계층만 봅니다.</li>
+<li><strong>각 계층의 <code>config</code>/<code>messages</code> 는 잎(leaf)입니다.</strong> <code>storage.config</code>·<code>cli.config</code> 만 루트 <code>config</code> 에서 앱 이름을 물려받고, 나머지 상수 모듈은 아무것도 import 하지 않습니다. 어휘와 상수는 누구에게도 의존하지 않습니다.</li>
+<li><strong><code>cli.app</code> 과 <code>context</code> 가 조립을 맡습니다.</strong> <code>cli.app</code> 은 CLI 부품 전체와 <code>context</code> 를, <code>context</code> 는 서비스 5개와 저장소 3개를 압니다 — "조립하는 쪽이 부품을 안다".</li>
+<li><strong><code>cli.*</code> 중 <code>storage.*</code> 를 import 하는 것이 하나도 없습니다.</strong> 리팩터 전에는 <code>cli.prompts</code> 가 <code>CategoryStore</code> 를, 핸들러가 <code>storage.backup</code> 을 직접 import 했습니다. 지금은 CLI 가 서비스와만 말합니다. 이것을 감시하는 테스트가 <code>tests/test_architecture.py::test_cli_never_touches_storage</code> 입니다.</li>
+<li><strong><code>cli.output</code> 을 import 하는 곳은 전부 <code>cli.*</code> 입니다.</strong> 그래서 <code>output</code> 이 <code>cli/</code> 안에 있는 것이 실측으로 정당화됩니다. 리팩터 전에는 <code>decorators</code> 도 이것을 import 했는데, <code>handle_errors</code> 를 떼어내면서 그 의존이 사라졌습니다(지금 <code>decorators</code> 가 아는 것은 루트 <code>config</code> 하나뿐).</li>
+</ol>
+<p>이것을 직접 확인하고 싶다면 프로젝트 루트에서 다음을 실행하면 됩니다.</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<span class="s2">import ast, pathlib</span>
+<span class="s2">for p in sorted(pathlib.Path(&#39;budget_app&#39;).rglob(&#39;*.py&#39;)):</span>
+<span class="s2">    if p.name == &#39;__init__.py&#39;: continue</span>
+<span class="s2">    pkg = list(p.parent.relative_to(&#39;budget_app&#39;).parts)</span>
+<span class="s2">    me = &#39;.&#39;.join(list(p.relative_to(&#39;budget_app&#39;).with_suffix(&#39;&#39;).parts))</span>
+<span class="s2">    deps = set()</span>
+<span class="s2">    for n in ast.walk(ast.parse(p.read_text(encoding=&#39;utf-8&#39;))):</span>
+<span class="s2">        if isinstance(n, ast.ImportFrom) and n.level:</span>
+<span class="s2">            up = pkg[:len(pkg) - (n.level - 1)]          # &#39;..&#39; 는 한 단계 위 패키지</span>
+<span class="s2">            mods = [n.module] if n.module else [a.name for a in n.names]</span>
+<span class="s2">            deps |= {&#39;.&#39;.join(up + [m]) if up else m for m in mods}</span>
+<span class="s2">    print(f&#39;{me:&lt;22} -&gt; {sorted(deps)}&#39;)</span>
+<span class="s2">&quot;</span>
+</code></pre></div>
+
+<p><code>n.level</code> 이 1이면 같은 패키지(<code>from . import x</code>), 2면 한 단계 위(<code>from .. import x</code>)입니다. 패키지가 생기면서 이 계산이 필요해졌습니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>from . import x</code> 같은 <strong>명시적 상대 import</strong> 는 PEP 328 이 도입했습니다. 같은 PEP 가 "점 없는 import 는 무조건 절대 경로"라는 규칙도 함께 정해서, 파이썬 3 에서는 <code>budget_app/domain/config.py</code> 가 있어도 <code>import calendar</code> 가 표준 라이브러리를 가져옵니다. <code>domain/periods.py</code> 의 모듈 docstring 이 "모듈 이름이 <code>calendar</code> 가 아닌 이유"를 설명하는 배경이 이것입니다 — 동작은 안전하지만 <strong>읽는 사람이 헷갈리는 비용</strong>은 남습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<p><strong>⚙️ 내부 동작</strong> — 상대 import 의 점(<code>.</code>)은 <strong>파일 위치가 아니라 <code>__package__</code> 를 기준</strong>으로 풀립니다. import 시스템은 <code>__package__</code> 에서 <code>level - 1</code> 만큼 조각을 떼어내 절대 이름을 만듭니다. <code>budget_app/cli/app.py</code> 는 <code>__package__ == "budget_app.cli"</code> 이므로 <code>from ..context import AppContext</code> 는 <code>budget_app.context</code> 가 됩니다. 그래서 <code>python budget_app/cli/app.py</code> 로 <strong>직접 실행하면 반드시 깨집니다</strong> — 그때 <code>__name__</code> 은 <code>"__main__"</code>, <code>__package__</code> 는 빈 문자열이라 위로 올라갈 패키지가 없고, <code>ImportError: attempted relative import with no known parent package</code> 가 납니다. 이 프로젝트를 <code>python -m budget_app</code> 으로만 실행하는 것은 취향이 아니라 <strong>문법적 요구</strong>입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<h3 id="121-순환-import-가-없는-것이-우연이-아닌-이유">1.2.1 순환 import 가 없는 것이 우연이 아닌 이유</h3>
+<p>위 목록에서 두 모듈이 서로를 가리키는 쌍은 하나도 없습니다. 이것은 파이썬에서 <strong>선택이 아니라 필수에 가깝습니다.</strong></p>
+<p><code>cli/app.py</code> 의 모듈 docstring 이 그 이유를 직접 말합니다.</p>
+<p>budget_app/cli/app.py:3-7</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">## 명령 → 핸들러 대응</span>
+
+<span class="err">``</span><span class="n">parser</span><span class="err">``</span> <span class="n">가</span> <span class="n">남긴</span> <span class="n">문자열</span> <span class="n">키</span><span class="p">(</span><span class="err">``</span><span class="s2">&quot;category.add&quot;</span><span class="err">``</span><span class="p">)</span><span class="n">를</span> <span class="err">``</span><span class="n">HANDLERS</span><span class="err">``</span> <span class="n">가</span> <span class="n">함수로</span> <span class="n">바꾼다</span><span class="o">.</span>
+<span class="n">파서가</span> <span class="n">함수</span> <span class="n">객체를</span> <span class="n">들고</span> <span class="n">있던</span> <span class="n">이전</span> <span class="n">방식과</span> <span class="n">달리</span> <span class="n">두</span> <span class="n">모듈이</span> <span class="n">서로를</span> <span class="kn">import</span><span class="w"> </span><span class="nn">하지</span> <span class="n">않으므로</span>
+<span class="n">순환이</span> <span class="n">없고</span><span class="p">,</span> <span class="n">하위</span> <span class="n">명령마다</span> <span class="n">핸들러가</span> <span class="n">하나씩</span> <span class="n">대응해</span> <span class="err">``</span><span class="k">if</span><span class="o">/</span><span class="k">elif</span><span class="err">``</span> <span class="n">분기가</span> <span class="n">사라졌다</span><span class="o">.</span>
+</code></pre></div>
+
+<p>리팩터 전에는 <code>parser.py</code> 가 <code>p.set_defaults(func=cmd_add)</code> 로 <strong>핸들러 함수 객체</strong>를 들고 있었습니다. 그러려면 <code>parser</code> 가 <code>handlers</code> 를 import 해야 하는데, <code>handlers</code> 는 프롬프트·프레젠터를 쓰고 <code>app</code> 은 둘 다 쓰므로 모듈 그래프가 금방 얽힙니다. 지금은 파서가 <code>handler="add"</code> 라는 <strong>문자열</strong>만 남기고, 문자열 → 함수 변환은 <code>app.HANDLERS</code> 딕셔너리 한 곳이 담당합니다. 의존 화살표가 <code>app → parser</code>, <code>app → handlers</code> 두 개로 갈라지고 <code>parser ↔ handlers</code> 사이에는 아무것도 없습니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — 순환이 생기면 파이썬은 어떻게 실패하는가. import 는 모듈 객체를 만들어 <code>sys.modules</code> 에 <strong>먼저 등록한 다음</strong> 본문을 위에서 아래로 실행합니다. A 를 실행하던 중 B 를 import 하고 B 가 다시 A 를 import 하면, <code>sys.modules["A"]</code> 는 이미 있으므로 재실행 없이 그 객체가 반환되는데 — 그 객체는 <strong>아직 본문을 끝내지 않은 반쯤 채워진 모듈</strong>입니다. 그래서 <code>from .a import A</code> 는 아직 대입되지 않은 이름을 찾다 실패하고, 다음 오류가 납니다.</p>
+<p><code>ImportError: cannot import name 'A' from partially initialized module 'pkg.a'
+(most likely due to a circular import)</code></p>
+<p>무서운 점은 <strong>실행 순서에 따라 나기도 하고 안 나기도 한다</strong>는 것입니다. <code>import a.b</code> 형태(모듈 객체만 받고 속성 접근은 나중)면 통과하고, <code>from a import X</code> 형태면 터집니다. 그래서 "돌아가니까 괜찮다"가 성립하지 않고, 애초에 순환을 만들지 않는 설계가 필요합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<h3 id="122-계층-규칙을-문서가-아니라-테스트가-강제합니다">1.2.2 계층 규칙을 문서가 아니라 <strong>테스트가</strong> 강제합니다</h3>
+<p>문서에 적힌 규칙은 검증되지 않습니다. 그래서 <code>tests/test_architecture.py</code> (115줄)가 규칙을 실행 가능한 형태로 갖고 있습니다.</p>
+<p>tests/test_architecture.py:25-29</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">#: 숫자가 작을수록 아래 계층. 같은 계층끼리는 허용한다.</span>
+<span class="n">LAYERS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;domain&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;storage&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;services&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;cli&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">}</span>
+
+<span class="c1">#: 계층에 속하지 않는 루트 모듈 — 아무나 써도 되는 공용 어휘</span>
+<span class="n">ROOT_MODULES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;errors&quot;</span><span class="p">,</span> <span class="s2">&quot;config&quot;</span><span class="p">,</span> <span class="s2">&quot;decorators&quot;</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="s2">&quot;__main__&quot;</span><span class="p">}</span>
+</code></pre></div>
+
+<p>이 파일이 검사하는 것은 다섯 가지입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>테스트</th>
+<th>검사 내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_no_upward_imports</code></td>
+<td>모든 모듈에 대해 <code>LAYERS[import한 계층] &lt;= LAYERS[자기 계층]</code>. <code>@pytest.mark.parametrize</code> 로 파일마다 케이스가 하나씩 생겨, 깨지면 <strong>어느 파일인지</strong> 이름으로 나옵니다</td>
+</tr>
+<tr>
+<td><code>test_cli_never_touches_storage</code></td>
+<td><code>cli/*.py</code> 중 <code>storage</code> 계층을 import 하는 파일 목록이 빈 리스트여야 함</td>
+</tr>
+<tr>
+<td><code>test_domain_imports_nothing_above_itself</code></td>
+<td><code>domain/*.py</code> 가 import 하는 계층이 <code>{"domain", "&lt;root&gt;"}</code> 부분집합이어야 함</td>
+</tr>
+<tr>
+<td><code>test_app_context_does_not_expose_repositories</code></td>
+<td><code>AppContext</code> 인스턴스의 <strong>공개 속성</strong>에 <code>txs</code>/<code>cats</code>/<code>budgets</code> 가 없어야 함(§6)</td>
+</tr>
+<tr>
+<td><code>test_every_handler_is_registered</code></td>
+<td><code>handlers</code> 의 <code>cmd_*</code> 함수 집합 == <code>app.HANDLERS</code> 값들의 <code>__name__</code> 집합</td>
+</tr>
+</tbody>
+</table></div>
+<p>핵심은 판정을 <strong>문자열 검색이 아니라 AST 로</strong> 한다는 점입니다. 테스트 docstring 이 그 이유를 적어 뒀습니다.</p>
+<p>tests/test_architecture.py:12-13</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">를</span> <span class="n">AST</span> <span class="n">로</span> <span class="n">세는</span> <span class="n">이유</span><span class="p">:</span> <span class="n">문자열</span> <span class="n">검색은</span> <span class="n">주석·docstring</span> <span class="n">에</span> <span class="n">적힌</span> <span class="n">모듈</span> <span class="n">이름까지</span>
+<span class="n">세어서</span> <span class="n">거짓</span> <span class="n">양성이</span> <span class="n">나온다</span><span class="o">.</span>
+</code></pre></div>
+
+<p>실제로 이 프로젝트의 docstring 에는 <code>storage.repositories</code> 같은 이름이 설명용으로 여러 번 등장합니다. <code>grep</code> 이었다면 전부 위반으로 잡혔을 것입니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>ast.parse(source)</code> 는 사실 <code>compile(source, filename, mode, flags=ast.PyCF_ONLY_AST)</code> 의 얇은 래퍼입니다. CPython 이 실제 컴파일에 쓰는 것과 <strong>같은 파서</strong>를 돌리되 바이트코드 생성 직전에 멈춰서 구문 트리를 돌려주므로, "파이썬이 이 코드를 어떻게 읽는가"와 결과가 어긋날 수 없습니다. 모듈을 import 하지 않고 읽기만 하므로 부작용도 없습니다.</p>
+<p><code>ast.walk(tree)</code> 는 <code>collections.deque</code> 를 쓴 <strong>너비 우선 순회</strong>입니다 — 노드를 꺼내 <code>iter_child_nodes()</code> 의 결과를 뒤에 붙이고 자신을 yield 하는 것이 전부라, 트리 전체를 순서 상관없이 훑을 때 쓰는 관용구입니다. 특정 노드만 필요하면 <code>isinstance(node, ast.ImportFrom)</code> 로 거릅니다.</p>
+<p><code>ast.ImportFrom</code> 노드가 들고 있는 것은 셋입니다 — <code>module</code>(점 뒤 모듈 이름, <code>from . import x</code> 면 <code>None</code>), <code>level</code>(점 개수), <code>names</code>(가져오는 이름들). <code>from ..storage.repositories import X</code> 는 <code>module="storage.repositories", level=2</code> 로 파싱되므로 <strong><code>module</code> 의 첫 조각이 곧 계층 이름</strong>이 됩니다. 테스트가 <code>(node.module or "").split(".")[0]</code> 한 줄로 계층을 뽑아내는 근거가 이것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<h3 id="13-리팩터가-고친-역류-services-decorators-output">1.3 리팩터가 고친 역류 — services → decorators → output</h3>
+<p>이 구조가 처음부터 이랬던 것은 아닙니다. 리팩터 전에는 <strong>아래 계층이 위 계층에 전이 의존</strong>하는 경로가 있었습니다.</p>
+<div class="codehilite"><pre><span></span><code>[리팩터 전]
+services.py ──import AppError──▶ decorators.py ──import──▶ output.py
+   (서비스)                         (횡단?)                 (프레젠테이션)
+   └──────────── 서비스가 화면 출력 모듈에 전이 의존 ──────────────┘
+</code></pre></div>
+
+<p>원인이 둘이었습니다.</p>
+<p><strong>(1) <code>AppError</code> 가 <code>decorators.py</code> 에 있었습니다.</strong> <code>AppError</code> 는 "등록되지 않은 카테고리입니다" 같은 <strong>도메인 오류</strong>인데, 이름이 <code>decorators</code> 인 파일에 살고 있었습니다. 서비스는 이 예외 하나를 쓰려고 <code>decorators</code> 를 import 해야 했습니다.</p>
+<p><strong>(2) <code>handle_errors</code> 도 <code>decorators.py</code> 에 있었습니다.</strong> 예외를 화면 문구와 종료 코드로 바꾸는 것은 <strong>CLI 표현 정책</strong>입니다. 그것이 있으니 <code>decorators</code> 가 <code>output</code> 을 import 해야 했고, 그 의존이 서비스까지 전파됐습니다.</p>
+<p>리팩터는 둘을 각각 제자리로 옮겼습니다.</p>
+<div class="codehilite"><pre><span></span><code>[리팩터 후]
+errors.py         ← AppError / ValidationError  (계층 공통 어휘, 아무것도 import 안 함)
+decorators.py     ← @log_call / @measure_time   (관측만, 루트 config 만 앎)
+cli/error_handler.py ← @handle_errors           (CLI 표현 정책, cli.output 을 앎)
+
+services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
+</code></pre></div>
+
+<p>§1.2 의 실측 목록이 이 결말을 확인해 줍니다 — <code>decorators -&gt; config</code> 한 줄뿐이고, <code>services.transactions</code>/<code>services.budgets</code> 가 <code>decorators</code> 를 import 해도 거기서 <code>cli.output</code> 으로 이어지는 길이 없습니다.</p>
+<p><strong>과제 방어 포인트</strong>: "계층을 왜 나눴나"라는 질문에 "나눠 봤더니 이런 역류가 있었고 이렇게 고쳤다"까지 답할 수 있으면, 계층 구조를 그림으로만 아는 것과 실제로 이해한 것의 차이가 드러납니다.</p>
+<hr>
+<h2 id="2-각-계층의-책임과-금지사항">2. 각 계층의 책임과 금지사항</h2>
+<p>계층 구조가 의미를 가지려면 "무엇을 하는가"만큼 <strong>"무엇을 하면 안 되는가"</strong> 가 지켜져야 합니다. 아래 표의 금지사항은 전부 grep 으로 검증 가능한 형태로 적었습니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>모듈</th>
+<th>책임</th>
+<th>금지사항 (검증 방법)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__main__.py</code></td>
+<td>프로세스 시작과 종료 코드 전달</td>
+<td>로직 금지 — 8줄뿐</td>
+</tr>
+<tr>
+<td><code>cli/app.py</code></td>
+<td><code>HANDLERS</code> 레지스트리 + <code>main</code> + <code>_dispatch</code>(컨텍스트 조립·호출)</td>
+<td><code>print(</code> 0회, 문자열 조립 금지</td>
+</tr>
+<tr>
+<td><code>cli/handlers.py</code></td>
+<td>인자 → 서비스 호출 번역, 결과 → 프레젠터 전달</td>
+<td>검증 규칙 금지, <code>storage.*</code> import 금지</td>
+</tr>
+<tr>
+<td><code>cli/parser.py</code></td>
+<td>argparse 문법 정의</td>
+<td>핸들러 함수 참조 금지 (문자열 키만)</td>
+</tr>
+<tr>
+<td><code>cli/prompts.py</code></td>
+<td>표준입력에서 값 받기</td>
+<td>저장소 직접 접근 금지 (<code>CategoryService</code> 만 받음)</td>
+</tr>
+<tr>
+<td><code>cli/presenter.py</code></td>
+<td>도메인 → 문자열</td>
+<td><code>print(</code> 0회 — <strong>반환만</strong></td>
+</tr>
+<tr>
+<td><code>cli/output.py</code></td>
+<td>채널 결정(stdout/stderr/log)</td>
+<td>문자열 조립 금지</td>
+</tr>
+<tr>
+<td><code>cli/error_handler.py</code></td>
+<td>예외 → 메시지 + 종료 코드</td>
+<td>도메인 규칙 금지</td>
+</tr>
+<tr>
+<td><code>services/*.py</code></td>
+<td>도메인 규칙과 정책</td>
+<td><code>open(</code> 0회, <code>print(</code> 0회</td>
+</tr>
+<tr>
+<td><code>storage/jsonl.py</code></td>
+<td>JSONL 열기·스트리밍·원자적 재작성</td>
+<td>엔티티 종류 인식 금지 (제네릭 <code>T</code>)</td>
+</tr>
+<tr>
+<td><code>storage/repositories.py</code></td>
+<td>엔티티별 저장소 (거래·카테고리·예산)</td>
+<td><code>print(</code> 0회, 도메인 판단 금지</td>
+</tr>
+<tr>
+<td><code>storage/ids.py</code></td>
+<td>ID 발급·워터마크</td>
+<td>거래 내용 해석 금지</td>
+</tr>
+<tr>
+<td><code>storage/unit_of_work.py</code></td>
+<td>여러 파일 한 단위 커밋</td>
+<td>정책 판단 금지</td>
+</tr>
+<tr>
+<td><code>storage/csv_io.py</code></td>
+<td>CSV ↔ 도메인 번역</td>
+<td>정책 판단 금지 (중복/원자 정책 모름)</td>
+</tr>
+<tr>
+<td><code>domain/entities.py</code></td>
+<td>데이터 구조 + 불변식</td>
+<td>I/O 전면 금지</td>
+</tr>
+<tr>
+<td><code>domain/validators.py</code></td>
+<td>필드 규칙</td>
+<td>저장소 접근 금지</td>
+</tr>
+<tr>
+<td><code>domain/specs.py</code></td>
+<td>조합 가능한 조건 객체</td>
+<td>파일·화면 금지</td>
+</tr>
+<tr>
+<td><code>errors.py</code></td>
+<td>예외 타입 정의</td>
+<td>import 0개</td>
+</tr>
+<tr>
+<td><code>decorators.py</code></td>
+<td>관측(로그/시간)</td>
+<td><code>cli.output</code> import 금지</td>
+</tr>
+<tr>
+<td><code>context.py</code></td>
+<td>합성 루트 — 저장소·서비스 조립</td>
+<td><code>cli.*</code> import 금지</td>
+</tr>
+<tr>
+<td><code>&lt;계층&gt;/config.py</code></td>
+<td>값 상수</td>
+<td>함수/클래스 금지, 문구 금지</td>
+</tr>
+<tr>
+<td><code>&lt;계층&gt;/messages.py</code></td>
+<td>문자열</td>
+<td>값 정책 금지</td>
+</tr>
+</tbody>
+</table></div>
+<p>각 항목을 풀어서 확인합니다.</p>
+<h3 id="21-print-는-outputpy-에만-있습니다">2.1 <code>print</code> 는 <code>output.py</code> 에만 있습니다</h3>
+<p>리팩터 전에는 <code>cli.py</code> 에 <code>print(</code> 가 26회 있었습니다. 지금은 0회입니다. 프로그램이 밖으로 글자를 내보내는 지점은 <code>output.py</code> 의 네 함수뿐입니다.</p>
+<p>budget_app/cli/output.py:42-44</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">out</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;프로그램의 결과 한 줄을 stdout 으로 출력한다.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+</code></pre></div>
+
+<p>네 함수는 <code>out</code> / <code>out_lines</code> / <code>err</code> / <code>err_lines</code> 입니다(<code>cli/output.py:42-71</code>).</p>
+<p><strong>리팩터 전에는 이 규칙이 선언만 있고 지켜지지 않았습니다.</strong> <code>output.py</code> 의 첫 줄은 원래도 "어떤 메시지가 어느 스트림으로 나가는지 이 모듈에서만 정한다"였는데, 정작 <code>err()</code> 만 있고 stdout 출력은 전부 <code>cli.py</code> 에 흩어져 있었습니다. <code>out()</code> 을 추가해 선언과 코드를 일치시킨 것이 리팩터의 작은 성과 중 하나입니다.</p>
+<h3 id="22-presenterpy-는-출력하지-않고-반환합니다">2.2 <code>presenter.py</code> 는 출력하지 않고 <strong>반환</strong>합니다</h3>
+<p>budget_app/cli/presenter.py:1-2 (docstring 발췌)</p>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;프레젠터 — 도메인 객체를 사람이 읽을 줄로 바꾼다.</span>
+</code></pre></div>
+
+<p>그 결과 핸들러가 이렇게 짧아집니다.</p>
+<p>budget_app/cli/handlers.py:72-75</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cmd_summary</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">AppContext</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">budget_service</span><span class="o">.</span><span class="n">monthly_summary</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">top_n</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">top</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">out_lines</span><span class="p">(</span><span class="n">presenter</span><span class="o">.</span><span class="n">summary_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_OK</span>
+</code></pre></div>
+
+<p>세 줄에 세 계층이 각각 한 번씩 등장합니다 — 서비스가 계산하고, 프레젠터가 문자열로 바꾸고, 출력 모듈이 채널을 고릅니다. 리팩터 전 <code>cmd_summary</code> 는 25줄짜리 렌더링 함수였습니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>summary_lines</code> 는 <code>return</code> 대신 <code>yield</code> 를 쓰는 <strong>제너레이터 함수</strong>입니다(§4 에 본문이 있습니다). 함수 본문 어딘가에 <code>yield</code> 가 있으면 컴파일러가 코드 객체에 제너레이터 플래그를 세워서, 호출해도 본문이 실행되지 않고 제너레이터 객체만 돌아옵니다. 그래서 프레젠터는 "출력을 만들지 않고 <strong>만드는 방법</strong>을 넘긴다"가 되고, <code>output.out_lines</code> 가 <code>for</code> 로 돌릴 때 비로소 한 줄씩 계산됩니다. 조기 반환(<code>if summary.is_empty: ... return</code>)이 자연스럽게 쓰이는 것도 제너레이터라서입니다 — 여기서 <code>return</code> 은 값이 아니라 <strong>종료</strong>를 뜻합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<h3 id="23-services-에는-open-이-없습니다">2.3 <code>services/</code> 에는 <code>open(</code> 이 없습니다</h3>
+<p>리팩터 전에는 <code>services.py</code> 안에서 CSV 파일을 직접 열었습니다. <code>repository.py</code> 는 "파일 입출력만 담당"한다고 선언해 놓고 실제로는 <strong>JSONL I/O 는 저장소, CSV I/O 는 서비스</strong>라는 일관성 없는 규칙이었습니다.</p>
+<p>지금은 파일을 여는 코드가 전부 저장소 계층(<code>storage/jsonl.py</code> / <code>storage/csv_io.py</code> / <code>storage/backup.py</code>)에 있고, <code>services/</code> 패키지 전체에서 <code>open(</code> 는 docstring 안의 설명 한 줄뿐입니다.</p>
+<p>budget_app/services/<strong>init</strong>.py:1-15</p>
+<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;서비스 계층 — 유스케이스와 정책.</span>
+
+<span class="sd">저장소(파일 I/O)와 CLI(화면) 사이에서 **판단**만 담당한다. 이 패키지에는</span>
+<span class="sd">``open()`` 이 하나도 없다. 파일을 여는 일은 ``storage`` 가, 글자를 내는 일은</span>
+<span class="sd">``cli.presenter`` 가 한다.</span>
+
+<span class="sd">- ``transactions`` : 거래 추가·수정·삭제·정렬 조회</span>
+<span class="sd">- ``budgets``      : 예산 설정 + 월별 요약(단일 패스 집계)</span>
+<span class="sd">- ``categories``   : 카테고리 관리 + 참조 무결성 보호</span>
+<span class="sd">- ``importexport`` : CSV 가져오기/내보내기 정책 (실패 축 × 중복 축)</span>
+
+<span class="sd">**재수출하지 않는다** — ``from ..services.budgets import BudgetService`` 처럼 소유</span>
+<span class="sd">모듈을 명시한다. 서비스가 넷뿐이라 어느 파일에 있는지 외우기 어렵지 않고,</span>
+<span class="sd">import 문이 곧 &quot;이 모듈이 어느 유스케이스를 쓰는가&quot;의 목록이 된다.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+</code></pre></div>
+
+<h3 id="24-storagerepositoriespy-는-도메인-판단을-하지-않습니다">2.4 <code>storage/repositories.py</code> 는 도메인 판단을 하지 않습니다</h3>
+<p>부모 클래스 <code>JsonlStore.append</code> 는 "받은 엔티티를 한 줄로 인코딩해 파일 끝에 붙인다"가 전부입니다.</p>
+<p>budget_app/storage/jsonl.py:210-211</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entity</span><span class="p">:</span> <span class="n">T</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_append_lines</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode</span><span class="p">(</span><span class="n">entity</span><span class="p">)])</span>
+</code></pre></div>
+
+<p><code>TransactionRepository</code> 가 이것을 재정의하지만, 더하는 일도 도메인 판단이 아니라 <strong>ID 워터마크 갱신</strong>뿐입니다.</p>
+<p>budget_app/storage/repositories.py:128-136</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx</span><span class="p">:</span> <span class="n">Transaction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;한 건을 이어 쓰고 워터마크를 갱신한다.</span>
+
+<span class="sd">        워터마크를 **쓰기 전에** 올린다. 그래야 &quot;발급된 번호는 어느 순간에도</span>
+<span class="sd">        기준선 아래로 내려가지 않는다&quot;가 항상 성립한다. 쓰기가 실패하면 번호가</span>
+<span class="sd">        하나 건너뛰지만, 빈 번호는 아무 문제도 일으키지 않는다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_watermark</span><span class="o">.</span><span class="n">remember</span><span class="p">(</span><span class="n">tx</span><span class="o">.</span><span class="n">id</span><span class="o">.</span><span class="n">number</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tx</span><span class="p">)</span>
+</code></pre></div>
+
+<p>"이 거래의 카테고리가 등록된 것인가?" 같은 판단은 여기에 없습니다. 저장소는 넘어온 객체를 의심하지 않는데, 그럴 수 있는 이유는 <code>Transaction</code> 이 생성 시점에 이미 검증을 마친 객체이기 때문입니다.</p>
+<p><strong>리팩터가 되돌린 위반이 하나 있습니다.</strong> 이전 <code>repository.update</code> 는 이런 코드였습니다.</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># (리팩터 전 — 지금은 없는 코드)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">changes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]:</span>
+        <span class="o">...</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">tx</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">changes</span><span class="p">)</span>
+        <span class="c1"># from_dict 가 검증을 다시 수행</span>
+        <span class="n">new_tx</span> <span class="o">=</span> <span class="n">Transaction</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</code></pre></div>
+
+<p>저장소가 <strong>"무엇으로 바꿀지 해석하고 도메인 규칙을 다시 적용"</strong> 하고 있었습니다. 지금은 그 일이 도메인(<code>Transaction.with_patch</code>)과 서비스로 올라가고, 저장소는 완성된 객체를 받아 교체만 합니다.</p>
+<p>budget_app/storage/repositories.py:184-189</p>
+<div class="codehilite"><pre><span></span><code>        <span class="k">def</span><span class="w"> </span><span class="nf">_swap</span><span class="p">(</span><span class="n">tx</span><span class="p">:</span> <span class="n">Transaction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Transaction</span><span class="p">:</span>
+            <span class="k">nonlocal</span> <span class="n">found</span>
+            <span class="k">if</span> <span class="n">tx</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">target</span><span class="p">:</span>
+                <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">return</span> <span class="n">new_tx</span>
+            <span class="k">return</span> <span class="n">tx</span>
+</code></pre></div>
+
+<h3 id="25-csv_iopy-는-정책을-모릅니다">2.5 <code>csv_io.py</code> 는 정책을 모릅니다</h3>
+<p>CSV 어댑터는 "행을 읽고 검증한다"까지만 하고, <strong>중복 id 를 어떻게 처리할지는 모릅니다.</strong> 그래서 <code>parse_row</code> 는 완성된 <code>Transaction</code> 이 아니라 <code>ParsedRow</code> 를 돌려줍니다.</p>
+<p>budget_app/storage/csv_io.py:39-64</p>
+<div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ParsedRow</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;검증을 마친 CSV 한 행 — 아직 ``Transaction`` 은 아니다.</span>
+
+<span class="sd">    id 가 아직 정해지지 않았을 수 있어서(빈 컬럼 → 발급 대상) 완성된 엔티티로</span>
+<span class="sd">    만들 수 없다. 그 마지막 한 조각을 채우는 것은 중복 정책을 아는 서비스의 몫이다.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tx_id</span><span class="p">:</span> <span class="n">TransactionId</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">date</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">amount</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">category</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">memo</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">tags</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="n">TransactionId</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Transaction</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Transaction</span><span class="p">(</span>
+            <span class="nb">id</span><span class="o">=</span><span class="n">tx_id</span><span class="p">,</span>
+            <span class="nb">type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="n">date</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">date</span><span class="p">,</span>
+            <span class="n">amount</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">,</span>
+            <span class="n">category</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span>
+            <span class="n">memo</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">,</span>
+            <span class="n">tags</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tags</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+
+<p><strong>"거의 다 됐지만 한 조각이 비어 있는 값"을 타입으로 표현</strong>한 것이 이 설계의 핵심입니다. 어댑터와 정책의 경계가 타입 하나로 그어집니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>tx_id: TransactionId | None</code> 의 <code>|</code> 유니온 표기는 PEP 604 로 파이썬 3.10 에 들어왔습니다. 그 전에는 <code>typing.Optional[TransactionId]</code> 또는 <code>typing.Union[...]</code> 을 썼습니다. 이 프로젝트의 <code>requires-python = "&gt;=3.10"</code> 은 이 표기를 쓰기 위한 조건 중 하나입니다. 다만 타입 어노테이션을 쓰는 파일 28개(43개 중)는 모두 <code>from __future__ import annotations</code> 를 켜 두어서 어노테이션이 문자열로만 보관되므로, 실행 시점에는 3.10 미만에서도 평가되지 않습니다 — 그래도 <code>list[str]</code>·<code>dict[str, int]</code> 같은 내장 제네릭(PEP 585, 3.9)과 함께 쓰이므로 하한선은 유지됩니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><strong>🔎 문법의 출처</strong> — <code>@dataclass(frozen=True)</code> 는 PEP 557 로 파이썬 3.7 에 들어온 <code>dataclasses</code> 입니다. 데코레이터가 클래스 어노테이션을 읽어 <code>__init__</code>·<code>__repr__</code>·<code>__eq__</code> <strong>소스 코드를 문자열로 조립한 뒤 <code>exec</code> 로 컴파일</strong>해 클래스에 붙입니다. <code>frozen=True</code> 면 추가로 <code>__setattr__</code>/<code>__delattr__</code> 을 심어 대입을 <code>FrozenInstanceError</code> 로 막고, <code>__hash__</code> 도 생성해 줍니다. <code>ParsedRow</code> 를 얼려 두면 "검증을 마친 값"이 어댑터를 떠난 뒤 몰래 바뀌는 일이 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<h3 id="26-domain-패키지는-io-를-전혀-모릅니다">2.6 <code>domain/</code> 패키지는 I/O 를 전혀 모릅니다</h3>
+<p><code>domain/</code> 의 9개 파일 어디에도 <code>open</code>, <code>print</code>, <code>input</code> 이 없고, dataclass 정의와 계산만 있습니다(§1.2 의 목록에서 <code>domain.*</code> 가 import 하는 것은 자기 계층과 루트 <code>errors</code> 뿐입니다). 그래서 도메인은 파일 없이 단독으로 테스트할 수 있고, <code>tests/test_architecture.py::test_domain_imports_nothing_above_itself</code> 가 이 규칙을 매 실행마다 확인합니다.</p>
+<h3 id="27-configpy-와-messagespy-나눈-기준">2.7 <code>config.py</code> 와 <code>messages.py</code> — 나눈 기준</h3>
+<p>둘 다 "상수 파일"이지만 <strong>바꿨을 때 일어나는 일이 다릅니다.</strong> 지금은 이 두 이름이 계층마다 하나씩, 총 9개 존재합니다(<code>domain/</code>·<code>storage/</code>·<code>services/</code>·<code>cli/</code> 각각 <code>config.py</code>·<code>messages.py</code> + 루트 <code>config.py</code>).</p>
+<p>두 축이 있습니다. <strong>무엇을 정하는가</strong>(정책 vs 문구)와 <strong>누가 쓰는가</strong>(계층)입니다.</p>
+<ul>
+<li><strong><code>&lt;계층&gt;/config.py</code></strong> — <em>정책</em>. 유효한 타입 목록, 날짜 형식, 파일명, 한도, 종료 코드처럼 <strong>동작이 달라지는 값</strong>. 바꾸면 프로그램이 다르게 동작합니다.</li>
+<li><strong><code>&lt;계층&gt;/messages.py</code></strong> — <em>문구</em>. 프롬프트·오류·힌트·출력 템플릿. 바꿔도 동작은 같고 화면 글자만 바뀝니다.</li>
+</ul>
+<p>이전에는 한 파일에 둘 다 있어서 도메인 모델이 CLI 한국어 문구까지 들어 있는 모듈에 의존했습니다. 그리고 <strong>계층별로 다시 나눴습니다</strong> — 실측 결과 옛 <code>config.py</code> 상수 46개 중 39개, <code>messages.py</code> 105개 중 104개가 <strong>단일 계층에서만</strong> 쓰이고 있었기 때문입니다.</p>
+<p>budget_app/config.py:1-25 (루트에 남은 것은 앱 이름 하나뿐)</p>
+<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;애플리케이션 정체성 — 어느 계층에도 속하지 않는 앱 전역 이름.</span>
+
+<span class="sd">## 진입 기준</span>
+
+<span class="sd">여기 남는 것은 **&quot;이 프로그램이 무엇으로 불리는가&quot;** 뿐이다. 계층 하나만 쓰는 값은</span>
+<span class="sd">그 계층의 ``config.py`` 로 내려갔다.</span>
+<span class="sd">...</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1">#: 앱 이름 하나만 소유한다. 계층별 자식 로거는 각 계층 config 가 여기서 **파생**시킨다</span>
+<span class="o">...</span>
+<span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="s2">&quot;budget_app&quot;</span>
+</code></pre></div>
+
+<p>계층을 넘나드는 값은 <strong>아래 계층이 소유하고 위 계층이 가져다 씁니다</strong>(<code>VALID_TYPES</code> 는 <code>domain.config</code> 가 갖고 argparse 의 <code>choices</code> 가 빌려 쓰는 식). §1.2 의 import 목록이 이 분업이 실제로 작동함을 보여 줍니다 — <code>cli.parser -&gt; domain.config, services.config</code> 한 줄이 그 증거입니다.</p>
+<p>로거 이름이 이 소유 규칙의 가장 깔끔한 예입니다. 루트가 <code>"budget_app"</code> 하나만 갖고, 저장소 계층이 거기서 <strong>파생</strong>시킵니다.</p>
+<p>budget_app/storage/config.py:11</p>
+<div class="codehilite"><pre><span></span><code><span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">app_config</span><span class="o">.</span><span class="n">LOGGER_NAME</span><span class="si">}</span><span class="s2">.storage&quot;</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>logging</code> 의 로거 이름은 <strong>점으로 계층을 만드는 문자열</strong>입니다. <code>logging.getLogger("budget_app.storage")</code> 는 이름이 같으면 항상 같은 객체를 돌려주고(모듈 수준 딕셔너리 캐시), 레코드를 처리할 때는 자기 핸들러를 부른 뒤 <code>propagate</code> 를 따라 부모 <code>"budget_app"</code> → 루트 로거로 <strong>거슬러 올라갑니다.</strong> 그래서 <code>output.setup_logging()</code> 이 <code>logging.basicConfig</code> 로 루트에 핸들러 하나만 붙여 두면 모든 계층의 로그가 그리로 모이고, 나중에 "저장소 로그만 끄고 싶다"가 생기면 <code>budget_app.storage</code> 한 줄만 조정하면 됩니다. 즉 <strong>모듈 트리와 로거 트리가 같은 모양</strong>이 되도록 이름을 파생시킨 것입니다. 현재 자식 로거는 <code>budget_app.storage</code> 하나뿐이고, <code>cli</code>·<code>decorators</code> 는 루트 이름 <code>"budget_app"</code> 을 그대로 씁니다(<code>cli/config.py:10</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+</blockquote>
+<hr>
+<h2 id="3-실행-흐름-완전-추적-1-쓰기-경로-python-m-budget_app-add">3. 실행 흐름 완전 추적 1 — 쓰기 경로 (<code>python -m budget_app add</code>)</h2>
+<p>거래 한 건이 저장되기까지의 전체 여정을 단계별로 따라갑니다. 이 경로 하나만 완전히 설명할 수 있으면 아키텍처의 절반을 설명한 셈입니다.</p>
+<div class="codehilite"><pre><span></span><code>python -m budget_app add
+  → __main__.py (진입)  sys.exit(main())
+  → cli.app.main
+      → parser.build_parser() → parse_args() → args.handler == &quot;add&quot;
+      → output.setup_logging(args.debug)
+      → _dispatch(args)                         ← @handle_errors 는 여기 하나뿐
+          → AppContext(Path(args.data_dir)) 조립  (경로 계산만, 디스크 무접촉)
+          → args.needs_storage 면 ctx.prepare()  (폴더·파일 준비)
+          → HANDLERS[&quot;add&quot;](ctx, args) == cmd_add
+              → prompts.ask_transaction(ctx.cat_service)  대화형 입력 + 필드 검증
+                  → prompts.ask_until(..., validators.parse_date)
+              → TransactionService.add(...)      도메인 규칙: 카테고리 등록됐나?
+                  → TransactionRepository.next_id()   ID 발급 (IdAllocator)
+                  → Transaction(...) 생성 → __post_init__ (불변식 검증)
+                  → TransactionRepository.append()    파일 쓰기
+              → output.out(MSG_SAVED_TX.format(...))
+  → data/transactions.jsonl 에 한 줄 추가
+</code></pre></div>
+
+<p><strong>1단계 — 진입.</strong> <code>python -m budget_app</code> 은 패키지의 <code>__main__.py</code> 를 실행합니다. <code>sys.exit(main())</code> 이 <code>cli.main</code> 의 반환값(정수)을 프로세스 종료 코드로 만듭니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>sys.exit(n)</code> 은 프로세스를 즉시 죽이는 것이 아니라 <code>SystemExit(n)</code> <strong>예외를 던지는</strong> 것입니다. 그래서 <code>try</code>/<code>finally</code> 와 컨텍스트 매니저의 정리 코드가 정상적으로 돌고, 인터프리터 최상단이 그 예외를 받아 종료 코드로 씁니다. 인자가 정수면 그대로 종료 코드, 문자열이면 stderr 에 찍고 코드 1, <code>None</code>/생략이면 0 입니다. <code>main()</code> 이 <code>int</code> 를 돌려주도록 설계한 이유가 여기 있습니다 — 모든 핸들러가 <code>config.EXIT_*</code> 상수를 <code>return</code> 하면 그 값이 그대로 셸의 <code>$?</code> 가 됩니다. 예외로 종료 코드를 정하지 않으므로 <code>handle_errors</code> 가 예외를 잡아 <code>return EXIT_IO</code> 하는 방식이 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<p><strong>2단계 — 파싱·준비·디스패치.</strong></p>
+<p>budget_app/cli/app.py:84-94</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+        <span class="c1"># 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가</span>
+        <span class="c1"># exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">setup_logging</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">_dispatch</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">BrokenPipeError</span><span class="p">:</span>
+        <span class="c1"># 예: `budget_app list | head` — head 가 먼저 닫음. 오류가 아니므로 조용히 종료.</span>
+        <span class="n">_silence_broken_pipe</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_OK</span>
+</code></pre></div>
+
+<p><code>args.handler</code> 가 어떻게 <code>"add"</code> 가 되는지는 파서 등록에 있습니다.</p>
+<p>budget_app/cli/parser.py:108-111</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_add_add</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;거래 추가 (대화형)&quot;</span><span class="p">)</span>
+    <span class="n">_add_shared_options</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>set_defaults(handler="add")</code> 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 <code>Namespace</code> 에 <strong>그냥 꽂아 넣을 값</strong>을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 <code>_defaults</code> 를 상위 <code>Namespace</code> 에 합칩니다. 그래서 <code>args.handler</code> 는 사용자가 입력한 적 없는데도 값이 들어 있고, <code>--data-dir</code> 처럼 실제 옵션이 아니라서 <code>--help</code> 에도 나오지 않습니다. <code>needs_storage</code> 도 같은 통로로 들어옵니다 — 최상위에서 <code>set_defaults(needs_storage=True)</code>, <code>backup</code> 하위 파서만 <code>False</code> 로 덮습니다(<code>cli/parser.py:91</code>, <code>cli/parser.py:243</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+</blockquote>
+<p><strong>3단계 — 컨텍스트 조립과 핸들러 실행.</strong> <code>@handle_errors</code> 는 개별 핸들러가 아니라 <strong><code>_dispatch</code> 한 곳에만</strong> 붙습니다.</p>
+<p>budget_app/cli/app.py:61-81</p>
+<div class="codehilite"><pre><span></span><code><span class="nd">@handle_errors</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_dispatch</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;컨텍스트를 조립하고 핸들러를 부른다 — **오류 방패 안에서**.</span>
+
+<span class="sd">    이 함수가 따로 있는 이유가 3-1 수정의 전부다. 이전에는 ``AppContext`` 생성과</span>
+<span class="sd">    ``prepare()`` 가 ``main`` 안, 즉 ``@handle_errors`` **밖**에 있었다. 그래서</span>
+<span class="sd">    ``--data-dir`` 에 파일 경로를 주면(오타 하나로 충분하다) ``mkdir`` 이</span>
+<span class="sd">    ``FileExistsError`` 를 던지고, 그것을 아무도 잡지 않아 **원시 트레이스백**과</span>
+<span class="sd">    종료 코드 1 로 끝났다. ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ctx</span> <span class="o">=</span> <span class="n">AppContext</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">needs_storage</span><span class="p">:</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">prepare</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">HANDLERS</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">handler</span><span class="p">](</span><span class="n">ctx</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+</code></pre></div>
+
+<p><code>AppContext</code> 생성과 <code>prepare()</code> 까지 방패 안에 들어와 있다는 점이 중요합니다. <strong>파일을 여는 코드가 방패 밖에 있으면 방패가 아닙니다.</strong> 이 아래 모든 단계에서 발생하는 예외는 스택트레이스 대신 <code>[오류]</code>/<code>[힌트]</code> 메시지와 종료 코드로 변환됩니다(§7).</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>@handle_errors</code> 라는 데코레이터 문법은 PEP 318 로 파이썬 2.4 에 들어왔고, 하는 일은 순수한 문법 설탕입니다. <code>@deco</code> 다음에 오는 <code>def f(...)</code> 는 파이썬이 <code>f = deco(f)</code> 로 바꿔 씁니다(정확히는 함수를 만든 직후 <code>deco</code> 를 적용하고 그 결과를 <code>f</code> 라는 이름에 대입합니다). 그래서 위 코드에서 <code>_dispatch</code> 라는 이름이 실제로 가리키는 것은 원본 함수가 아니라 <code>handle_errors</code> 가 돌려준 <code>wrapper</code> 입니다. "정책을 한 줄로 붙인다"가 가능한 이유가 이 재대입 하나입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<p><code>HANDLERS["add"]</code> 가 가리키는 함수가 이것입니다.</p>
+<p>budget_app/cli/handlers.py:33-50</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cmd_add</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">AppContext</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ctx</span><span class="o">.</span><span class="n">cat_service</span><span class="o">.</span><span class="n">list_names</span><span class="p">():</span>
+        <span class="c1"># 0 이 아닌 종료 코드로 끝나는 실패 경로 → 진단 채널(stderr).</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">err</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">MSG_NO_CATEGORIES</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_NO_CATEGORY</span>
+
+    <span class="n">output</span><span class="o">.</span><span class="n">out</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">MSG_ADD_INTERACTIVE</span><span class="p">)</span>
+    <span class="n">entered</span> <span class="o">=</span> <span class="n">prompts</span><span class="o">.</span><span class="n">ask_transaction</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">cat_service</span><span class="p">)</span>
+    <span class="n">tx</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">tx_service</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+        <span class="n">date</span><span class="o">=</span><span class="n">entered</span><span class="o">.</span><span class="n">date</span><span class="p">,</span>
+        <span class="n">type_</span><span class="o">=</span><span class="n">entered</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+        <span class="n">category</span><span class="o">=</span><span class="n">entered</span><span class="o">.</span><span class="n">category</span><span class="p">,</span>
+        <span class="n">amount</span><span class="o">=</span><span class="n">entered</span><span class="o">.</span><span class="n">amount</span><span class="p">,</span>
+        <span class="n">memo</span><span class="o">=</span><span class="n">entered</span><span class="o">.</span><span class="n">memo</span><span class="p">,</span>
+        <span class="n">tags</span><span class="o">=</span><span class="n">entered</span><span class="o">.</span><span class="n">tags</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">out</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">MSG_SAVED_TX</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">tx</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_OK</span>
+</code></pre></div>
+
+<p><strong>핸들러가 하는 일은 넷뿐입니다</strong> — 전제 조건 확인, 입력 수집 위임, 서비스 호출, 결과 출력. 대화형 입력의 "어떻게"는 전혀 모릅니다.</p>
+<p><strong>4단계 — 입력 수집.</strong> <code>prompts</code> 가 순서와 검증기를 알고 있습니다.</p>
+<p>budget_app/cli/prompts.py:112-121</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask_transaction</span><span class="p">(</span><span class="n">cat_service</span><span class="p">:</span> <span class="n">CategoryService</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionInput</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 한 건에 필요한 값을 순서대로 받아 온다.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">TransactionInput</span><span class="p">(</span>
+        <span class="n">date</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_DATE</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_date</span><span class="p">),</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_TYPE</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_type</span><span class="p">),</span>
+        <span class="n">category</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_CATEGORY</span><span class="p">,</span> <span class="n">registered_category_validator</span><span class="p">(</span><span class="n">cat_service</span><span class="p">)),</span>
+        <span class="n">amount</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_AMOUNT</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">),</span>
+        <span class="n">memo</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">(</span><span class="n">ask</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_MEMO</span><span class="p">)),</span>
+        <span class="n">tags</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">(</span><span class="n">ask</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_TAGS</span><span class="p">)),</span>
+    <span class="p">)</span>
+</code></pre></div>
+
+<p>여기서 <strong>CLI 가 자체 검증 규칙을 갖지 않는다</strong>는 점이 중요합니다. <code>validators.parse_date</code> 를 그대로 넘길 뿐입니다. 카테고리만 서비스에 물어봐야 하므로 클로저 팩토리로 감쌉니다 — <code>registered_category_validator(cat_service)</code> 는 <code>cat_service</code> 를 기억하는 <strong>한 인자짜리 함수</strong>를 만들어 돌려주므로, <code>ask_until</code> 이 요구하는 <code>Callable[[str], T]</code> 모양에 맞아떨어집니다(<code>cli/prompts.py:77-109</code>, 자세한 것은 <a href="03-python-advanced.html">03 §4.5</a>).</p>
+<p><code>ask_until</code> 은 재입력 루프의 뼈대이고, EOF 와 무한 반복이라는 두 함정을 막아 둡니다(<code>cli/prompts.py:60-74</code>) — EOF 면 <code>InputAborted</code> 를 던지고, 재입력은 <code>config.MAX_INPUT_RETRIES</code> 회로 끊습니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>ask_until</code> 이 검증 <strong>함수 자체</strong>를 인자로 받을 수 있는 것은 파이썬에서 함수가 일급 객체(first-class object)이기 때문입니다. <code>def</code> 는 선언이 아니라 <strong>실행되는 문</strong>이고, 함수 객체를 만들어 이름에 대입합니다. 그래서 <code>validators.parse_date</code> 는 호출하지 않으면 그냥 값이고, 딕셔너리에 담거나(<code>app.HANDLERS</code>) 인자로 넘기거나(<code>ask_until</code>) 감싸서 새 함수를 만들 수 있습니다(<code>registered_category_validator</code>). 별도의 "함수 포인터" 개념이 필요 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote>
+<p><strong>5단계 — 서비스의 도메인 규칙.</strong></p>
+<p>budget_app/services/transactions.py:27-35</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@log_call</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">date</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">type_</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">amount</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">memo</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">tags</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</code></pre></div>
+
+<p>서비스가 판단하는 것은 <strong>"카테고리가 등록되어 있는가"</strong> 하나입니다. 이것은 필드 규칙이 아니라 <strong>저장된 상태를 봐야 아는 규칙</strong>이라 <code>validators</code> 가 아니라 서비스에 있습니다. 이 구분이 <code>ValidationError</code>(값) vs <code>AppError</code>(상황)의 구분과 정확히 대응합니다.</p>
+<p>budget_app/services/transactions.py:89-91</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_require_registered_category</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">ERR_CATEGORY_NOT_REGISTERED</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>6단계 — ID 발급.</strong> 저장소가 파일 상태를 훑어 다음 번호를 정합니다.</p>
+<p>budget_app/storage/repositories.py:53-63</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">id_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="n">TransactionId</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;(최대 번호, 사용 중인 id 집합) — 파일을 한 번만 훑는다.&quot;&quot;&quot;</span>
+        <span class="n">max_n</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">taken</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">TransactionId</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_raw</span><span class="p">():</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scan_id</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">found</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">taken</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">found</span><span class="p">)</span>
+            <span class="n">max_n</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">max_n</span><span class="p">,</span> <span class="n">found</span><span class="o">.</span><span class="n">number</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">max_n</span><span class="p">,</span> <span class="n">taken</span>
+</code></pre></div>
+
+<p><strong><code>iter_raw()</code> 를 쓴다는 점이 핵심입니다.</strong> 검증에 실패하는 줄에도 id 는 들어 있고, 그 번호는 이미 쓰인 번호입니다. <code>stream()</code>(유효한 것만)으로 훑으면 그 번호가 보이지 않아 <strong>재발급으로 중복 id 가 생깁니다</strong>. 저장소는 읽기 경로를 둘로 나눠 두었습니다 — <code>iter_raw()</code> 는 해석 실패 줄까지 원문 그대로 주고, <code>stream()</code> 은 해석에 성공한 엔티티만 줍니다(<a href="07-repository.html">07 §4</a>).</p>
+<p><strong>7단계 — 생성자 불변식.</strong> <code>Transaction(...)</code> 호출이 <code>__post_init__</code> 을 태우고, 여기서 모든 필드가 검증·정규화됩니다. 여기까지 예외 없이 왔다면 <strong>객체는 반드시 유효</strong>합니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>__post_init__</code> 은 파이썬 언어의 특수 메서드가 아니라 <strong><code>dataclasses</code> 모듈의 약속</strong>입니다. <code>@dataclass</code> 가 생성해 주는 <code>__init__</code> 의 마지막 줄에 "클래스에 <code>__post_init__</code> 이 있으면 부른다"는 호출이 삽입되는 것뿐입니다. 그런데 <code>Transaction</code> 은 <code>frozen=True</code> 라 <code>self.date = ...</code> 같은 정규화 대입이 막히므로, 정규화가 필요한 자리는 <code>object.__setattr__(self, "date", ...)</code> 로 얼음을 우회합니다(<code>domain/entities.py:68-80</code>). "검증은 생성자에서 단 한 번" 규칙이 성립하는 지점이 여기입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<p><strong>8단계 — 파일 쓰기.</strong> <code>append</code> 가 한 줄을 파일 끝에 붙입니다(§2.4). 새 거래 추가는 파일 전체를 다시 쓰지 않으므로 O(1) 입니다.</p>
+<hr>
+<h2 id="4-실행-흐름-완전-추적-2-읽기-경로-summary-month-2024-01">4. 실행 흐름 완전 추적 2 — 읽기 경로 (<code>summary --month 2024-01</code>)</h2>
+<div class="codehilite"><pre><span></span><code>python -m budget_app summary --month 2024-01
+  → cmd_summary(ctx, args)
+      → BudgetService.monthly_summary(&quot;2024-01&quot;, top_n=5)     @measure_time
+          → validators.parse_month(&quot;2024-01&quot;)                  형식 검증
+          → SearchFilter.for_month(&quot;2024-01&quot;)
+              → periods.month_range() → (&quot;2024-01-01&quot;, &quot;2024-01-31&quot;)
+              → specs 조립: DateFrom &amp; DateTo
+          → TransactionRepository.stream()                     제너레이터
+              → iter_raw() → RawLine → 유효한 것만 통과
+          → 단일 패스로 income/expense/카테고리별 합계 집계
+          → BudgetStore.get(&quot;2024-01&quot;)
+          → MonthlySummary(...) 반환
+      → presenter.summary_lines(summary)                       문자열 생성
+      → output.out_lines(...)                                  stdout
+</code></pre></div>
+
+<p>budget_app/services/budgets.py:30-66</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@measure_time</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">monthly_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">top_n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_TOP_N</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonthlySummary</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;월별 요약을 계산해 ``MonthlySummary`` 로 돌려준다.</span>
+
+<span class="sd">        &quot;이 달에 속하는가&quot;의 판정을 ``SearchFilter.for_month`` 에 위임한 것이 핵심이다.</span>
+<span class="sd">        이전에는 요약은 ``date.startswith(month + &quot;-&quot;)``, 내보내기는 CLI 가 계산한</span>
+<span class="sd">        말일 범위를 써서 **같은 개념이 두 알고리즘으로** 구현돼 있었다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_month</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
+        <span class="n">flt</span> <span class="o">=</span> <span class="n">SearchFilter</span><span class="o">.</span><span class="n">for_month</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+
+        <span class="n">income_total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">expense_total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">per_category</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">has_data</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">has_data</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">tx</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">domain_config</span><span class="o">.</span><span class="n">TYPE_INCOME</span><span class="p">:</span>
+                <span class="n">income_total</span> <span class="o">+=</span> <span class="n">tx</span><span class="o">.</span><span class="n">amount</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">expense_total</span> <span class="o">+=</span> <span class="n">tx</span><span class="o">.</span><span class="n">amount</span>
+                <span class="n">per_category</span><span class="p">[</span><span class="n">tx</span><span class="o">.</span><span class="n">category</span><span class="p">]</span> <span class="o">=</span> <span class="n">per_category</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tx</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">tx</span><span class="o">.</span><span class="n">amount</span>
+
+        <span class="n">top_expense</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">sorted</span><span class="p">(</span><span class="n">per_category</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)[:</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">top_n</span><span class="p">)]</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">MonthlySummary</span><span class="p">(</span>
+            <span class="n">month</span><span class="o">=</span><span class="n">target</span><span class="p">,</span>
+            <span class="n">income</span><span class="o">=</span><span class="n">income_total</span><span class="p">,</span>
+            <span class="n">expense</span><span class="o">=</span><span class="n">expense_total</span><span class="p">,</span>
+            <span class="n">top_expense</span><span class="o">=</span><span class="n">top_expense</span><span class="p">,</span>
+            <span class="n">has_data</span><span class="o">=</span><span class="n">has_data</span><span class="p">,</span>
+            <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budgets</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">),</span>
+        <span class="p">)</span>
+</code></pre></div>
+
+<p>세 가지를 눈여겨보세요.</p>
+<p><strong>(1) 단일 패스 집계.</strong> 파일을 <strong>한 번만</strong> 순회하며 수입 합계·지출 합계·카테고리별 합계를 동시에 누적합니다. 세 값을 각각 구하려고 세 번 읽는 방식보다 파일 I/O 가 1/3 입니다.</p>
+<p><strong>(2) 파생값을 계산하지 않습니다.</strong> <code>balance</code>, <code>usage_pct</code>, <code>over_budget</code> 이 여기 없습니다. 전부 <code>MonthlySummary</code> 의 <code>@property</code> 입니다(<code>domain/results.py:38-50</code>). 서비스는 <strong>원자료만</strong> 담아 넘깁니다.</p>
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>@property</code> 는 문법이 아니라 <strong>내장 클래스</strong>입니다. <code>property(fget)</code> 가 <code>__get__</code> 을 가진 객체(디스크립터)를 만들어 클래스 속성 자리에 앉으면, <code>summary.balance</code> 라는 <strong>속성 접근</strong>이 파이썬 내부에서 <code>type(summary).balance.__get__(summary)</code> 로 바뀌어 함수가 호출됩니다. 그래서 호출 괄호 없이도 계산이 일어나고, 프레젠터 쪽 코드는 "필드를 읽는 것"과 "계산을 요청하는 것"을 구분할 필요가 없어집니다. 파생값의 정의처가 데이터 옆에 붙어 있게 되는 것이 이 설계의 이득입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<p><strong>(3) 리팩터 전에는 dict 를 돌려줬습니다.</strong> <code>{"month": ..., "income": ..., "usage_pct": ...}</code> 형태의 9키 딕셔너리였고, CLI 가 <code>result["has_data"]</code> 처럼 꺼내 썼습니다. 키 오타는 런타임 <code>KeyError</code> 였고, "예산이 없으면 N/A" 같은 <strong>도메인 상태 해석이 화면 코드에 섞여</strong> 있었습니다.</p>
+<p>프레젠터는 그 결과를 읽기만 합니다.</p>
+<p>budget_app/cli/presenter.py:63-88</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">summary_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="n">MonthlySummary</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_NO_DATA</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">month</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_INCOME</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">income</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">income</span><span class="p">)</span>
+    <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_EXPENSE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">expense</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">expense</span><span class="p">)</span>
+    <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_BALANCE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">balance</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">balance</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">budget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">yield from</span> <span class="n">_budget_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">top_expense</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_TOP_EXPENSE_HEADER</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">top_expense</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">rank</span><span class="p">,</span> <span class="p">(</span><span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">top_expense</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">FMT_TOP_EXPENSE_ITEM</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rank</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="n">amount</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_budget_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="n">MonthlySummary</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="n">usage</span> <span class="o">=</span> <span class="n">summary</span><span class="o">.</span><span class="n">usage_pct</span>
+    <span class="n">usage_str</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">messages</span><span class="o">.</span><span class="n">FMT_USAGE_PCT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">)</span> <span class="k">if</span> <span class="n">usage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_USAGE_NA</span>
+    <span class="p">)</span>
+    <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_BUDGET</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">amount</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">budget</span><span class="o">.</span><span class="n">amount</span><span class="p">,</span> <span class="n">usage</span><span class="o">=</span><span class="n">usage_str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">over_budget</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_OVER_BUDGET</span>
+</code></pre></div>
+
+<p><code>summary.is_empty</code>, <code>summary.balance</code>, <code>summary.over_budget</code> — 프레젠터는 <strong>묻기만 하고 계산하지 않습니다.</strong></p>
+<hr>
+<h2 id="5-실행-흐름-완전-추적-3-가장-복잡한-경로-import">5. 실행 흐름 완전 추적 3 — 가장 복잡한 경로 (<code>import</code>)</h2>
+<p><code>import</code> 는 이 프로그램에서 계층이 가장 많이 관여하는 명령입니다. 정책이 셋(실패/중복/카테고리 자동 등록) 얽혀 있고, 준비와 커밋이 나뉘어 있습니다.</p>
+<div class="codehilite"><pre><span></span><code>python -m budget_app import --from data.csv --atomic --on-duplicate skip
+  → cmd_import(ctx, args)
+      → ImportExportService.import_csv(path, atomic=True, on_duplicate=&quot;skip&quot;)
+          │
+          │  ── 준비(prepare) 단계: 파일을 전혀 건드리지 않음 ──
+          ├─ TransactionRepository.id_allocator()   파일 1회 스캔 → 발급기
+          ├─ CategoryStore.name_set()               파일 1회 스캔 → 이름 집합
+          └─ for (lineno, row) in csv_io.read_rows(path):     ← CSV 어댑터
+                 ├─ csv_io.parse_row()              필드 검증 (validators 사용)
+                 │     실패 → atomic? AppError 발생 : batch.note_error()
+                 ├─ _resolve_id()                   id 결정 (중복 정책)
+                 │     중복 + skip → batch.note_duplicate(), 이 행 버림
+                 └─ batch.transactions.append(ParsedRow.to_transaction(tx_id))
+          │
+          │  ── 커밋(commit) 단계: 여기서 처음 파일이 바뀜 ──
+          └─ _commit(batch, atomic=True) → _commit_atomic(batch)
+                 ├─ TransactionRepository.remember_ids(txs)   워터마크 먼저
+                 └─ with UnitOfWork() as uow:                 두 파일 = 한 단위
+                        ├─ uow.stage(cats, extra=새 카테고리)  → categories.jsonl.tmp
+                        ├─ uow.stage(txs,  extra=거래들)       → transactions.jsonl.tmp
+                        └─ __exit__ → commit() → os.replace 두 번 연달아
+           (--atomic 없이 부분 성공 모드면 _commit_appending:
+            CategoryStore.add_many → TransactionRepository.append_many, 둘 다 이어쓰기)
+      → presenter.import_result_line(report, mode)   결과 한 줄 (stdout)
+      → presenter.import_problem_lines(report)       사유들 (stderr)
+</code></pre></div>
+
+<p>budget_app/services/importexport.py:88-102</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">import_csv</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">in_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">atomic</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">on_duplicate</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_ON_DUPLICATE</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImportReport</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;CSV 거래 일괄 등록.</span>
+
+<span class="sd">        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다.</span>
+<span class="sd">        카테고리 자동 등록과 ID 발급도 커밋 단계에서 한 번에 일어나므로, 원자</span>
+<span class="sd">        모드에서 준비 중 중단되면 카테고리·거래 어느 쪽도 남지 않는다.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">in_path</span><span class="p">),</span> <span class="n">atomic</span><span class="o">=</span><span class="n">atomic</span><span class="p">,</span> <span class="n">on_duplicate</span><span class="o">=</span><span class="n">on_duplicate</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_commit</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">atomic</span><span class="o">=</span><span class="n">atomic</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>메서드 본문이 두 줄</strong>입니다. 이름이 곧 구조 설명이 됩니다 — 준비하고, 커밋한다.</p>
+<p>이 경로에서 각 계층이 무엇을 아는지 정리하면 다음과 같습니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>계층</th>
+<th>이 명령에서 아는 것</th>
+<th>모르는 것</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cli/handlers.py</code></td>
+<td>인자 이름, 모드 표시 문구, 두 출력 채널</td>
+<td>검증 규칙, 중복 판정</td>
+</tr>
+<tr>
+<td><code>services/importexport.py</code></td>
+<td>실패 정책, 중복 정책, 카테고리 자동 등록</td>
+<td>CSV 파일 형식, JSONL 쓰기 방법</td>
+</tr>
+<tr>
+<td><code>storage/csv_io.py</code></td>
+<td>CSV 헤더/컬럼/인코딩, 필드 검증</td>
+<td>중복이 무엇인지, 원자성이 무엇인지</td>
+</tr>
+<tr>
+<td><code>storage/ids.py</code></td>
+<td>어떤 번호가 이미 쓰였는지, 다음 번호</td>
+<td>그 번호가 CSV 에서 왔는지</td>
+</tr>
+<tr>
+<td><code>storage/unit_of_work.py</code></td>
+<td>여러 파일을 한 단위로 바꾸는 법</td>
+<td>무엇을 왜 쓰는지</td>
+</tr>
+<tr>
+<td><code>storage/repositories.py</code> <code>jsonl.py</code></td>
+<td>원자적 쓰기, 이어쓰기</td>
+<td>CSV 가 존재한다는 사실</td>
+</tr>
+<tr>
+<td><code>domain/validators.py</code></td>
+<td>각 필드의 규칙</td>
+<td>파일이 존재한다는 사실</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>csv_io</code> 가 "중복"을 모른다는 점이 특히 중요합니다. 그래서 CSV 스키마가 바뀌어도 정책 코드는 그대로고, 정책이 바뀌어도 CSV 파싱 코드는 그대로입니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>with UnitOfWork() as uow:</code> 는 PEP 343 으로 파이썬 2.5 에 들어온 <code>with</code> 문입니다. 파이썬은 이것을 "<code>__enter__()</code> 를 불러 그 반환값을 <code>uow</code> 에 대입하고, 블록이 어떻게 끝나든 — 정상 종료든 예외든 — <code>__exit__(예외타입, 예외값, 트레이스백)</code> 을 반드시 부른다"로 풀어냅니다. <code>UnitOfWork.__exit__</code> 은 예외 인자가 <code>None</code> 인지 보고 <code>commit()</code> 할지 <code>rollback()</code> 할지 정합니다(<code>storage/unit_of_work.py:172-181</code>). "준비 중 죽으면 아무것도 남지 않는다"는 약속이 <code>try/finally</code> 를 손으로 쓰지 않고도 지켜지는 이유입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<p>정책 3축(실패 축 × 중복 축 × 카테고리 자동 등록)의 조합이 어떻게 결정되는지는 <a href="08-services.html">08. 서비스 계층</a>에서 다룹니다 — 요지는 <code>--atomic</code> 이 "준비 중 한 줄이라도 실패하면 즉시 <code>AppError</code> 로 중단(파일 무접촉)", 기본 모드는 "실패한 줄만 기록하고 나머지는 넣는다"이고, <code>--on-duplicate</code> 는 그와 <strong>독립적으로</strong> id 충돌만 다룬다는 것입니다.</p>
+<hr>
+<h2 id="6-appcontext-수동-의존성-주입di과-부작용-분리">6. AppContext — 수동 의존성 주입(DI)과 부작용 분리</h2>
+<p><strong>개념.</strong> 의존성 주입이란 "객체가 필요한 협력자를 스스로 만들지 않고 <strong>밖에서 받는</strong> 것"입니다.</p>
+<p>budget_app/services/transactions.py:23-25</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">txs</span><span class="p">:</span> <span class="n">TransactionRepository</span><span class="p">,</span> <span class="n">cats</span><span class="p">:</span> <span class="n">CategoryStore</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">txs</span> <span class="o">=</span> <span class="n">txs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cats</span> <span class="o">=</span> <span class="n">cats</span>
+</code></pre></div>
+
+<p><code>TransactionService</code> 는 저장소를 <strong>인자로 받습니다</strong>. 만약 생성자 안에서 <code>self.txs = TransactionRepository(Path("./data"))</code> 라고 직접 만들었다면, 이 서비스는 영원히 <code>./data</code> 폴더에 묶이고 테스트에서 가짜 저장소로 바꿀 수도 없습니다. 네 서비스가 모두 같은 모양입니다(<code>services/budgets.py:23-25</code>, <code>services/categories.py:18-20</code>, <code>services/importexport.py:71-73</code>).</p>
+<p>그럼 그 저장소는 누가 만드나 — <strong>합성 루트(composition root)</strong> 인 <code>AppContext</code> 입니다.</p>
+<p>budget_app/context.py:33-65</p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AppContext</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;저장소/서비스를 한 번에 조립해 핸들러로 전달한다.</span>
+<span class="sd">    ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
+
+        <span class="c1"># 저장소는 비공개다 — 조립하는 데만 쓰고 밖으로 내보이지 않는다.</span>
+        <span class="c1"># 공개해 두면 핸들러가 서비스를 건너뛰어 `ctx.cats.list_names()` 처럼</span>
+        <span class="c1"># 부를 수 있고, 실제로 그런 자리가 있었다. 이름 앞의 밑줄 하나가</span>
+        <span class="c1"># &quot;이 계층은 서비스와만 말한다&quot;를 코드로 강제한다.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_txs</span> <span class="o">=</span> <span class="n">TransactionRepository</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cats</span> <span class="o">=</span> <span class="n">CategoryStore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_budgets</span> <span class="o">=</span> <span class="n">BudgetStore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tx_service</span> <span class="o">=</span> <span class="n">TransactionService</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_txs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cats</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cat_service</span> <span class="o">=</span> <span class="n">CategoryService</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cats</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_txs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">budget_service</span> <span class="o">=</span> <span class="n">BudgetService</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_txs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_budgets</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">io_service</span> <span class="o">=</span> <span class="n">ImportExportService</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_txs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cats</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backup_service</span> <span class="o">=</span> <span class="n">BackupService</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;데이터 폴더와 파일을 준비한다 — 명령 실행 전 한 번만.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_require_usable_data_dir</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_txs</span><span class="o">.</span><span class="n">ensure_ready</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_budgets</span><span class="o">.</span><span class="n">ensure_ready</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cats</span><span class="o">.</span><span class="n">ensure_ready</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cats</span><span class="o">.</span><span class="n">seed_defaults</span><span class="p">()</span>
+</code></pre></div>
+
+<h3 id="61-저장소-객체가-서비스-사이에서-공유됩니다">6.1 저장소 객체가 서비스 사이에서 공유됩니다</h3>
+<p><code>self._txs</code> 하나가 <code>tx_service</code>, <code>cat_service</code>, <code>budget_service</code>, <code>io_service</code> 네 곳에 전달됩니다. 저장소는 상태를 거의 갖지 않지만(경로와 ID 워터마크), 파일 경로 계산이 한 곳에서 끝나므로 "서비스마다 다른 폴더를 보는" 사고가 구조적으로 불가능합니다.</p>
+<p>밑줄이 붙은 <code>_txs</code>/<code>_cats</code>/<code>_budgets</code> 는 관례가 아니라 <strong>테스트로 강제되는 규칙</strong>입니다.</p>
+<p>tests/test_architecture.py:99-106</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">test_app_context_does_not_expose_repositories</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;핸들러가 서비스를 건너뛸 수 있는 통로를 남기지 않는다.&quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">budget_app.context</span><span class="w"> </span><span class="kn">import</span> <span class="n">AppContext</span>
+
+    <span class="n">ctx</span> <span class="o">=</span> <span class="n">AppContext</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">))</span>
+    <span class="n">public</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)}</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="p">{</span><span class="s2">&quot;txs&quot;</span><span class="p">,</span> <span class="s2">&quot;cats&quot;</span><span class="p">,</span> <span class="s2">&quot;budgets&quot;</span><span class="p">}</span> <span class="o">&amp;</span> <span class="n">public</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;저장소가 공개돼 있다: </span><span class="si">{</span><span class="n">public</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">assert</span> <span class="s2">&quot;tx_service&quot;</span> <span class="ow">in</span> <span class="n">public</span> <span class="ow">and</span> <span class="s2">&quot;backup_service&quot;</span> <span class="ow">in</span> <span class="n">public</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>vars(ctx)</code> 는 <code>ctx.__dict__</code> 를 그대로 돌려줍니다. 파이썬 객체의 인스턴스 속성은 클래스에 선언되는 것이 아니라 <strong>생성자가 대입할 때 이 딕셔너리에 들어가는</strong> 것이므로, <code>vars()</code> 한 번이면 "이 객체가 실제로 무엇을 들고 있는가"의 전체 목록이 나옵니다. 그래서 이 테스트는 소스를 읽지 않고 객체를 실제로 만들어 확인합니다. <code>AppContext(Path("."))</code> 를 만들어도 디스크가 안전한 것은 생성자가 경로 계산만 하기 때문입니다(§6.2) — 만약 이전처럼 생성자가 mkdir 을 했다면 <strong>이 테스트 자체가 부작용</strong>이 됐을 것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<h3 id="62-생성자와-prepare-를-나눈-이유-리팩터">6.2 생성자와 <code>prepare()</code> 를 나눈 이유 (리팩터)</h3>
+<p><strong>리팩터 전에는 저장소 생성자가 디스크를 건드렸습니다.</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># (리팩터 전 — 지금은 없는 코드)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">seed_defaults</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">FILE_NAME</span>
+        <span class="n">_ensure_parent</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>              <span class="c1"># mkdir!</span>
+        <span class="n">created</span> <span class="o">=</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">created</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">touch</span><span class="p">()</span>                  <span class="c1"># 파일 생성!</span>
+        <span class="k">if</span> <span class="n">seed_defaults</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_empty</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_CATEGORIES</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_append</span><span class="p">(</span><span class="n">Category</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">))</span>   <span class="c1"># 파일 쓰기!</span>
+</code></pre></div>
+
+<p>여기에 더해 <strong>핸들러마다 <code>AppContext(args.data_dir)</code> 를 새로 만들었습니다</strong>(10곳). 결과적으로:</p>
+<ul>
+<li>객체를 만드는 것만으로 디스크가 바뀝니다.</li>
+<li><code>budget_app list --data-dir /오타난/경로</code> 가 조용히 폴더를 만들고 기본 카테고리 5개를 씁니다.</li>
+<li><code>backup</code> 명령도 백업하려는 폴더를 먼저 만들어 버려, "백업할 데이터가 없다"는 오류 대신 <strong>빈 백업</strong>이 생깁니다.</li>
+</ul>
+<p>지금은 셋이 분리되어 있습니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>단계</th>
+<th>하는 일</th>
+<th>호출 시점</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__init__</code></td>
+<td>경로 계산만</td>
+<td>객체 생성 시</td>
+</tr>
+<tr>
+<td><code>ensure_ready()</code></td>
+<td>폴더·파일 생성</td>
+<td><code>prepare()</code> 안에서</td>
+</tr>
+<tr>
+<td><code>seed_defaults()</code></td>
+<td>기본 카테고리 심기</td>
+<td><code>prepare()</code> 안에서</td>
+</tr>
+</tbody>
+</table></div>
+<p>그리고 진입점(<code>cli/app.py:78-80</code> 의 <code>_dispatch</code>)이 <strong>한 번만</strong> <code>prepare()</code> 를 호출하되, 필요 없는 명령은 건너뜁니다. 건너뛸지 여부는 파서가 남긴 <code>needs_storage</code> 플래그가 정합니다.</p>
+<p>budget_app/cli/parser.py:239-243</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_add_backup</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">&quot;backup&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;데이터 폴더 백업 (보너스)&quot;</span><span class="p">)</span>
+    <span class="n">_add_shared_options</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+    <span class="c1"># 백업은 기존 폴더를 읽기만 한다 — 없으면 만들지 말고 오류로 알려야 한다.</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">&quot;backup&quot;</span><span class="p">,</span> <span class="n">needs_storage</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="63-왜-di-프레임워크를-쓰지-않았나">6.3 왜 DI 프레임워크를 쓰지 않았나</h3>
+<p>이 프로젝트는 표준 라이브러리만 쓴다는 제약이 있고, 의존 관계가 8개 객체(저장소 3 + 서비스 5)로 단순합니다. <code>AppContext.__init__</code> 열여섯 줄이 프레임워크가 할 일을 전부 하며, <strong>"무엇이 무엇에 의존하는지"가 한 화면에 보인다</strong>는 장점까지 있습니다. 규모가 커지면 그때 도구를 고려하면 됩니다.</p>
+<p>그런데 "규모가 작아서"만이 이유는 아닙니다. <strong>파이썬에는 DI 컨테이너가 해결하려는 문제 자체가 거의 없습니다.</strong></p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — 자바·C# 계열의 DI 컨테이너는 두 가지를 대신해 줍니다. (1) "이 인터페이스의 구현체를 찾아 꽂아라" — 리플렉션으로 타입을 뒤져 생성자를 호출하는 일, (2) "테스트에서는 다른 구현으로 바꿔라" — 컴파일 시점에 타입이 고정돼 있어 언어만으로는 못 하는 일. 파이썬에서는 둘 다 언어 기능으로 끝납니다.</p>
+<ul>
+<li><strong>함수와 클래스가 일급 객체</strong>입니다. 클래스 자체가 값이므로 <code>TransactionService(repo, cats)</code> 처럼 그냥 부르면 되고, "팩토리"가 필요하면 함수 하나면 됩니다. 별도의 등록 DSL 이 필요 없습니다.</li>
+<li><strong>덕 타이핑(duck typing)</strong> 이라 타입 선언이 실행에 관여하지 않습니다. <code>def __init__(self, txs: TransactionRepository, ...)</code> 의 어노테이션은 문서이자 정적 검사용일 뿐, 인터프리터는 검사하지 않습니다. 그래서 테스트가 <code>.stream()</code> 과 <code>.append()</code> 만 있는 가짜 객체를 넘겨도 그대로 동작합니다 — 인터페이스를 추상 클래스로 뽑아 두지 않아도 교체가 됩니다(§8.5 에서 다시 다룹니다).</li>
+</ul>
+<p>그 결과 파이썬의 "DI 프레임워크"는 대개 <strong>딕셔너리 하나와 생성자 호출 몇 줄</strong>로 축소되고, 그것이 이 프로젝트의 <code>AppContext</code> 입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote>
+<hr>
+<h2 id="7-오류-처리-아키텍처-예외의-발생지와-변환지">7. 오류 처리 아키텍처 — 예외의 발생지와 변환지</h2>
+<h3 id="71-예외의-3가지-종류와-발생-계층">7.1 예외의 3가지 종류와 발생 계층</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>예외</th>
+<th>정의 위치</th>
+<th>발생 계층</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ValidationError</code></td>
+<td>errors.py:33</td>
+<td>domain/validators, entities, tx_id, storage/jsonl</td>
+<td><strong>값</strong>이 규칙 위반</td>
+</tr>
+<tr>
+<td><code>AppError</code></td>
+<td>errors.py:41</td>
+<td>services/*, storage/csv_io, cli</td>
+<td><strong>상황</strong>이 규칙 위반</td>
+</tr>
+<tr>
+<td><code>InputAborted</code></td>
+<td>cli/prompts.py:28</td>
+<td>cli/prompts</td>
+<td>EOF 로 입력 중단 (AppError 의 자식)</td>
+</tr>
+<tr>
+<td>내장 예외</td>
+<td>(파이썬)</td>
+<td>storage/*, context</td>
+<td>파일 없음/권한/인코딩/폴더 아님 등</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>ValidationError</code> 는 <code>ValueError</code> 를 상속합니다(<code>errors.py:33</code>) — 이 예외를 모르는 호출자도 <code>except ValueError</code> 로 자연스럽게 받게 하려는 선택입니다. <code>AppError</code> 는 <code>message</code> 와 <code>hint</code> 두 속성을 갖는 것이 존재 이유이므로 <code>Exception</code> 을 직접 상속합니다(<code>errors.py:41-51</code>).</p>
+<p><strong><code>ValidationError</code> vs <code>AppError</code> 의 구분 기준</strong>이 이 아키텍처의 작지만 중요한 결정입니다.</p>
+<ul>
+<li><code>ValidationError</code> — <strong>값 하나만 보고 판단 가능</strong>. <code>"2024-13-45"</code> 는 저장된 데이터를 몰라도 틀렸음을 압니다. 그래서 <code>validators</code> 가 던집니다.</li>
+<li><code>AppError</code> — <strong>저장된 상태를 봐야 판단 가능</strong>. <code>"food"</code> 라는 카테고리가 유효한지는 <code>categories.jsonl</code> 을 읽어야 압니다. 그래서 서비스가 던집니다.</li>
+</ul>
+<p>이 구분이 그대로 종료 코드로 이어집니다(2 vs 4).</p>
+<h3 id="72-변환지-handle_errors-한-곳">7.2 변환지 — <code>handle_errors</code> 한 곳</h3>
+<p>아무리 깊은 곳에서 예외가 나도, 사용자에게 보이는 형태로 바꾸는 곳은 <strong>단 한 군데</strong>입니다.</p>
+<div class="codehilite"><pre><span></span><code>validators.parse_date()      ── ValidationError ──┐
+services.*.add()             ── AppError ─────────┤
+storage.jsonl.iter_raw()     ── FileNotFoundError ┤
+storage.csv_io.read_rows()   ── AppError ─────────┤
+context._require_usable_...  ── NotADirectoryError┤
+                                                  ▼
+                        @handle_errors  (cli/error_handler.py:20-121)
+                                    ↑ 붙는 자리는 cli/app.py:61 의 _dispatch 하나
+                                                  │
+                     ┌────────────────────────────┼────────────────────────┐
+                     ▼                            ▼                        ▼
+              output.err(&quot;[오류] ...&quot;)      output.err(&quot;[힌트] ...&quot;)   return EXIT_*
+                     │                            │                        │
+                     └──── stderr ────────────────┘             main → __main__ → sys.exit
+</code></pre></div>
+
+<p><strong>이 구조의 이점이 셋입니다.</strong></p>
+<ol>
+<li><strong>각 계층은 자기 언어로 실패를 말하면 됩니다.</strong> 저장소는 <code>FileNotFoundError</code>, 서비스는 <code>AppError</code> 를 던지고 "이걸 사용자에게 어떻게 보여줄까"를 고민하지 않습니다.</li>
+<li><strong>메시지 정책이 한 곳입니다.</strong> <code>[오류]</code>/<code>[힌트]</code> 형식, stderr 채널, 종료 코드 매핑이 전부 <code>cli/error_handler.py</code> 한 파일에 있습니다.</li>
+<li><strong>적용 지점도 한 곳입니다.</strong> 이전에는 핸들러 13개에 <code>@handle_errors</code> 가 각각 붙어 있었고, 정작 <code>AppContext</code> 생성과 <code>prepare()</code> 는 그 <strong>밖</strong>이라 <code>--data-dir</code> 오타 하나로 원시 트레이스백이 났습니다. 지금은 <code>_dispatch</code> 하나에만 붙습니다 — "핸들러를 추가할 때 데코레이터를 빠뜨리는" 실수가 성립하지 않습니다.</li>
+</ol>
+<p>전체 except 체인과 순서 정책은 <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a>에서 상세히 다룹니다 — 순서의 핵심은 <strong>좁은 것부터</strong>입니다. <code>try</code> 문은 위에서부터 <code>isinstance</code> 검사를 하고 <strong>처음 맞는 절 하나만</strong> 실행하므로, <code>FileNotFoundError</code>·<code>IsADirectoryError</code>·<code>NotADirectoryError</code>·<code>PermissionError</code> 를 부모인 <code>except OSError</code> 보다 위에 두지 않으면 그 네 절이 영원히 도달 불가능해집니다. <code>cli/error_handler.py</code> 는 네 부류(종료 신호 → 입력 오류 → 환경 상태 → 최후 방어선)로 묶고 각 부류 안에서 이 순서를 지킵니다.</p>
+<h3 id="73-출력-채널도-아키텍처입니다">7.3 출력 채널도 아키텍처입니다</h3>
+<p>"어디로 나가는가"가 계층 설계의 일부입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>채널</th>
+<th>내용</th>
+<th>함수</th>
+<th>왜</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stdout</td>
+<td>명령의 <strong>결과</strong></td>
+<td><code>output.out()</code></td>
+<td><code>list &gt; out.txt</code> 로 데이터만 받을 수 있어야 함</td>
+</tr>
+<tr>
+<td>stderr</td>
+<td>사용자용 <strong>진단</strong></td>
+<td><code>output.err()</code></td>
+<td>오류가 데이터 파일을 오염시키면 안 됨</td>
+</tr>
+<tr>
+<td>logging</td>
+<td>개발자용 <strong>진단</strong></td>
+<td><code>logger.debug()</code></td>
+<td>기본은 꺼짐, <code>--debug</code> 로만 켬</td>
+</tr>
+</tbody>
+</table></div>
+<p>budget_app/cli/output.py:11-18 (모듈 docstring 발췌)</p>
+<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;...</span>
+<span class="sd">왜 stdout 과 stderr 를 나누나:</span>
+
+<span class="sd">1. **리다이렉트 오염 방지** — 오류가 stdout 으로 나가면 ``list &gt; out.txt`` 의 데이터</span>
+<span class="sd">   파일에 오류 문자열이 섞인다. 파이프라인에서 쓰는 도구로서는 버그다.</span>
+<span class="sd">2. **파이프가 끊겨도 살아남음** — 하류가 먼저 닫혀 stdout 이 ``BrokenPipeError`` 로</span>
+<span class="sd">   깨진 상황에서도 stderr 는 열려 있어 사용자에게 원인을 전할 수 있다.</span>
+<span class="sd">3. **셸에서 골라 버릴 수 있음** — ``2&gt;/dev/null`` 은 진단만, ``1&gt;/dev/null`` 은 결과만</span>
+<span class="sd">   버린다. 두 채널이 섞여 있으면 둘 다 불가능하다.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+</code></pre></div>
+
+<p>이 규칙이 실제로 지켜지는지는 셸에서 확인할 수 있습니다.</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>search<span class="w"> </span>--category<span class="w"> </span>없는것<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w">   </span><span class="c1"># 진단만 버림 → &quot;(데이터 없음)&quot;</span>
+python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>import<span class="w"> </span>--from<span class="w"> </span>nope.csv<span class="w"> </span><span class="m">1</span>&gt;/dev/null<span class="w">     </span><span class="c1"># 결과만 버림 → 오류만 보임</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>output.err()</code> 이 <code>print(..., file=sys.stderr)</code> <strong>앞에</strong> <code>sys.stdout.flush()</code> 를 부르는 이유는 두 스트림의 버퍼링 정책이 다르기 때문입니다. CPython 은 stdout 이 터미널(tty)이면 줄 단위 버퍼링, 파이프나 파일이면 <strong>블록 버퍼링</strong>(보통 8KB 단위)으로 잡고, stderr 는 대상이 무엇이든 라인 버퍼(<code>line_buffering=True</code>)라 개행마다 곧바로 흘러나갑니다. 그래서 <code>cmd 2&gt;&amp;1 | less</code> 처럼 두 채널을 다시 합치면, 아직 버퍼에 남은 결과보다 진단이 먼저 튀어나와 순서가 뒤집힙니다. 비우고 쓰면 그 역전이 사라집니다.</p>
+<p>같은 이유로 <code>_silence_broken_pipe()</code> 가 필요합니다. 하류가 먼저 닫힌 뒤 인터프리터가 종료하면서 stdout 버퍼를 마지막으로 비우려다 또 <code>BrokenPipeError</code> 가 나고, 그것은 이미 예외 처리 밖이라 <code>Exception ignored in: ...</code> 가 찍힙니다. <code>os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())</code> 는 <strong>파일 서술자 1번 자체를 <code>/dev/null</code> 로 갈아 끼워서</strong>, 남은 바이트가 아무 데도 가지 않고 조용히 사라지게 합니다(파이썬 공식 문서가 권장하는 레시피입니다). → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+</blockquote>
+<p><code>import</code> 는 한 명령이 두 채널을 모두 쓰는 예입니다.</p>
+<p>budget_app/cli/handlers.py:176-184</p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cmd_import</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">AppContext</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">messages</span><span class="o">.</span><span class="n">MODE_ATOMIC</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">atomic</span> <span class="k">else</span> <span class="n">messages</span><span class="o">.</span><span class="n">MODE_PARTIAL</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">io_service</span><span class="o">.</span><span class="n">import_csv</span><span class="p">(</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">from_</span><span class="p">),</span> <span class="n">atomic</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">atomic</span><span class="p">,</span> <span class="n">on_duplicate</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">on_duplicate</span>
+    <span class="p">)</span>
+    <span class="c1"># 요약 한 줄은 결과(stdout), 건너뛴 줄의 사유는 진단(stderr)이다.</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">out</span><span class="p">(</span><span class="n">presenter</span><span class="o">.</span><span class="n">import_result_line</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">mode</span><span class="p">))</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">err_lines</span><span class="p">(</span><span class="n">presenter</span><span class="o">.</span><span class="n">import_problem_lines</span><span class="p">(</span><span class="n">report</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_OK</span>
+</code></pre></div>
+
+<hr>
+<h2 id="8-설계-원칙-정리-이-코드가-지키고-있는-것">8. 설계 원칙 정리 — 이 코드가 지키고 있는 것</h2>
+<h3 id="81-관심사-분리-separation-of-concerns">8.1 관심사 분리 (Separation of Concerns)</h3>
+<p>"입력 받기 / 규칙 판단 / 파일 쓰기 / 화면 표시"를 서로 다른 파일에 두었습니다. <code>cmd_summary</code> 세 줄(§2.2)이 이 원칙의 가장 압축된 증거입니다.</p>
+<h3 id="82-단일-책임-원칙-single-responsibility-principle">8.2 단일 책임 원칙 (Single Responsibility Principle)</h3>
+<p><strong>"이 파일을 고칠 이유가 몇 개인가"</strong> 가 기준입니다(§1.1). 클래스 수준에서도 같습니다 — <code>TransactionService</code>(거래 CRUD), <code>BudgetService</code>(예산·요약), <code>CategoryService</code>(카테고리 보호), <code>ImportExportService</code>(CSV 정책)가 각각 하나의 이유로만 바뀝니다.</p>
+<p><code>JsonlStore</code> 와 하위 클래스의 관계도 이 원칙입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>클래스</th>
+<th>아는 것</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JsonlStore</code></td>
+<td>JSONL 파일을 읽고 쓰는 법</td>
+</tr>
+<tr>
+<td><code>TransactionRepository</code></td>
+<td>거래 고유의 것 — ID 발급, 카테고리 재지정</td>
+</tr>
+<tr>
+<td><code>CategoryStore</code></td>
+<td>카테고리 고유의 것 — 이름 중복, 기본값 시딩</td>
+</tr>
+<tr>
+<td><code>BudgetStore</code></td>
+<td>예산 고유의 것 — 같은 달은 덮어쓰기</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="83-dry-dont-repeat-yourself-네-가지-단일-출처">8.3 DRY (Don't Repeat Yourself) — 네 가지 "단일 출처"</h3>
+<p><strong>(1) 값·문구의 단일 출처.</strong> 계층별 <code>config.py</code> 와 <code>messages.py</code>(§2.7). 파일명·형식·한도·종료 코드·모든 화면 문자열이 한 번씩만 정의됩니다.</p>
+<p><strong>(2) 검증 규칙의 단일 출처.</strong> <code>domain/validators.py</code>. 규칙 하나 = 함수 하나이고, 엔티티(<code>__post_init__</code>)·CSV 어댑터·대화형 입력이 같은 함수를 부릅니다. 리팩터 전에는 금액 규칙이 세 형태(모듈 함수 / <code>Transaction.validate_amount</code> / <code>Budget</code> 이 부르는 모듈 함수)로 존재했습니다.</p>
+<p><strong>(3) 파일 처리의 단일 출처.</strong> <code>JsonlStore</code>. 세 저장소가 복사해 갖고 있던 열기/스트리밍/원자적 재작성 코드가 한 곳으로 모였습니다.</p>
+<p><strong>(4) 기간 규칙의 단일 출처.</strong> <code>domain/periods.py</code> 의 <code>month_range</code>(20-30행). 리팩터 전에는 <code>summary</code> 가 <code>date.startswith(month + "-")</code>, <code>export</code> 가 CLI 의 <code>_month_bounds()</code> 로 <strong>같은 개념을 두 알고리즘으로</strong> 구현하고 있었습니다.</p>
+<div class="codehilite"><pre><span></span><code>[리팩터 전]
+cli._month_bounds()  ──calendar 로 말일 계산──▶  export 만 사용
+services.monthly_summary()  ──startswith 접두 비교──▶  summary 만 사용
+        ↑ 같은 개념, 다른 구현, 다른 계층
+
+[리팩터 후]
+domain/periods.py :: month_range()  ──calendar.monthrange 로 실제 말일 계산
+        ↓
+domain/queries.py :: SearchFilter.for_month()
+        ├──▶ services/budgets.py :: BudgetService.monthly_summary()
+        └──▶ cli/handlers.py :: _export_filter()
+</code></pre></div>
+
+<blockquote>
+<p><strong>⚙️ 내부 동작</strong> — <code>calendar.monthrange(year, month)</code> 는 <code>(그 달 1일의 요일, 그 달의 일수)</code> 튜플을 돌려줍니다. <code>month_range</code> 가 쓰는 것은 두 번째 값뿐입니다(<code>[1]</code>). 윤년 판정까지 포함해 실제 말일을 주므로 "모든 달을 31일로 가정"하는 실수가 원천 봉쇄됩니다. 이 모듈의 이름이 <code>calendar.py</code> 가 아니라 <code>periods.py</code> 인 것은 표준 라이브러리와 이름이 겹치면 읽는 사람이 헷갈리기 때문입니다 — 파이썬 3 의 절대 import 규칙(PEP 328) 덕분에 동작은 안전하지만, 혼동 자체가 비용이라는 판단입니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+</blockquote>
+<p><strong>DRY 의 본질은 "코드 줄이기"가 아니라 "지식의 중복 제거"</strong> 입니다. 위 네 가지는 전부 "같은 지식이 두 곳에 있으면 어긋날 수 있다"는 문제를 해결한 것입니다.</p>
+<h3 id="84-명시적-계약-explicit-contract">8.4 명시적 계약 (Explicit Contract)</h3>
+<p>타입으로 계약을 적어 둔 자리들입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>계약</th>
+<th>표현</th>
+<th>적힌 자리</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>검증기</td>
+<td><code>Callable[[str], T]</code> — 문자열 받아 T 반환, 실패는 ValidationError</td>
+<td><code>cli/prompts.py:60</code></td>
+</tr>
+<tr>
+<td>재작성 콜백</td>
+<td><code>Callable[[T], T \| None]</code> — 바꾼 것 / 그대로 / 삭제(None)</td>
+<td><code>storage/jsonl.py:266</code>, <code>315</code></td>
+</tr>
+<tr>
+<td>명령 핸들러</td>
+<td><code>Callable[[AppContext, Namespace], int]</code> — 컨텍스트+인자 → 종료 코드</td>
+<td><code>cli/app.py:26</code> (<code>Handler</code> 별칭)</td>
+</tr>
+<tr>
+<td>수정 요청</td>
+<td><code>TransactionPatch</code> — 필드가 선언돼 있어 오타가 TypeError</td>
+<td><code>domain/entities.py:127-154</code></td>
+</tr>
+<tr>
+<td>계산 결과</td>
+<td><code>MonthlySummary</code> / <code>ImportReport</code> — 문자열 키 dict 대체</td>
+<td><code>domain/results.py</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>리팩터의 상당 부분이 <strong>"암묵적 dict 계약 → 명시적 타입 계약"</strong> 이었습니다.</p>
+<blockquote>
+<p><strong>🔎 문법의 출처</strong> — <code>Callable[[str], T]</code> 의 <code>T</code> 는 <code>TypeVar</code> 로 선언한 타입 변수입니다(<code>cli/prompts.py:25</code> 의 <code>T = TypeVar("T")</code>). "무엇이든 좋지만 <strong>입력과 출력에서 같은 것</strong>"을 뜻하므로, <code>ask_until(prompt, parse_amount)</code> 의 결과가 <code>int</code> 로, <code>ask_until(prompt, parse_date)</code> 의 결과가 <code>str</code> 로 각각 추론됩니다. 여기서 중요한 것은 <strong>이 어노테이션이 실행에 아무 영향을 주지 않는다</strong>는 점입니다 — 어노테이션을 쓰는 파일 28개가 모두 <code>from __future__ import annotations</code> 를 켜 두어 어노테이션은 문자열로만 보관되고, 검사는 mypy/pyright 같은 별도 도구가 합니다. 계약은 <strong>사람과 정적 검사기를 향한 선언</strong>이고, 실행 시점의 강제는 여전히 <code>__post_init__</code> 같은 코드가 합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+</blockquote>
+<h3 id="85-의존성-역전은-아닐까-구분해-두기">8.5 의존성 역전은 아닐까? (구분해 두기)</h3>
+<p>이 프로젝트는 의존성 <strong>주입</strong>(DI)은 쓰지만 의존성 <strong>역전</strong>(DIP, 추상 인터페이스에 의존)은 쓰지 않습니다. <code>TransactionService</code> 는 <code>TransactionRepository</code> <strong>구체 클래스</strong>를 타입 힌트로 받습니다(<code>services/transactions.py:23</code>).</p>
+<p>규모상 추상화 계층(<code>ABC</code>/<code>Protocol</code>)을 도입할 실익이 없기 때문이며, 필요해지면(예: SQLite 저장소 추가) 그때 인터페이스를 뽑으면 됩니다. <strong>지금 없는 것과 못 하는 것을 구분해서 말할 수 있어야</strong> 합니다.</p>
+<p>여기서 §6.3 의 논점이 다시 걸립니다 — 파이썬에서는 어노테이션이 실행에 관여하지 않으므로, DIP 가 없어도 <strong>교체 자체는 이미 가능합니다.</strong> 필요한 메서드만 가진 객체를 넘기면 그대로 돕니다. <code>Protocol</code> 을 도입해서 얻는 것은 실행 시점의 능력이 아니라 <strong>"저장소란 무엇인가"를 한 곳에 적어 두고 정적 검사기가 확인하게 하는 것</strong>입니다. 그 구분을 정확히 말할 수 있으면 "왜 안 했나"에 대한 답이 변명이 아니라 판단이 됩니다.</p>
+<p>한편 도메인 계층은 다른 방식으로 추상화를 씁니다. <code>domain/specs.py</code> 의 <code>Spec</code> 은 <code>is_satisfied_by</code> 하나를 요구하는 기반 클래스이고, <code>And</code>/<code>Or</code>/<code>Not</code>/<code>DateFrom</code>/… 이 이를 구현해 조건을 조합 가능한 값으로 만듭니다. 즉 <strong>이 코드에 다형성이 없는 것이 아니라, 저장소 축에만 없습니다.</strong></p>
+<hr>
+<h2 id="9-설계의-진화-리팩터-전후-대조표">9. 설계의 진화 — 리팩터 전후 대조표</h2>
+<p>이 코드는 처음부터 지금 모습이 아니었습니다. 리팩터에서 바뀐 것을 한눈에 정리합니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>리팩터 전</th>
+<th>문제</th>
+<th>리팩터 후</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>AppError</code> 가 <code>decorators.py</code></td>
+<td>services → decorators → output 역류</td>
+<td><code>errors.py</code> 신설</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>handle_errors</code> 가 <code>decorators.py</code></td>
+<td>관측과 표현이 한 파일</td>
+<td><code>error_handler.py</code> 분리</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>config.py</code> 에 값+문구</td>
+<td>models 가 CLI 문구에 의존</td>
+<td><code>messages.py</code> 분리</td>
+</tr>
+<tr>
+<td>4</td>
+<td>검증이 3형태(모듈함수/staticmethod)</td>
+<td>규칙 중복, 의존 역류</td>
+<td><code>validators.py</code> 단일 정의</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>changes: Dict[str, object]</code> 가 3계층 관통</td>
+<td>오타가 조용히 무시됨</td>
+<td><code>TransactionPatch</code> dataclass</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>repository.update</code> 가 도메인 변경 수행</td>
+<td>저장소가 도메인 판단</td>
+<td><code>with_patch</code> + <code>replace</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>stream()</code> 하나 (손실적 읽기)</td>
+<td><strong>재작성 시 손상 줄 영구 삭제</strong></td>
+<td><code>iter_raw()</code> / <code>stream()</code> 분리</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>max_id_num</code> 이 <code>stream()</code> 사용</td>
+<td><strong>검증 실패 줄의 id 를 못 봐 중복 발급</strong></td>
+<td><code>iter_raw()</code> 기반 <code>id_state()</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>ID 발급 규칙이 2곳</td>
+<td>서비스가 저장소 ID 포맷을 앎</td>
+<td><code>IdAllocator</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>CSV I/O 가 <code>services.py</code></td>
+<td>JSONL 은 저장소, CSV 는 서비스</td>
+<td><code>storage/csv_io.py</code> 분리</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>backup_data_dir</code> 가 <code>services.py</code></td>
+<td>도메인 판단 없는 파일 복사</td>
+<td><code>storage/backup.py</code> 로 이동 (<code>services/maintenance.py</code> 가 얇게 호출)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>요약이 9키 dict</td>
+<td>문자열 키, 화면이 상태 해석</td>
+<td><code>MonthlySummary</code> + property</td>
+</tr>
+<tr>
+<td>13</td>
+<td>"이 달" 규칙이 2곳 2방식</td>
+<td>갈라질 수 있는 구조</td>
+<td><code>domain/periods.py::month_range</code> 통합</td>
+</tr>
+<tr>
+<td>14</td>
+<td>저장소 생성자가 디스크 조작</td>
+<td>객체 생성 = 부작용</td>
+<td><code>ensure_ready()</code> / <code>seed_defaults()</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>cli.py</code> 512줄, 책임 4개</td>
+<td>고칠 이유가 넷</td>
+<td>parser/prompts/presenter/handlers 분리</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>set_defaults(func=cmd_x)</code></td>
+<td>파서와 핸들러 결합(순환 위험)</td>
+<td>문자열 키 + <code>HANDLERS</code> (§1.2.1)</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>category</code>/<code>budget</code> 통합 핸들러</td>
+<td>도달 불가 분기(죽은 코드)</td>
+<td>하위 명령별 핸들러</td>
+</tr>
+<tr>
+<td>18</td>
+<td>export CSV 에 <code>id</code> 없음</td>
+<td><strong>왕복 시 거래 중복 생성</strong></td>
+<td><code>id</code> 선택 컬럼 + 중복 정책</td>
+</tr>
+<tr>
+<td>19</td>
+<td>3저장소가 파일 처리 코드 복제</td>
+<td>약 60줄 중복</td>
+<td><code>JsonlStore</code> 제네릭 기반 클래스</td>
+</tr>
+<tr>
+<td>20</td>
+<td>원자적 쓰기에 fsync 없음 (당시 이름 <code>_atomic_write_jsonl</code>)</td>
+<td>크래시 시 빈 파일 가능</td>
+<td><code>atomic_write_lines</code>(밑줄 없음, <code>storage/jsonl.py:80-87</code>)에 <code>flush</code> + <code>fsync</code></td>
+</tr>
+<tr>
+<td>21</td>
+<td>핸들러 13개에 <code>@handle_errors</code> 개별 부착</td>
+<td>컨텍스트 조립이 방패 <strong>밖</strong></td>
+<td><code>_dispatch</code> 한 곳에만 부착 (§7.2)</td>
+</tr>
+<tr>
+<td>22</td>
+<td><code>--atomic</code> 이 거래 파일 안에서만 원자적</td>
+<td>카테고리만 남는 중간 상태</td>
+<td><code>UnitOfWork</code> — 두 파일 한 단위 (§5)</td>
+</tr>
+<tr>
+<td>23</td>
+<td>계층 규칙이 문서에만 존재</td>
+<td>위반을 아무도 못 잡음</td>
+<td><code>tests/test_architecture.py</code> (AST 검사, §1.2.2)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>7·8·18·21·22 번은 단순한 구조 개선이 아니라 실제 버그였습니다.</strong> 7번은 무관한 삭제가 손상 줄을 지웠고, 8번은 중복 id 를 발급했으며, 18번은 export→import 왕복 때마다 거래가 복제됐고, 21번은 <code>--data-dir</code> 오타 하나에 원시 트레이스백을 냈고, 22번은 <code>--atomic</code> 의 약속을 절반만 지켰습니다. 앞의 세 버그는 뿌리가 같다는 점이 흥미롭습니다 — <strong>읽기 경로 하나가 두 가지 용도(조회 / 재작성·스캔)를 겸하고 있었던 것</strong>입니다.</p>
+<hr>
+<h2 id="10-요약-과제-방어용-문답-정리">10. 요약 — 과제 방어용 문답 정리</h2>
+<p><strong>Q. 코드를 몇 개 모듈로 나눴고, 각 모듈의 책임을 어떻게 정했나요?</strong></p>
+<p>구현 파일 38개(패키지 선언 5개 별도), 4계층입니다. 기준은 "이 파일을 고칠 이유가 몇 개인가"입니다. CLI 계층만 해도 문법(<code>parser</code>)·입력(<code>prompts</code>)·표시(<code>presenter</code>)·채널(<code>output</code>)·오류표현(<code>error_handler</code>)·오케스트레이션(<code>handlers</code>)·조립과 진입(<code>app</code>)으로 나뉘는데, 각각 바뀌는 이유가 다르기 때문입니다. 의존 방향은 import 문으로 검증 가능하며(§1.2) 위로 향하는 의존이 하나도 없고, 그것을 <code>tests/test_architecture.py</code> 가 AST 로 매 실행마다 확인합니다.</p>
+<p><strong>Q. 클래스에 부여한 책임 경계를 어떻게 정했나요?</strong></p>
+<p>두 예를 듭니다. (1) <code>JsonlStore</code> 와 세 하위 저장소 — "JSONL 파일을 다루는 법"은 공통이므로 부모에, "무엇이 유일 키인가" 같은 엔티티 고유 규칙은 자식에 두었습니다. (2) <code>csv_io.ParsedRow</code> 와 <code>services.ImportExportService</code> — 어댑터는 "CSV 행을 검증"까지, 정책은 "중복이면 어떻게 할지"부터 담당하고, 그 경계를 <code>ParsedRow</code>(id 가 아직 비어 있는 값)라는 타입으로 그었습니다.</p>
+<p><strong>Q. 파일 기반 update/delete 를 어떻게 안전하게 처리했나요?</strong></p>
+<p>임시 파일에 전부 쓰고 <code>flush</code> + <code>fsync</code> 로 디스크에 내린 뒤 <code>os.replace</code> 로 이름을 교체합니다. <code>os.replace</code> 는 같은 파일시스템에서 원자적이라 "교체 전" 아니면 "교체 후"만 존재합니다. 여기에 더해, 재작성의 재료를 <code>iter_raw()</code>(모든 줄 보존)로 바꿔서 <strong>해석하지 못한 줄이 원문 그대로 살아남게</strong> 했습니다. 리팩터 전에는 무관한 거래를 지울 때 손상된 줄이 함께 사라졌습니다.</p>
+<p><strong>Q. 계층을 나눠서 실제로 얻은 게 뭔가요?</strong></p>
+<p>세 가지를 실증할 수 있습니다. (1) 화면 문구를 고쳐도 도메인은 영향을 받지 않습니다 — <code>domain/*</code> 는 <code>cli.messages</code> 를 import 하지 않고, 자기 계층의 <code>domain/messages.py</code> 만 봅니다(§1.2 목록). (2) 서비스 계층이 파일을 열지 않으므로 저장 방식을 SQLite 로 바꿔도 정책 코드는 그대로입니다. (3) 프레젠터가 문자열을 반환하므로 화면 형식을 프로세스 없이 검증할 수 있습니다.</p>
+<p><strong>Q. 계층 구조에서 가장 아쉬운 점은?</strong></p>
+<p>의존성 <strong>역전</strong>(추상 인터페이스)이 없어 서비스가 구체 저장소 클래스에 묶여 있습니다. 지금 규모에서는 실익이 없다고 판단했지만, 저장 방식을 실제로 교체하게 되면 <code>Protocol</code> 을 도입해야 합니다. 또 <code>update</code> 경로가 파일을 3번 훑습니다(서비스의 <code>get</code> → 저장소의 <code>get</code> → <code>rewrite</code>) — 정확성을 위해 성능을 양보한 지점입니다(<a href="10-advanced-design.html">10</a>).</p>
+<hr>
+<p><strong>다음 문서</strong>: 계층별 상세는 <a href="05-config-and-models.html">05. 설정·검증·모델</a> → <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a> → <a href="07-repository.html">07. 저장소 계층</a> → <a href="08-services.html">08. 서비스 계층</a> → <a href="09-cli.html">09. CLI 계층</a> 순으로 이어집니다.</p>
+<div class="pager"><span><a href="03-python-advanced.html">← 03. 이 코드에 쓰인 파이썬 중·고급 기법</a></span><span><a href="05-config-and-models.html">05. 설정·검증·모델 — config / messages / validators / errors / entities →</a></span></div>
+<footer>docs/04-architecture.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+</main>
+</div>
+</body>
+</html>
