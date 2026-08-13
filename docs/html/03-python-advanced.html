@@ -11,13 +11,65 @@
 <nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html" class="current"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
 <main>
 <h1 id="03-이-코드에-쓰인-파이썬-중고급-기법">03. 이 코드에 쓰인 파이썬 중·고급 기법</h1>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#쉬운-말로-먼저">쉬운 말로 먼저</a></li><li><a href="#목차">목차</a></li><li><a href="#1-dataclass-완전-해설">1. dataclass 완전 해설</a></li><li><a href="#2-메서드-3종과-클래스에-둘-것-모듈에-둘-것">2. 메서드 3종과 &quot;클래스에 둘 것 / 모듈에 둘 것&quot;</a></li><li><a href="#3-제너레이터-심화">3. 제너레이터 심화</a></li><li><a href="#4-데코레이터와-클로저-심화">4. 데코레이터와 클로저 심화</a></li><li><a href="#5-예외-심화">5. 예외 심화</a></li><li><a href="#6-제네릭-typevar-와-generic">6. 제네릭 — TypeVar 와 Generic</a></li><li><a href="#7-from-future-import-annotations">7. from future import annotations</a></li><li><a href="#8-표준-라이브러리-활용">8. 표준 라이브러리 활용</a></li><li><a href="#9-콜러블을-값으로-전달하는-패턴">9. 콜러블을 값으로 전달하는 패턴</a></li><li><a href="#10-적용된-디자인-패턴-2종">10. 적용된 디자인 패턴 2종</a></li><li><a href="#정리-기법-간의-연결-관계">정리 — 기법 간의 연결 관계</a></li></ul></details><h2 id="쉬운-말로-먼저">쉬운 말로 먼저</h2>
+<p>이 문서는 프로그램의 특정 기능을 설명하지 않습니다. 대신 <strong>코드 전체에 되풀이해서 나타나는 글쓰기 습관 열 가지</strong>를 모아 놓았습니다. 가계부 프로그램이 하는 일 자체는 단순합니다 — 거래를 받아 적고, 파일에 넣고, 필요할 때 꺼내 보여 줍니다. 그런데 같은 일을 하는 코드도 쓰는 방식은 여럿이고, 어느 방식을 골랐는지가 나중에 고치기 쉬운 코드와 손댈 수 없는 코드를 가릅니다. 여기서 다루는 것이 그 선택들입니다 — 같은 검사를 여러 군데 베껴 두지 않으려면 어떻게 하는지, 10만 건짜리 파일을 통째로 들지 않고 훑는 방법은 무엇인지, 모든 명령에 똑같이 붙어야 하는 잡일(기록 남기기, 오류 처리)을 본문에 섞지 않고 떼어 두는 방법은 무엇인지.</p>
+<p>마지막 절에는 <strong>쓰지 않기로 한 방식</strong>들도 나옵니다. 어떤 기법을 알면서도 "이 프로그램에는 아직 필요 없다"고 판단해 넣지 않은 것 역시 설계이고, 그 근거를 말할 수 있는 것이 기법을 하나 더 아는 것보다 낫습니다. 미리 알아 두면 그 절이 덜 뜬금없습니다.</p>
+<p><strong>이 문서에 자주 나오는 말</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>말</th>
+<th>쉬운 뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dataclass</td>
+<td>담을 칸의 이름만 적어 두면, 나머지 뻔한 작업(칸 채우기 · 내용 찍어 보기 · 두 개가 같은지 대조하기)을 파이썬이 대신 만들어 주는 클래스 선언법</td>
+</tr>
+<tr>
+<td>frozen(불변)</td>
+<td>만든 뒤에는 값을 바꿀 수 없는 상태. 고치려면 고친 값으로 새것을 하나 더 만듭니다</td>
+</tr>
+<tr>
+<td>정규화</td>
+<td>같은 뜻의 값이 여러 표기로 갈리지 않게 하나로 통일하는 일. <code>2024-1-5</code> 와 <code>2024-01-05</code> 를 늘 뒤쪽 표기로 맞추는 것</td>
+</tr>
+<tr>
+<td>제너레이터</td>
+<td>결과를 한꺼번에 다 만들어 주지 않고, 달라고 할 때마다 하나씩 내주는 함수</td>
+</tr>
+<tr>
+<td>데코레이터</td>
+<td>원래 함수는 그대로 두고 그 앞뒤에 할 일을 덧씌우는 표기(<code>@이름</code>)</td>
+</tr>
+<tr>
+<td>클로저</td>
+<td>함수가 만들어질 때 곁에 있던 <strong>변수</strong>를 붙잡은 채로 돌아다니는 것. 값을 베껴 두는 것이 아니라 그 변수를 계속 같이 보는 것이라, 나중에 값이 바뀌면 바뀐 값이 보입니다</td>
+</tr>
+<tr>
+<td>제네릭</td>
+<td>안에 무엇이 담기는지를 나중에 정하는 상자 표기(<code>JsonlStore[Transaction]</code>)</td>
+</tr>
+<tr>
+<td>불변식</td>
+<td>객체가 살아 있는 동안 절대 깨지면 안 되는 약속. 예를 들어 "금액은 언제나 양의 정수"</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>바쁘면 여기만</strong></p>
+<ul>
+<li><strong><a href="#1-dataclass-완전-해설">§1.1 ~ §1.4</a></strong> — 거래·예산·카테고리가 어떤 모양으로 만들어지고, 왜 <strong>만들어지는 순간에</strong> 검사를 받는지. 이 프로그램에 잘못된 데이터가 들어가지 않는 이유가 여기 있습니다.</li>
+<li><strong><a href="#32-읽기-경로가-둘--iter_raw-와-stream">§3.2</a></strong> — 실제로 났던 사고 이야기입니다. 무관한 거래 하나를 지웠더니 깨진 줄이 파일에서 영구히 사라졌고, 그것을 어떻게 갈라 고쳤는지. 기법보다 판단이 보이는 절입니다.</li>
+<li><strong><a href="#104-쓰지-않기로-한-패턴">§10.4</a></strong> — 표 하나로 끝납니다. "왜 안 썼나"만 읽어도 이 프로젝트가 무엇을 경계했는지 보입니다.</li>
+</ul>
 <p>budget_app 코드에 실제로 등장하는 dataclass, 제네릭, 데코레이터, 제너레이터, 사용자 정의 예외 등 중·고급 파이썬 기법을 "개념 원리 → 실제 코드 → 설계 의도" 순서로 완전히 해설합니다.</p>
 <blockquote>
 <p><strong>난이도</strong>: 🟡 중급</p>
 <p><strong>먼저 읽으면 좋은 문서</strong>: <a href="02-python-basics.html">02. 이 코드에 쓰인 파이썬 기초 문법</a>, <a href="04-architecture.html">04. 아키텍처</a></p>
 </blockquote>
 <hr>
-<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#목차">목차</a></li><li><a href="#1-dataclass-완전-해설">1. dataclass 완전 해설</a></li><li><a href="#2-메서드-3종과-클래스에-둘-것-모듈에-둘-것">2. 메서드 3종과 &quot;클래스에 둘 것 / 모듈에 둘 것&quot;</a></li><li><a href="#3-제너레이터-심화">3. 제너레이터 심화</a></li><li><a href="#4-데코레이터와-클로저-심화">4. 데코레이터와 클로저 심화</a></li><li><a href="#5-예외-심화">5. 예외 심화</a></li><li><a href="#6-제네릭-typevar-와-generic">6. 제네릭 — TypeVar 와 Generic</a></li><li><a href="#7-from-future-import-annotations">7. from future import annotations</a></li><li><a href="#8-표준-라이브러리-활용">8. 표준 라이브러리 활용</a></li><li><a href="#9-콜러블을-값으로-전달하는-패턴">9. 콜러블을 값으로 전달하는 패턴</a></li><li><a href="#10-적용된-디자인-패턴-2종">10. 적용된 디자인 패턴 2종</a></li><li><a href="#정리-기법-간의-연결-관계">정리 — 기법 간의 연결 관계</a></li></ul></details><h2 id="목차">목차</h2>
+<h2 id="목차">목차</h2>
 <ol>
 <li><a href="#1-dataclass-완전-해설">dataclass 완전 해설</a></li>
 <li><a href="#2-메서드-3종과-클래스에-둘-것--모듈에-둘-것">메서드 3종과 "클래스에 둘 것 / 모듈에 둘 것"</a></li>
@@ -30,7 +82,7 @@
 <li><a href="#9-콜러블을-값으로-전달하는-패턴">콜러블을 값으로 전달하는 패턴</a></li>
 <li><a href="#10-적용된-디자인-패턴-2종">적용된 디자인 패턴 2종</a></li>
 </ol>
-<blockquote>
+<blockquote class="callout origin">
 <p><strong>이 문서의 두 종류 보강 노트.</strong> 본문 곳곳에 인용문으로 붙은
 <strong>🔎 문법의 출처</strong>(이 표기가 어느 PEP·어느 버전에서 왔고 그 전에는 무엇으로 썼는가)와
 <strong>⚙️ 내부 동작</strong>(이 호출이 CPython 안에서 실제로 무슨 일을 하는가)이 그것입니다.
@@ -56,7 +108,7 @@
 <td><code>__post_init__</code> 이 <code>object.__setattr__</code> 로 <strong>정규화하며 덮어씀</strong></td>
 </tr>
 <tr>
-<td>값 객체</td>
+<td>값 객체(규칙이 딸린 작은 타입)</td>
 <td><code>TransactionId</code></td>
 <td>예</td>
 <td>형식 규칙 + <code>total_ordering</code> 비교</td>
@@ -94,6 +146,9 @@
 <li><code>__repr__</code> — <code>Transaction(id='TX-000001', type='expense', ...)</code> 형태의 표현 문자열</li>
 <li><code>__eq__</code> — 모든 필드 값이 같으면 두 인스턴스를 같다고 판정</li>
 </ul>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 양식지를 새로 만드는 일과 비슷합니다. "이름 칸, 날짜 칸, 금액 칸이 필요하다"고 칸 이름만 적어 내면, 인쇄소가 빈 양식지에 더해 "작성된 내용을 그대로 읽어 주는 사본"과 "두 장이 같은 내용인지 대조하는 방법"까지 딸려 만들어 줍니다. 그 셋이 각각 <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code> 입니다.
+다만 이 비유는 인쇄소가 칸의 <strong>이름과 순서만</strong> 볼 뿐 내용 규칙은 모른다는 데서 깨집니다 — "금액 칸에 음수가 오면 안 된다" 같은 것은 딸려 오지 않고, §1.4 의 <code>__post_init__</code> 이 따로 붙입니다.</p>
+</blockquote>
 <p>일반론 예시로, 아래 두 코드는 사실상 같습니다(이 프로젝트 코드가 아니라 개념 설명용 예시입니다).</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — 손으로 쓴 버전</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Point</span><span class="p">:</span>
@@ -157,18 +212,17 @@
 </code></pre></div>
 
 <p>이 선언 하나로 생성자, 필드 전체를 보여주는 <code>__repr__</code>, 필드 단위 <code>==</code> 비교가 전부 생깁니다. <code>memo</code> 와 <code>tags</code> 는 기본값이 있으므로 생략 가능한 선택 인자가 됩니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>dataclasses</code> 는 PEP 557 로 파이썬 3.7 에 표준 라이브러리로 들어왔습니다.
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>dataclasses</code> 는 PEP 557 로 파이썬 3.7 에 표준 라이브러리로 들어왔습니다.
 그 전에는 <code>collections.namedtuple</code>(불변·인덱스 접근) 이나 외부 패키지 <code>attrs</code>, 아니면 위의
 "손으로 쓴 버전"을 그대로 썼습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>@dataclass</code> 는 클래스의 <code>__annotations__</code> 를 순서대로 읽어
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>@dataclass</code> 는 클래스의 <code>__annotations__</code> 를 순서대로 읽어
 <code>def __init__(self, id, type, ..., memo='', tags=()):</code> 라는 <strong>파이썬 소스 문자열을 조립한 뒤
 <code>exec</code> 로 컴파일</strong>해 클래스에 붙입니다. 그래서 생성된 <code>__init__</code> 의
 <code>__code__.co_filename</code> 은 파일 경로가 아니라 <code>&lt;string&gt;</code> 입니다(3.13 에서 직접 확인).
 이 "소스를 만들어 exec 한다"는 사실이 §1.3 의 <code>frozen</code> 과 §1.4 의 <code>object.__setattr__</code>
 을 설명하는 열쇠입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
-<p><strong>설계 의도.</strong> 이 앱의 엔티티는 전부 "필드 묶음 + 검증"이 본질입니다. dataclass 를 쓰면 보일러플레이트가 사라져 <strong>필드 계약(docstring)과 검증 로직만 남고</strong>, <code>__eq__</code> 자동 생성 덕분에 테스트에서 <code>assert tx1 == tx2</code> 같은 비교도 공짜로 얻습니다.</p>
+<p><strong>설계 의도.</strong> 이 앱의 엔티티는 전부 "필드 묶음 + 검증"이 본질입니다. dataclass 를 쓰면 보일러플레이트(어느 클래스에나 똑같이 되풀이되는 상투적인 코드)가 사라져 <strong>필드 계약(docstring)과 검증 로직만 남고</strong>, <code>__eq__</code> 자동 생성 덕분에 테스트에서 <code>assert tx1 == tx2</code> 같은 비교도 공짜로 얻습니다.</p>
 <h3 id="12-fielddefault_factorylist-와-가변-기본값-함정">1.2 field(default_factory=list) 와 가변 기본값 함정</h3>
 <p><strong>개념.</strong> 파이썬에서 함수(그리고 생성자)의 기본값은 <strong>함수가 정의되는 순간 딱 한 번</strong> 평가되어 함수 객체에 저장됩니다. 그래서 기본값으로 리스트 같은 <strong>가변(mutable) 객체</strong>를 쓰면, 모든 호출이 <strong>같은 리스트 하나를 공유</strong>하게 됩니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — 가변 기본값 버그</span>
@@ -196,8 +250,7 @@
 </code></pre></div>
 
 <p>리스트 4개는 전부 <code>default_factory</code>, 정수 2개는 불변이라 <code>= 0</code> 으로 충분합니다. <strong>가변이면 factory, 불변이면 직접 대입</strong>이 판단 기준입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — dataclass 가 "가변 기본값"을 판정하는 기준은 타입 이름이 아니라
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — dataclass 가 "가변 기본값"을 판정하는 기준은 타입 이름이 아니라
 <strong>해시 가능성</strong>입니다. 기본값 객체의 클래스가 <code>__hash__ is None</code> 이면
 <code>ValueError: mutable default ... use default_factory</code> 를 냅니다(리스트·딕트·집합이 여기 해당).
 <code>field(default_factory=list)</code> 를 쓰면 생성된 <code>__init__</code> 소스에 <code>self.x = list()</code> 대신
@@ -206,8 +259,9 @@
 </blockquote>
 <h3 id="13-frozentrue-만들어진-뒤-바뀌지-않는-dataclass">1.3 <code>frozen=True</code> — 만들어진 뒤 바뀌지 않는 dataclass</h3>
 <p><strong>개념.</strong> <code>@dataclass(frozen=True)</code> 는 필드 대입을 막습니다. 대입하려 하면 <code>FrozenInstanceError</code> 가 나고, 부수 효과로 <code>__hash__</code> 가 자동 생성되어 set/dict 키로 쓸 수 있게 됩니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>frozen</code> 은 어떻게 대입을 막는가</strong> — 마법이 아니라 <strong>메서드 두 개를
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 코팅해서 발급한 증명서 같은 것입니다. 발급이 끝나면 글자를 고칠 수 없고, 내용을 바꾸려면 고친 내용으로 새로 발급받아야 합니다. 그 대신 "이 증명서는 발급 시점의 검사를 통과한 것"이라는 사실이 손에 들고 있는 내내 참으로 남습니다.
+다만 이 비유는 코팅되는 것이 <strong>겉장뿐</strong>이라는 데서 깨집니다 — 증명서에 서류철이 끼워져 있으면 그 안의 종이는 여전히 빼고 넣을 수 있습니다. <code>Transaction.tags</code> 가 리스트가 아니라 튜플인 이유가 그것입니다.</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>frozen</code> 은 어떻게 대입을 막는가</strong> — 마법이 아니라 <strong>메서드 두 개를
 덮어쓰는 것</strong>입니다. <code>frozen=True</code> 면 dataclass 가 <code>__setattr__</code> 과 <code>__delattr__</code> 를
 "<strong>그 클래스 자신의 인스턴스이거나 대입 대상 이름이 필드일 때</strong> <code>FrozenInstanceError</code> 를
 던지는 함수"로 만들어 클래스에 붙입니다(그 두 조건에 걸리지 않으면 <code>super().__setattr__</code>
@@ -219,7 +273,7 @@
 <code>Transaction.tags</code> 가 <code>tuple[str, ...]</code> 인 이유가 정확히 이것이고, 소스 docstring 도
 "<code>frozen</code> 은 필드를 다시 묶는 것만 막지 리스트 안을 바꾸는 것은 막지 못한다"고
 같은 말을 합니다(domain/entities.py:54-57). → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>⚙️ 내부 동작 — <code>__hash__</code> 는 공짜가 아닙니다</strong> — 파이썬은 <code>__eq__</code> 를 정의한 클래스의
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>__hash__</code> 는 공짜가 아닙니다</strong> — 파이썬은 <code>__eq__</code> 를 정의한 클래스의
 <code>__hash__</code> 를 자동으로 <code>None</code> 으로 만듭니다(변경 가능한 값이 dict 키가 되는 것을 막으려고).
 dataclass 는 <code>eq=True</code>(기본) <strong>와</strong> <code>frozen=True</code> 가 <strong>동시에</strong> 참일 때만 <code>__hash__</code> 를
 다시 만들어 줍니다 — 내용은 "필드 전부를 튜플로 묶어 <code>hash()</code>". 그래서 <strong>필드 중 하나라도
@@ -282,8 +336,7 @@ __post_init__            ← 검증·정규화 (여기서 실패하면 객체 �
 </code></pre></div>
 
 <p>각 줄은 "검증하며 정규화한 값으로 필드를 덮어쓰기" 합니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 왜 <code>self.type = ...</code> 이 아니라 <code>object.__setattr__(self, ...)</code> 인가</strong>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 왜 <code>self.type = ...</code> 이 아니라 <code>object.__setattr__(self, ...)</code> 인가</strong>
 <code>frozen=True</code> 가 <code>Transaction.__setattr__</code> 를 "무조건 예외"로 덮어썼기 때문입니다(§1.3).
 <code>self.type = x</code> 는 <code>type(self).__setattr__(self, "type", x)</code> 로 풀리므로 그 덮어쓴 함수에
 걸립니다. <code>object.__setattr__(self, "type", x)</code> 는 <strong>덮어쓰기 전의 원래 구현을 직접 호출</strong>하는
@@ -292,7 +345,7 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 즉 이 코드는 우회로가 아니라 <strong>표준이 정한 정규 통로</strong>입니다.
 <code>_set = object.__setattr__</code> 은 그 긴 이름을 지역 변수에 한 번만 담아 둔 것뿐입니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>⚙️ 내부 동작 — <code>__post_init__</code> 은 어떻게 불리나</strong> — 특별한 훅 등록 같은 것이 아닙니다.
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>__post_init__</code> 은 어떻게 불리나</strong> — 특별한 훅 등록 같은 것이 아닙니다.
 <code>@dataclass</code> 는 클래스에 <code>__post_init__</code> 이라는 이름이 있으면
 <strong>생성된 <code>__init__</code> 소스의 마지막 줄에 <code>self.__post_init__()</code> 호출문을 덧붙일 뿐</strong>입니다.
 없으면 그 줄을 아예 만들지 않습니다. 그래서 (1) 모든 필드 대입이 끝난 뒤에 불리고,
@@ -307,6 +360,9 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 </code></pre></div>
 
 <p><strong>설계 의도.</strong> 이것이 이 프로젝트의 핵심 설계인 <strong>"생성자 불변식(constructor invariant)"</strong> 입니다. 거래 객체가 만들어지는 경로는 최소 네 가지입니다 — (1) CLI 대화형 입력 → 서비스의 <code>add</code>, (2) JSONL 파일에서 읽는 <code>from_dict</code>, (3) CSV import, (4) 수정 시 <code>with_patch</code>. 검증을 각 경로에 흩어 놓으면 한 경로를 빠뜨리는 순간 불량 데이터가 들어옵니다. <code>__post_init__</code> 하나에 모아 두면 <strong>어떤 경로로 만들어져도 반드시 이 지점을 통과</strong>하므로, "검증을 깜빡한 경로"라는 것이 존재할 수 없습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 출입구가 하나뿐인 건물입니다. 어느 길로 왔든 그 문을 지나야 안으로 들어올 수 있고, 문에는 검사대가 있습니다. 거래 객체가 만들어지는 길은 위의 네 갈래인데 문은 <code>__post_init__</code> 하나뿐이라, "검사를 안 받고 들어온 거래"가 원리적으로 있을 수 없습니다.
+다만 이 비유는 검사가 <strong>들어올 때 한 번</strong>이라는 데서 깨집니다 — 이미 파일에 적혀 있는 잘못된 줄이 그 자리에서 걸러지는 것은 아니고, 그 줄을 다시 읽어 객체로 세우는 순간에야 걸립니다(§8.4 는 그 성질을 이용해 옛 날짜 표기를 읽으면서 고쳐 나갑니다).</p>
+</blockquote>
 <p><strong>리팩터 포인트 — 규칙 자체는 여기 없습니다.</strong> 위 코드의 각 줄이 <code>validators.parse_*</code> 를 호출할 뿐 규칙을 담고 있지 않다는 점에 주목하세요. 이전에는 <code>validate_type</code>/<code>validate_date</code> 가 클래스 안 staticmethod 였는데, 그 이유가 "CLI 의 재입력 루프가 검증기를 콜러블로 넘겨야 해서"였습니다. 즉 <strong>하위 계층(모델)의 공개 API 모양이 상위 계층(CLI)의 편의로 정해진</strong> 상태였습니다. 지금은 규칙이 <code>validators.py</code> 모듈 함수이고, 모델·CSV 어댑터·대화형 입력이 모두 같은 함수를 호출합니다(§2.2).</p>
 <h3 id="15-searchfilter-조건에도-같은-규칙을-적용">1.5 <code>SearchFilter</code> — 조건에도 같은 규칙을 적용</h3>
 <p><code>__post_init__</code> 은 저장 엔티티만의 것이 아닙니다. 질의 조건도 정규화가 필요합니다.</p>
@@ -344,8 +400,7 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 <li><strong><code>for_month</code> 는 대체 생성자(classmethod)입니다.</strong> "월 전체"라는 자주 쓰는 조건을 이름 있는 생성 방법으로 제공합니다. <code>summary</code> 와 <code>export</code> 가 이 하나를 공유하므로 "이 달에 속하는가"의 정의가 프로그램 전체에 하나뿐입니다.</li>
 <li><strong>명세는 거래마다 다시 만들지 않습니다.</strong> <code>spec</code> 이 <code>field(init=False)</code> 인 파생 필드라 조립은 필터 생성 시 딱 한 번이고, 10만 건을 훑는 동안에는 이미 만들어진 객체 트리에 <code>is_satisfied_by</code> 만 반복해서 묻습니다.</li>
 </ol>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>date_from: str | None = None</code> 의 <code>|</code> 는 PEP 604 로 파이썬 3.10 에
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>date_from: str | None = None</code> 의 <code>|</code> 는 PEP 604 로 파이썬 3.10 에
 들어온 유니온 표기입니다. 그 전에는 <code>typing.Optional[str]</code> 또는 <code>typing.Union[str, None]</code>
 을 썼습니다. 이 프로젝트의 <code>requires-python = "&gt;=3.10"</code> 이 이 표기를 어노테이션 밖
 (예: <code>isinstance</code> 인자)에서도 쓸 수 있게 하는 하한선입니다.
@@ -354,8 +409,7 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 <p><strong>설계 의도.</strong> 검색 조건 6개를 함수 인자로 일일이 넘기면 시그니처가 비대해지고, 조건이 하나 늘 때마다 호출부 전체를 고쳐야 합니다. <code>SearchFilter</code> 하나로 묶으면 시그니처는 <code>stream_sorted(flt)</code> 로 고정되고, "이 거래가 조건에 맞는가"라는 판정 로직도 조건 데이터 바로 옆에 응집됩니다.</p>
 <h3 id="16-property-저장하지-않고-계산하는-필드">1.6 <code>@property</code> — 저장하지 않고 계산하는 필드</h3>
 <p><strong>개념.</strong> <code>@property</code> 는 메서드를 <strong>속성처럼</strong> 읽게 만듭니다. <code>summary.usage_pct</code> 처럼 괄호 없이 씁니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>property</code> 는 문법이 아니라 <strong>내장 클래스</strong>이고, <code>@property</code> 는
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>property</code> 는 문법이 아니라 <strong>내장 클래스</strong>이고, <code>@property</code> 는
 <code>usage_pct = property(usage_pct)</code> 로 풀립니다(§4.2 의 데코레이터 해체와 같은 규칙).
 이렇게 만들어진 객체는 <code>__get__</code> 을 가진 <strong>디스크립터</strong>라, 속성 조회가
 "인스턴스 <code>__dict__</code> → 클래스" 순서로 이름을 찾다가 클래스에서 디스크립터를 만나면
@@ -415,8 +469,7 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 </code></pre></div>
 
 <p><code>id</code> 는 <code>TransactionId</code> 값 객체이고 그것 역시 <code>@dataclass(frozen=True)</code> 입니다(domain/tx_id.py:52). <code>asdict(tx)</code> 를 부르면 <code>{"id": {"value": "TX-000001"}, ...}</code> 가 나와 파일 형식이 통째로 달라집니다. 그래서 손으로 씁니다 — <code>self.id.value</code> 로 <strong>경계에서 원시 문자열로 풀고</strong>, <code>tags</code> 는 튜플을 <code>list()</code> 로 바꿉니다(JSON 에 튜플 타입이 없어 <code>json.dumps</code> 가 어차피 배열로 쓰지만, 왕복 시 형태가 흔들리지 않도록 여기서 확정합니다). <code>Budget.to_dict</code>(domain/entities.py:168-169)와 <code>Category.to_dict</code>(domain/entities.py:185-186)는 필드가 1~2개라 애초에 손으로 쓰는 편이 짧습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>asdict</code> 는 필드를 훑으며 값이 dataclass 면 자기 자신을 재귀 호출하고,
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>asdict</code> 는 필드를 훑으며 값이 dataclass 면 자기 자신을 재귀 호출하고,
 list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.deepcopy</code> 로 나머지 값을 복사</strong>합니다.
 "얕게 한 겹만 풀기"라는 옵션이 없다는 점이 여기서 결정적이었습니다.
 한 겹만 필요하면 <code>dataclasses.fields</code> 로 직접 도는 편이 정확합니다.
@@ -434,8 +487,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 </code></pre></div>
 
 <p><code>fields(self)</code> 로 필드를 순회하고 <code>getattr</code> 로 값을 꺼냅니다. <strong>필드 이름을 코드에 나열하지 않으므로, <code>TransactionPatch</code> 에 필드를 추가해도 이 함수는 고칠 필요가 없습니다.</strong> 손으로 나열했다면 필드 추가 시 여기를 빠뜨려 "그 필드만 수정이 안 되는" 버그가 났을 것입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>@dataclass</code> 는 처리한 필드 정보를 클래스 속성
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>@dataclass</code> 는 처리한 필드 정보를 클래스 속성
 <code>__dataclass_fields__</code>(이름 → <code>Field</code> 객체 dict)에 저장해 둡니다. <code>fields(obj)</code> 는 그 dict 를
 꺼내 <code>ClassVar</code>/<code>InitVar</code> 같은 의사(pseudo) 필드를 걸러 튜플로 돌려줄 뿐이고
 (<code>field(init=False)</code> 로 선언한 필드는 걸러지지 않고 그대로 나옵니다), <code>Field</code> 객체에는
@@ -461,14 +513,13 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <li><strong>새 객체 생성</strong> — 그래서 <code>__post_init__</code> 이 다시 돌고, 변경된 값도 검증을 통과합니다.</li>
 </ol>
 <p>이름의 <code>with_</code> 접두사는 "이 객체를 바탕으로 ~을 바꾼 새 객체"를 뜻하는 함수형 프로그래밍 관례입니다(<code>dataclasses.replace</code> 와 같은 계열).</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>{**A, **B}</code> 로 딕셔너리를 병합하는 표기는 PEP 448
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>{**A, **B}</code> 로 딕셔너리를 병합하는 표기는 PEP 448
 (Additional Unpacking Generalizations)로 파이썬 3.5 에 들어왔습니다. 그 전에는
 <code>d = dict(A); d.update(B)</code> 두 줄이거나 <code>dict(A, **B)</code>(키가 문자열일 때만) 였습니다.
 참고로 3.9 에는 <code>A | B</code> 라는 더 짧은 표기도 생겼지만 이 코드는 <code>{**A, **B}</code> 를 씁니다 —
 같은 줄에서 <code>Transaction(**...)</code> 언패킹과 표기를 맞추기 위해서입니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>Transaction(**d)</code> 의 <code>**</code> 는 dict 를 <strong>키워드 인자로 펼치는</strong> 호출
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>Transaction(**d)</code> 의 <code>**</code> 는 dict 를 <strong>키워드 인자로 펼치는</strong> 호출
 문법입니다. 인터프리터가 dict 의 키를 매개변수 이름과 맞춰 보므로, 키가 하나라도
 매개변수에 없으면 <code>TypeError: got an unexpected keyword argument</code> 가 즉시 납니다.
 즉 <code>to_dict()</code> 의 키 집합과 <code>__init__</code> 의 매개변수 이름이 어긋나는 순간 조용히 넘어가지
@@ -513,8 +564,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <li><strong>classmethod</strong> 는 인스턴스가 아직 없는 상태에서 클래스 자체가 필요할 때, 특히 <strong>대체 생성자(alternative constructor)</strong> 를 만들 때 씁니다.</li>
 <li><strong>staticmethod</strong> 는 클래스와 논리적으로 관련은 있지만 <code>self</code> 도 <code>cls</code> 도 필요 없는 순수 함수를, 이름공간 정리 목적으로 클래스 안에 두는 것입니다.</li>
 </ul>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 세 종류를 가르는 것은 디스크립터입니다</strong> — 클래스 본문의 <code>def</code> 는
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 세 종류를 가르는 것은 디스크립터입니다</strong> — 클래스 본문의 <code>def</code> 는
 그냥 함수 객체이고, 함수는 <code>__get__</code> 을 가진 디스크립터입니다. <code>tx.to_dict</code> 로 꺼낼 때
 그 <code>__get__</code> 이 <strong>인스턴스를 첫 인자로 미리 채운 바운드 메서드</strong>를 만들어 돌려주기
 때문에 <code>self</code> 가 자동으로 넘어갑니다. <code>@classmethod</code> / <code>@staticmethod</code> 는 그 <code>__get__</code>
@@ -541,7 +591,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
         <span class="p">)</span>
 </code></pre></div>
 
-<p><code>to_dict</code> 와 짝을 이루어 다음의 <strong>직렬화 왕복(round-trip)</strong> 을 구성합니다.</p>
+<p><code>to_dict</code> 와 짝을 이루어 다음의 <strong>직렬화 왕복(round-trip)</strong> 을 구성합니다. 직렬화란 객체를 파일에 적을 수 있는 형태로 펴는 일이고, 왕복이란 폈다가 되돌렸을 때 같은 것이 나오는가입니다.</p>
 <div class="codehilite"><pre><span></span><code>Transaction 객체 ──to_dict()──▶ dict ──json.dumps──▶ 파일의 한 줄(JSONL)
        ▲                                                    │
        └──__post_init__ 재검증◀──from_dict()◀──json.loads──┘
@@ -555,7 +605,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
             <span class="n">entity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 </code></pre></div>
 
-<p><code>self.entity_cls</code> 는 하위 클래스가 지정한 dataclass(<code>Transaction</code>/<code>Category</code>/<code>Budget</code>)입니다. 세 클래스가 <strong>같은 이름의 classmethod 를 갖고 있기 때문에</strong> 이 한 줄이 셋 모두에 동작합니다. 이것이 파이썬의 덕 타이핑(duck typing)이며, 공통 조상 클래스를 만들지 않고도 다형성을 얻는 방법입니다.</p>
+<p><code>self.entity_cls</code> 는 하위 클래스가 지정한 dataclass(<code>Transaction</code>/<code>Category</code>/<code>Budget</code>)입니다. 세 클래스가 <strong>같은 이름의 classmethod 를 갖고 있기 때문에</strong> 이 한 줄이 셋 모두에 동작합니다. 이것이 파이썬의 덕 타이핑(duck typing — 타입이 무엇인지 묻지 않고, 필요한 메서드가 있으면 그냥 부르는 방식)이며, 공통 조상 클래스를 만들지 않고도 다형성(같은 호출이 대상에 따라 알아서 다르게 동작하는 성질)을 얻는 방법입니다.</p>
 <h3 id="22-왜-staticmethod-검증기를-없앴는가-리팩터-핵심">2.2 왜 <code>@staticmethod</code> 검증기를 없앴는가 (리팩터 핵심)</h3>
 <p>리팩터 전 <code>models.py</code> 에는 이런 코드가 있었습니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># (리팩터 전 — 지금은 없는 코드)</span>
@@ -572,7 +622,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;필드 규칙 — &quot;이 값이 유효한가&quot;를 판단하는 단 하나의 정의처.</span>
 </code></pre></div>
 
-<p><strong>모듈 함수도 콜러블입니다.</strong> staticmethod 가 제공하던 "인스턴스 없이 참조해서 넘길 수 있다"는 성질은 모듈 함수가 더 잘 만족합니다.</p>
+<p><strong>모듈 함수도 콜러블(괄호를 붙여 부를 수 있는 것)입니다.</strong> staticmethod 가 제공하던 "인스턴스 없이 참조해서 넘길 수 있다"는 성질은 모듈 함수가 더 잘 만족합니다.</p>
 <p>budget_app/cli/prompts.py:112-121</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask_transaction</span><span class="p">(</span><span class="n">cat_service</span><span class="p">:</span> <span class="n">CategoryService</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionInput</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 한 건에 필요한 값을 순서대로 받아 온다.&quot;&quot;&quot;</span>
@@ -602,15 +652,17 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <hr>
 <h2 id="3-제너레이터-심화">3. 제너레이터 심화</h2>
 <h3 id="31-yield-의-원리-지연-평가-상태-보존-1회성-소진">3.1 yield 의 원리 — 지연 평가, 상태 보존, 1회성 소진</h3>
-<p><strong>개념.</strong> 함수 본문에 <code>yield</code> 가 하나라도 있으면 그 함수는 <strong>제너레이터 함수</strong>가 됩니다. 호출해도 본문이 실행되지 않고 <strong>제너레이터 객체</strong>가 반환되며, 소비자(예: <code>for</code> 루프)가 다음 값을 요구할 때마다 본문이 <strong>다음 <code>yield</code> 까지만</strong> 실행됩니다. 핵심 성질은 세 가지입니다.</p>
+<p><strong>개념.</strong> 함수 본문에 <code>yield</code> 가 하나라도 있으면 그 함수는 <strong>제너레이터 함수</strong>가 됩니다. 이 함수는 호출해도 본문이 실행되지 않고, <strong>제너레이터 객체</strong>를 하나 돌려줄 뿐입니다. 실제 실행은 소비자(예: <code>for</code> 루프)가 다음 값을 요구할 때 시작되며, 그때마다 본문이 <strong>다음 <code>yield</code> 까지만</strong> 나아갑니다. 핵심 성질은 세 가지입니다.</p>
 <ol>
 <li><strong>지연 평가(lazy)</strong>: 값은 요구되는 순간에 하나씩 만들어집니다. 소비자가 중간에 <code>break</code> 하면 나머지는 아예 계산되지 않습니다.</li>
 <li><strong>상태 보존</strong>: <code>yield</code> 에서 멈출 때 지역 변수·파일 위치·루프 진행 상태가 그대로 얼어붙었다가, 다음 요청 때 그 지점부터 재개됩니다.</li>
 <li><strong>1회성 소진</strong>: 한 번 끝까지 소비한 제너레이터는 재사용할 수 없습니다. 다시 순회하려면 제너레이터 함수를 다시 호출해 새 객체를 만들어야 합니다.</li>
 </ol>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 책을 통째로 복사해 가방에 넣는 대신, 열람실에서 한 장씩 넘겨 보는 것입니다. 찾던 대목이 나오면 거기서 덮고 나오면 되고, 뒷장은 아예 펼치지도 않습니다. 그래서 거래가 10만 건이어도 <code>stream()</code> 이 한 번에 손에 들고 있는 것은 한 줄뿐입니다(전체 정렬이 필요한 <code>stream_sorted</code> 와 파일을 다시 쓰는 <code>rewrite</code> 는 예외라 모아 두는 부분이 있습니다 — §3.3·§3.5).
+다만 이 비유는 책이라면 앞으로 되돌려 다시 볼 수 있다는 데서 깨집니다 — 제너레이터는 한 번 끝까지 넘기면 그것으로 끝이라, 다시 보려면 처음부터 새로 빌려 와야 합니다(위의 세 번째 성질).</p>
+</blockquote>
 <p>타입 표기 <code>Iterator[T]</code> 는 "T 를 하나씩 내놓는 반복자"라는 뜻으로, 제너레이터 함수의 반환 타입 표기로 관례처럼 쓰입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — "호출해도 본문이 안 돈다"는 컴파일 시점에 결정됩니다</strong> — 실행 중에
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — "호출해도 본문이 안 돈다"는 컴파일 시점에 결정됩니다</strong> — 실행 중에
 <code>yield</code> 를 만나서 그렇게 되는 것이 아닙니다. 컴파일러가 함수 본문을 훑어 <code>yield</code> 를
 발견하면 그 코드 객체에 <strong><code>CO_GENERATOR</code>(값 32) 플래그</strong>를 켭니다. 호출 시점에는
 인터프리터가 그 플래그만 보고 프레임을 실행하는 대신 <strong>제너레이터 객체를 만들어
@@ -618,7 +670,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 그래서 <code>iter_raw()</code> 를 불러 놓고 소비하지 않으면 <code>open()</code> 조차 실행되지 않습니다 —
 §3.2 의 "첫 값을 요구하는 순간에야 파일이 열린다"가 바로 이 결과입니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>🔎 문법의 출처</strong> — 기본 제너레이터(<code>yield</code> 문)는 PEP 255 로 파이썬 2.2 에 들어왔고,
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 기본 제너레이터(<code>yield</code> 문)는 PEP 255 로 파이썬 2.2 에 들어왔고,
 <code>yield</code> 를 <strong>식</strong>으로 만들어 값을 보낼 수 있게 한 것이 PEP 342(2.5),
 다른 반복자에 위임하는 <code>yield from</code> 이 PEP 380(3.3)입니다.
 이 프로젝트는 셋 중 <strong>문으로서의 <code>yield</code></strong> 와 <strong><code>yield from</code></strong> 만 씁니다 —
@@ -686,8 +738,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 </code></pre></div>
 
 <p><strong>이것이 제너레이터를 층층이 쌓는(stacking) 전형입니다.</strong> <code>stream()</code> 은 자기 파일을 열지 않고 <code>iter_raw()</code> 를 소비할 뿐이며, 둘 다 한 번에 한 줄만 메모리에 둡니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 인자 없는 <code>return</code> 과 <code>with</code> 의 수명</strong> — 제너레이터 안의 <code>return</code> 은
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 인자 없는 <code>return</code> 과 <code>with</code> 의 수명</strong> — 제너레이터 안의 <code>return</code> 은
 값을 반환하는 것이 아니라 <code>StopIteration</code> 을 일으키는 것입니다(<code>return v</code> 를 쓰면
 <code>StopIteration.value</code> 에 <code>v</code> 가 실립니다 — PEP 380 이 정한 규칙이고 여기서는 쓰지 않습니다).
 <code>for</code> 문은 그 <code>StopIteration</code> 을 잡아 루프를 정상 종료시키므로 호출부에는 "빈 반복"으로만
@@ -751,8 +802,7 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p>정렬 키 <code>lambda t: (t.date, t.id)</code> 는 튜플 비교를 이용합니다 — 날짜가 같으면 id 로 순서가 정해지므로 정렬이 항상 결정적(deterministic)입니다. <code>t.id</code> 는 문자열이 아니라 <code>TransactionId</code> 값 객체인데, 그 클래스가 <code>@functools.total_ordering</code> + <code>__lt__</code>(domain/tx_id.py:91-95)를 갖고 있어서 튜플 비교의 두 번째 원소로 그대로 쓸 수 있습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>functools.total_ordering</code></strong> — <code>TransactionId</code> 는 <code>__lt__</code> 하나만
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>functools.total_ordering</code></strong> — <code>TransactionId</code> 는 <code>__lt__</code> 하나만
 정의합니다(비교 기준은 <code>self.number &lt; other.number</code>). <code>total_ordering</code> 은 클래스에
 정의된 비교 메서드 중 하나를 찾아 <strong>미리 정해진 변환표</strong>대로 나머지 셋을 채워 넣습니다.
 <code>__lt__</code> 를 준 경우 <code>__gt__</code>, <code>__le__</code>, <code>__ge__</code> 가 생기고, 각각은 <code>__lt__</code> 를 호출한 뒤
@@ -760,7 +810,7 @@ output.out_lines             ── stdout 으로 출력
 <code>__eq__</code> 는 채워 주지 않는데, 여기서는 <code>@dataclass</code> 가 이미 만들어 줍니다.
 그래서 "메서드 하나 + 데코레이터 한 줄"로 6종 비교가 완성됩니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>⚙️ 내부 동작 — 튜플 비교</strong> — <code>(a1, b1) &lt; (a2, b2)</code> 는 사전식(lexicographic)입니다:
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 튜플 비교</strong> — <code>(a1, b1) &lt; (a2, b2)</code> 는 사전식(lexicographic)입니다:
 먼저 <code>a1 == a2</code> 인지 보고, 다르면 <code>a1 &lt; a2</code> 의 결과가 곧 답이며, 같을 때만 <code>b</code> 를 봅니다.
 그래서 <code>id</code> 비교는 <strong>날짜가 같은 거래들 사이에서만</strong> 실제로 일어납니다.
 <code>list.sort</code> 는 안정 정렬(Timsort)이지만, 키를 (날짜, id) 로 완전히 결정해 두면
@@ -802,8 +852,7 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p>마지막 줄의 인자가 제너레이터 식입니다 — 함수 호출의 <strong>유일한 인자</strong>일 때는 소괄호를 생략할 수 있습니다. (<code>append_all</code> 자신은 첫 줄에서 <code>entities = list(entities)</code> 로 즉시 펼칩니다(storage/jsonl.py:213-218) — 여기서도 "비었는가"와 "몇 건인가"를 둘 다 알아야 하기 때문입니다.)</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 제너레이터 식은 PEP 289 로 파이썬 2.4 에 들어왔습니다.
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 제너레이터 식은 PEP 289 로 파이썬 2.4 에 들어왔습니다.
 리스트 컴프리헨션(PEP 202, 2.0)이 먼저 있었고, 그 대괄호를 소괄호로 바꾸면
 <strong>리스트를 만들지 않고 하나씩 흘려보내는</strong> 형태가 됩니다. "유일한 인자면 괄호 생략"은
 문법 자체에 들어 있는 규칙이라 <code>f(x for x in y)</code> 는 유효하지만 <code>f(x for x in y, 1)</code> 은
@@ -841,7 +890,10 @@ output.out_lines             ── stdout 으로 출력
 <hr>
 <h2 id="4-데코레이터와-클로저-심화">4. 데코레이터와 클로저 심화</h2>
 <h3 id="41-바탕-개념-고차-함수와-클로저">4.1 바탕 개념: 고차 함수와 클로저</h3>
-<p><strong>개념.</strong> 파이썬에서 함수는 <strong>일급 객체</strong>입니다 — 변수에 담고, 인자로 넘기고, 반환값으로 돌려줄 수 있습니다. 함수를 받거나 돌려주는 함수를 <strong>고차 함수(higher-order function)</strong> 라고 합니다. 그리고 안쪽 함수가 바깥 함수의 지역 변수를 참조한 채 바깥 함수 밖으로 반환되면, 그 변수는 바깥 함수가 끝나도 사라지지 않고 안쪽 함수에 <strong>캡처</strong>되어 살아남습니다. 이것이 <strong>클로저(closure)</strong> 입니다.</p>
+<p><strong>개념.</strong> 파이썬에서 함수는 <strong>일급 객체</strong>(숫자나 문자열처럼 값으로 다룰 수 있는 대상)입니다 — 변수에 담고, 인자로 넘기고, 반환값으로 돌려줄 수 있습니다. 함수를 받거나 돌려주는 함수를 <strong>고차 함수(higher-order function)</strong> 라고 합니다. 여기에 성질이 하나 더 얹힙니다. 안쪽 함수가 바깥 함수의 지역 변수를 참조한 채로 바깥 함수 밖으로 반환되는 경우입니다. 이때 그 변수는 바깥 함수가 끝나도 사라지지 않고, 안쪽 함수에 <strong>캡처</strong>(붙잡혀 따라감)되어 살아남습니다. 이것이 <strong>클로저(closure)</strong> 입니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 심부름 쪽지에 가깝습니다. "3을 더해서 가져와"라고 적어 건네면, 쪽지를 쓴 사람이 자리를 떠난 뒤에도 쪽지에 적힌 3은 그대로 남아 있습니다. 아래 예시의 <code>add3</code> 이 정확히 그 쪽지입니다.
+다만 이 비유는 쪽지에 값을 <strong>베껴 적는</strong> 것처럼 들린다는 데서 깨집니다 — 실제로는 값이 든 서랍을 함께 넘기는 쪽에 가까워서, 바깥 함수가 그 뒤에 서랍 속을 바꾸면 안쪽 함수도 바뀐 값을 봅니다. 반대 방향 — 안쪽 함수가 서랍 속을 바꾸는 것 — 은 그냥은 안 되고 <code>nonlocal</code> 이라고 따로 선언해야 하는데, §4.6 의 <code>reassign_category</code> 가 그 방식으로 바뀐 건수를 세어 옵니다.</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — 클로저</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_adder</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
@@ -853,6 +905,9 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p>데코레이터는 이 두 개념의 조합입니다: <strong>"함수를 받아 → 감싼 새 함수를 돌려주는" 고차 함수</strong>이고, 감싼 함수(wrapper)는 원본 <code>func</code> 를 클로저로 캡처합니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 선물 포장입니다. 안의 물건은 손대지 않고 겉에 포장지와 리본만 더합니다. <code>@log_call</code> 이 붙은 함수를 부르면 "불렀다"는 기록 → 원래 함수 → "끝냈다"는 기록 순서로 진행되고, 돌려받는 것은 원래 함수의 결과 그대로입니다.
+다만 이 비유는 포장이 내용물을 절대 바꾸지 않는다는 데서 깨집니다 — 데코레이터는 결과를 가로챌 수도, 원본을 아예 부르지 않을 수도 있습니다. 실제로 <code>handle_errors</code> 는 자기가 잡아 내는 예외를 원본의 반환값 대신 종료 코드로 바꿔 돌려줍니다(<code>BrokenPipeError</code> 만은 잡지 않고 그대로 다시 던집니다 — §5.3).</p>
+</blockquote>
 <h3 id="42-log_call-func-log_callfunc-해체">4.2 <code>@log_call</code> == <code>func = log_call(func)</code> 해체</h3>
 <p>budget_app/decorators.py:37-47</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_call</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -868,7 +923,7 @@ output.out_lines             ── stdout 으로 출력
     <span class="k">return</span> <span class="n">wrapper</span>
 </code></pre></div>
 
-<p><code>@</code> 문법은 순전히 설탕(syntactic sugar)입니다. <code>@log_call</code> 이 붙은 <code>TransactionService.add</code>(services/transactions.py:27-28)는 클래스 본문이 실행될 때 다음과 <strong>완전히 동일</strong>합니다.</p>
+<p><code>@</code> 문법은 순전히 설탕(syntactic sugar — 의미는 그대로 두고 표기만 짧고 읽기 좋게 만든 문법)입니다. <code>@log_call</code> 이 붙은 <code>TransactionService.add</code>(services/transactions.py:27-28)는 클래스 본문이 실행될 때 다음과 <strong>완전히 동일</strong>합니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — @ 없이 풀어 쓴 동등 코드</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
     <span class="o">...</span>
@@ -876,13 +931,12 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p>즉 <code>TransactionService.add</code> 를 호출하면 실제로는 <code>wrapper</code> 가 실행되고, wrapper 는 (1) "call add" 디버그 로그 → (2) 캡처해 둔 원본 <code>func</code> 호출 → (3) "done add" 로그 → (4) 원본의 반환값 그대로 반환, 순서로 동작합니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>@데코레이터</code> 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@데코레이터</code> 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다
 (클래스에 붙이는 형태는 PEP 3129, 3.0). 그 전에는 예시 코드처럼 <code>add = log_call(add)</code> 를
 <code>def</code> 아래에 직접 써야 했고, 이름이 세 번 반복되는 데다 함수가 길면 "이 함수가 감싸져
 있다"는 사실이 본문 끝에 가서야 드러났습니다. <code>@</code> 는 그 정보를 <code>def</code> 위로 끌어올린 것뿐이고
 <strong>의미는 완전히 동일</strong>합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작 — 겹쳐 쓰면 순서는 아래에서 위로</strong> — 데코레이터를 두 개 쌓으면
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 겹쳐 쓰면 순서는 아래에서 위로</strong> — 데코레이터를 두 개 쌓으면
 <code>f = A(B(f))</code> 로 풀립니다. <strong>적용은 <code>def</code> 에 가장 가까운(아래) 것부터, 실행은 가장 바깥(위)
 것부터</strong>입니다. <em>(일반론 예시 — 이 소스에는 겹쳐 쓴 자리가 없습니다. 서비스 메서드는
 <code>@log_call</code> 셋(services/transactions.py:27, 52, 72)과 <code>@measure_time</code> 하나
@@ -904,8 +958,7 @@ output.out_lines             ── stdout 으로 출력
 <li><code>log_call</code> 과 <code>measure_time</code> 은 로그에 <code>func.__name__</code> 을 찍습니다. <code>wraps</code> 가 없으면 로그가 전부 <code>wrapper</code> 로 찍혀 무의미해집니다.</li>
 <li><code>handle_errors</code> 로 감싼 <code>_dispatch</code>(cli/app.py:61-81)도 <code>wraps</code> 덕분에 디버깅·트레이스에서 원래 이름으로 보입니다.</li>
 </ol>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>wraps</code> 가 정확히 무엇을 복사하나</strong> — <code>functools.wraps(f)</code> 는
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>wraps</code> 가 정확히 무엇을 복사하나</strong> — <code>functools.wraps(f)</code> 는
 <code>functools.partial(update_wrapper, wrapped=f)</code> 이고, <code>update_wrapper</code> 가 하는 일은 셋입니다.
 (1) <code>WRAPPER_ASSIGNMENTS</code> 에 나열된 이름을 하나씩 <strong>대입</strong>합니다 — 3.13 기준
 <code>__module__</code>, <code>__name__</code>, <code>__qualname__</code>, <code>__doc__</code>, <code>__annotations__</code>, <code>__type_params__</code>.
@@ -1014,13 +1067,12 @@ output.out_lines             ── stdout 으로 출력
 <p><strong><code>nonlocal changed</code> 가 핵심입니다.</strong> 이것이 없으면 <code>changed += 1</code> 은 "<code>_reassign</code> 안의 <strong>새 지역 변수</strong> <code>changed</code> 를 만들려는 시도"로 해석되어 <code>UnboundLocalError</code> 가 납니다. <code>nonlocal</code> 은 "이 이름은 바깥 함수의 지역 변수다"라고 선언해 대입이 바깥으로 전달되게 합니다.</p>
 <p>(읽기만 할 때는 <code>nonlocal</code> 이 필요 없습니다 — 위 코드에서 <code>source</code>, <code>patch</code> 는 선언 없이 그냥 읽습니다. <strong>대입할 때만</strong> 필요합니다.)</p>
 <p><code>delete</code>(storage/repositories.py:150-171)와 <code>replace</code>(storage/repositories.py:173-192)도 <code>nonlocal found</code> 로 같은 일을 합니다. 이 패턴 덕분에 <code>rewrite</code> 는 "무엇을 세는지" 전혀 모른 채 재작성이라는 뼈대만 제공할 수 있습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>nonlocal</code> 은 PEP 3104 로 파이썬 3.0 에 들어온 <strong>예약어</strong>입니다.
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>nonlocal</code> 은 PEP 3104 로 파이썬 3.0 에 들어온 <strong>예약어</strong>입니다.
 파이썬 2 에는 없었고, 같은 일을 하려면 <code>changed = [0]</code> 처럼 <strong>가변 컨테이너에 담아
 안쪽에서 원소를 바꾸는</strong> 우회법(<code>changed[0] += 1</code>)을 썼습니다. <code>nonlocal</code> 은 그 우회를
 불필요하게 만든 문법입니다. (<code>global</code> 과 달리 모듈 전역이 아니라 <strong>가장 가까운 바깥
 함수 스코프</strong>를 가리킵니다.) → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작 — <code>UnboundLocalError</code> 가 나는 진짜 이유</strong> — 파이썬 컴파일러는 함수 본문을
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>UnboundLocalError</code> 가 나는 진짜 이유</strong> — 파이썬 컴파일러는 함수 본문을
 훑어 <strong>대입되는 이름은 그 함수의 지역 변수로 확정</strong>합니다. 실행 전에, 정적으로 정해집니다.
 그래서 <code>nonlocal</code> 이 없으면 <code>changed += 1</code> 의 <code>changed</code> 는 <code>_reassign</code> 의 지역 변수가
 되고, <code>+=</code> 는 읽기부터 하는데 아직 값이 없으니 <code>UnboundLocalError</code> 입니다.
@@ -1065,8 +1117,7 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p><code>super().__init__(message)</code> 로 일반 예외처럼 <code>str(exc)</code> 가 메시지를 돌려주게 하면서, <code>message</code> 와 <code>hint</code> 를 <strong>속성으로도</strong> 보관합니다. 잡는 쪽(<code>handle_errors</code>)은 <code>exc.message</code> 를 <code>[오류]</code> 줄로, <code>exc.hint</code> 가 있으면 <code>[힌트]</code> 줄로 출력합니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>super().__init__(message)</code> 가 왜 필요한가</strong> — <code>BaseException.__init__</code>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>super().__init__(message)</code> 가 왜 필요한가</strong> — <code>BaseException.__init__</code>
 은 받은 위치 인자를 그대로 <code>self.args</code> 튜플에 저장하고, <code>BaseException.__str__</code> 은
 <code>args</code> 가 한 개면 그 원소를, 비었으면 빈 문자열을, 여럿이면 튜플 표현을 돌려줍니다.
 그래서 이 한 줄을 빠뜨리면 <code>str(exc)</code> 가 <code>""</code> 가 되고, <code>f"[오류] {exc}"</code> 로 찍는 곳이 전부
@@ -1120,13 +1171,12 @@ output.out_lines             ── stdout 으로 출력
 <p>같은 패턴이 <code>parse_month</code>(domain/validators.py:112 — 역시 <code>strptime</code> 의 <code>ValueError</code> 를 번역)와 원자 모드 가져오기 실패(services/importexport.py:115-118 — <code>ValidationError</code>/<code>KeyError</code> 를 <code>AppError</code> 로 번역)에도 반복됩니다.</p>
 <p>반면 <code>parse_amount</code> 는 <code>from</code> 을 쓰지 <strong>않습니다</strong> — 그 함수는 잡을 하부 예외가 애초에 없기 때문입니다. <code>int()</code> 에 맡기는 대신 정규식 <code>_INTEGER</code> 로 먼저 판정하고 스스로 <code>raise ValidationError(...)</code> 하므로(domain/validators.py:65-69), 연결할 원인 예외가 존재하지 않습니다. <strong><code>from</code> 은 "번역"할 때만 쓰는 것</strong>이지 예외를 던질 때마다 붙이는 장식이 아니라는 대비가 여기서 보입니다.</p>
 <p><strong>설계 의도</strong>: 바깥 계층은 <code>ValidationError</code>/<code>AppError</code> 라는 도메인 어휘만 다루면 되고, 디버깅할 때는 <code>__cause__</code> 사슬을 따라 "실제로는 strptime 이 실패했다"는 근본 원인까지 추적할 수 있습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 예외 연쇄(<code>raise B from A</code>, <code>__cause__</code>/<code>__context__</code>)는 PEP 3134 로
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 예외 연쇄(<code>raise B from A</code>, <code>__cause__</code>/<code>__context__</code>)는 PEP 3134 로
 파이썬 3.0 에 들어왔습니다. 파이썬 2 에는 연쇄 자체가 없어서, 저수준 예외를 도메인
 예외로 바꾸면 <strong>원래 트레이스백이 통째로 사라졌습니다.</strong> 그래서 원인을 남기려면
 메시지 문자열에 <code>str(exc)</code> 를 이어 붙이는 수밖에 없었습니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작 — <code>__cause__</code> 와 <code>__context__</code> 는 다릅니다</strong> — <code>except</code> 블록 안에서 예외를
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>__cause__</code> 와 <code>__context__</code> 는 다릅니다</strong> — <code>except</code> 블록 안에서 예외를
 던지면 인터프리터가 <strong>자동으로</strong> 원래 예외를 <code>__context__</code> 에 넣습니다(<code>from</code> 을 안 써도).
 <code>from exc</code> 를 명시하면 거기에 더해 <code>__cause__ = exc</code> 와 <code>__suppress_context__ = True</code> 가
 설정됩니다. 트레이스백 출력이 갈리는 지점이 이것입니다 —
@@ -1195,8 +1245,7 @@ output.out_lines             ── stdout 으로 출력
 <p>인자 없는 <code>raise</code> 는 "지금 잡은 예외를 그대로 재전파"입니다. 이 절이 없으면 아래의 <code>except OSError</code> 가 삼켜서 <code>[오류] 입출력 오류...</code> 를 출력하려다 <strong>또 파이프가 깨지는 2차 사고</strong>가 납니다.</p>
 <p><strong>(2) <code>KeyboardInterrupt</code> 는 명시적으로 잡아야 합니다.</strong></p>
 <p><code>KeyboardInterrupt</code> 는 <code>Exception</code> 이 아니라 <code>BaseException</code> 직계이므로, 마지막 <code>except Exception</code> 은 이것을 <strong>못 잡습니다</strong>. Ctrl+C 를 관례적 종료 코드 130 으로 처리하려면 별도 절이 필요합니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>except</code> 는 어떻게 절을 고르나</strong> — 인터프리터는 위에서부터 각 절의
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>except</code> 는 어떻게 절을 고르나</strong> — 인터프리터는 위에서부터 각 절의
 타입과 던져진 예외를 <code>issubclass</code> 로 비교해(<code>PyErr_GivenExceptionMatches</code>)
 <strong>처음 참이 되는 절 하나만</strong> 실행하고 나머지는 건너뜁니다. 그래서 순서가 곧 정책입니다.
 <code>BaseException</code> 이 계층 꼭대기에 따로 있는 이유도 여기서 나옵니다 —
@@ -1225,8 +1274,7 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p><code>logger.exception(...)</code> 은 <code>logger.error(..., exc_info=True)</code> 의 축약으로, "현재 처리 중인 예외의 전체 트레이스백을 이 로그 레코드에 첨부하라"는 뜻입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>exc_info=True</code> 를 만나면 logging 은 <code>sys.exc_info()</code> 를 불러
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>exc_info=True</code> 를 만나면 logging 은 <code>sys.exc_info()</code> 를 불러
 <strong>지금 처리 중인 예외 3종 세트</strong>(타입/값/트레이스백)를 가져와 <code>LogRecord.exc_info</code> 에
 담습니다. 문자열 변환은 그때가 아니라 포매터가 <code>Formatter.formatException</code> 을 부를 때
 (내부적으로 <code>traceback.print_exception</code>) 일어납니다. 두 가지가 따라옵니다 —
@@ -1257,7 +1305,10 @@ output.out_lines             ── stdout 으로 출력
 <p>같은 판단이 <code>_resolve_id</code> 에도 있습니다(services/importexport.py:133-164) — 중복 id 는 정책에 따라 예외일 수도(<code>error</code>), 값(<code>None</code> = 건너뜀)일 수도 있습니다.</p>
 <hr>
 <h2 id="6-제네릭-typevar-와-generic">6. 제네릭 — TypeVar 와 Generic</h2>
-<p><strong>개념.</strong> "리스트든 집합이든 담긴 타입을 그대로 유지하는" 표기를 직접 만들 수 있게 해 주는 것이 제네릭입니다. <code>TypeVar</code> 는 "아직 정해지지 않은 타입"의 자리표시자이고, <code>Generic[T]</code> 를 상속하면 클래스가 그 자리표시자를 받는다고 선언합니다.</p>
+<p><strong>개념.</strong> "리스트든 집합이든, 담긴 것의 타입을 그대로 유지하는" 표기를 직접 만들 수 있게 해 주는 것이 제네릭입니다. <code>TypeVar</code> 는 "아직 정해지지 않은 타입"을 가리키는 자리표시자입니다. 클래스가 <code>Generic[T]</code> 를 상속하면, 그 자리표시자를 밖에서 받아 쓰겠다고 선언하는 것이 됩니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 이삿짐 상자에 "내용물: ____" 라벨을 붙여 두는 것과 같습니다. 상자를 접고 테이프를 붙이는 방법은 무엇을 담든 하나면 충분하고, 무엇을 담을지는 쓰는 사람이 그때 적습니다. <code>JsonlStore</code> 가 "JSONL 파일 다루는 법"이라는 상자이고, <code>JsonlStore[Transaction]</code> 이 라벨을 채운 것입니다.
+다만 이 비유는 파이썬에서 그 라벨을 <strong>사람과 검사 도구만 읽는다</strong>는 데서 깨집니다 — "그릇"이라고 적은 상자에 책을 넣어도 프로그램은 아무 불평 없이 돌아갑니다. 그래서 실행 중에 실제로 쓸 클래스는 <code>entity_cls</code> 라는 평범한 값으로 한 번 더 적어 둡니다(아래 표).</p>
+</blockquote>
 <p><strong>실제 코드.</strong></p>
 <p>budget_app/cli/prompts.py:25</p>
 <div class="codehilite"><pre><span></span><code><span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
@@ -1318,14 +1369,13 @@ output.out_lines             ── stdout 으로 출력
 </tbody>
 </table></div>
 <p>파이썬 제네릭은 <strong>런타임에 지워집니다</strong>(type erasure). <code>JsonlStore[Transaction]</code> 을 상속했다고 해서 실행 중에 "T 가 Transaction 이다"를 알 수 있는 게 아닙니다. 그래서 실제 파싱에 쓸 클래스는 <code>entity_cls</code> 라는 <strong>평범한 클래스 속성</strong>으로 따로 지정합니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>TypeVar</code>/<code>Generic</code> 은 PEP 484(파이썬 3.5)가 <code>typing</code> 모듈과 함께
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>TypeVar</code>/<code>Generic</code> 은 PEP 484(파이썬 3.5)가 <code>typing</code> 모듈과 함께
 들여왔습니다. 핵심은 그 PEP 가 스스로 밝힌 원칙입니다 — <strong>"파이썬은 여전히 동적 타입
 언어이며, 런타임에 타입을 강제하지 않는다."</strong> 그래서 <code>JsonlStore[Transaction]</code> 에
 <code>Category</code> 를 넣어도 실행은 아무 불평 없이 됩니다. 검사는 mypy 같은 <strong>별도 도구</strong>의 일입니다.
 (3.12 의 PEP 695 는 <code>class JsonlStore[T]:</code> 라는 더 짧은 표기를 추가했지만, 이 프로젝트는
 <code>&gt;=3.10</code> 이 하한선이라 쓰지 않습니다.) → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
-<p><strong>⚙️ 내부 동작 — <code>JsonlStore[Transaction]</code> 이라는 표기는 무엇이 되는가</strong> — 대괄호는
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>JsonlStore[Transaction]</code> 이라는 표기는 무엇이 되는가</strong> — 대괄호는
 클래스에 정의된 <code>__class_getitem__</code> 을 부릅니다(<code>Generic</code> 이 제공합니다).
 결과는 클래스가 아니라 <strong><code>typing._GenericAlias</code> 객체</strong>로, <code>__origin__</code>(원래 클래스)과
 <code>__args__</code>(채워 넣은 타입 튜플)를 들고 있습니다. 이것을 상속하면 파이썬은 실제 MRO 에는
@@ -1335,7 +1385,7 @@ output.out_lines             ── stdout 으로 출력
 이유이기도 합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p>두 가지를 다 두는 것이 중복처럼 보이지만 역할이 다릅니다 — 하나는 <strong>개발 도구를 위한 선언</strong>, 다른 하나는 <strong>실행을 위한 값</strong>입니다. <a href="02-python-basics.html">02 §10.3</a>에서 본 "힌트는 개발 시점 도구, 검증은 실행 시점 코드"와 정확히 같은 구조입니다.</p>
-<p><strong>설계 의도.</strong> 리팩터 전에는 세 저장소가 각자 <code>stream()</code>, <code>__init__</code>, 원자적 쓰기 코드를 복사해 갖고 있었습니다(약 60줄 중복). <code>JsonlStore</code> 로 올리면 "JSONL 파일을 다루는 법"이 한 번만 정의되고, 하위 클래스는 <strong>엔티티 고유의 것만</strong> 갖습니다 — <code>TransactionRepository</code> 는 ID 발급과 카테고리 재지정, <code>CategoryStore</code> 는 이름 중복 검사와 기본값 시딩, <code>BudgetStore</code> 는 "같은 달은 덮어쓰기".</p>
+<p><strong>설계 의도.</strong> 리팩터 전에는 세 저장소가 각자 <code>stream()</code>, <code>__init__</code>, 원자적(중간 상태가 남지 않는 통째 바꿔치기) 쓰기 코드를 복사해 갖고 있었습니다(약 60줄 중복). <code>JsonlStore</code> 로 올리면 "JSONL 파일을 다루는 법"이 한 번만 정의되고, 하위 클래스는 <strong>엔티티 고유의 것만</strong> 갖습니다 — <code>TransactionRepository</code> 는 ID 발급과 카테고리 재지정, <code>CategoryStore</code> 는 이름 중복 검사와 기본값 시딩, <code>BudgetStore</code> 는 "같은 달은 덮어쓰기".</p>
 <hr>
 <h2 id="7-from-future-import-annotations">7. from <strong>future</strong> import annotations</h2>
 <p><strong>개념.</strong> <code>__future__</code> 는 "미래 버전의 동작을 미리 켜는" 특수 모듈입니다. <code>from __future__ import annotations</code>(PEP 563)를 모듈 최상단에 쓰면, 그 모듈의 <strong>모든 타입 어노테이션이 실행 시점에 평가되지 않고 문자열로만 저장</strong>됩니다. 효과는 두 가지입니다.</p>
@@ -1356,15 +1406,14 @@ output.out_lines             ── stdout 으로 출력
 <p>이 시점(<code>Transaction</code> 클래스 본문 실행 중)에는 <code>Transaction</code> 도 <code>TransactionPatch</code> 도 아직 완성되지 않았습니다 — <code>TransactionPatch</code> 는 파일에서 이 줄보다 <strong>아래에</strong> 정의되어 있습니다(domain/entities.py:127-128). 전통적 해법이 <code>"TransactionPatch"</code> 처럼 <strong>따옴표로 감싼 문자열 어노테이션</strong>이었습니다.</p>
 <p><strong>이 코드에는 따옴표 어노테이션이 한 곳도 없습니다.</strong> <code>from __future__ import annotations</code> 가 타입 힌트를 쓰는 모듈 28개(43개 중) 맨 위에 있어서 어노테이션이 어차피 전부 문자열로 남기 때문에, 따옴표를 손으로 붙일 이유가 사라진 것입니다. 이 줄이 없는 나머지 15개는 <code>__init__.py</code>·<code>config.py</code>·<code>messages.py</code> 처럼 어노테이션이 아예 없는 재수출·상수 모듈이라 켤 이유가 없습니다. future import 를 켜 놓고도 따옴표를 병용하면 같은 일을 두 번 표기하는 셈이라 오히려 편차가 생깁니다 — 이 프로젝트는 <strong>표기법을 하나로 통일하는 쪽</strong>을 택했습니다.</p>
 <p><strong>설계 의도.</strong> 어노테이션이 런타임에 평가되지 않으면 (1) import 시 타입 표현식 평가 비용이 사라지고, (2) 전방 참조·순환 참조 문제에서 자유로워지며, (3) 어노테이션을 쓰는 모듈이 모두 같은 규칙을 따르므로 편차가 없습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — 이 한 줄에 세 개의 PEP 가 얽혀 있습니다</strong>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — 이 한 줄에 세 개의 PEP 가 얽혀 있습니다</strong>
 <code>from __future__ import annotations</code> 자체는 <strong>PEP 563</strong>(3.7 에서 선택 가능).
 이것이 켜져 있어야 <code>dict[str, str]</code> 같은 <strong>내장 제네릭 표기</strong>(PEP 585, 정식으로는 3.9)와
 <code>str | None</code> <strong>유니온 표기</strong>(PEP 604, 3.10)를 어노테이션 자리에 마음 놓고 쓸 수 있습니다.
 이 프로젝트는 <code>requires-python = "&gt;=3.10"</code> 이라 뒤의 둘은 사실 future import 없이도
 되지만, 세 표기를 한 규칙으로 묶어 두면 "어느 버전부터 되는지"를 매번 따질 필요가 없어집니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작</strong> — future import 는 평범한 import 가 아니라 <strong>컴파일러 지시문</strong>입니다.
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — future import 는 평범한 import 가 아니라 <strong>컴파일러 지시문</strong>입니다.
 그래서 모듈의 docstring 다음, 다른 모든 문장보다 <strong>먼저</strong> 와야 하고 아니면 <code>SyntaxError</code>
 입니다. 켜지면 컴파일러는 어노테이션 표현식을 평가하는 바이트코드를 만들지 않고
 <strong>소스 텍스트를 문자열 그대로</strong> <code>__annotations__</code> 에 넣습니다. 부작용도 명확합니다 —
@@ -1445,8 +1494,7 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p><strong><code>match</code> 와 <code>search</code> 의 차이</strong>가 여기서 실질적입니다. <code>match</code> 는 문자열 <strong>시작부터</strong> 매칭을 시도하고, <code>search</code> 는 <strong>어디서든</strong> 찾습니다. 검증은 "전체가 이 형식이어야" 하므로 <code>match</code> + <code>^...$</code>, 발굴은 "줄 어딘가에 있으면 됨"이므로 <code>search</code> 입니다. <code>m.group(1)</code> 이 괄호로 잡은 캡처 그룹을 꺼냅니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>re.compile</code> 이 실제로 하는 일</strong> — <code>re</code> 는 패턴 문자열을 파싱해
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>re.compile</code> 이 실제로 하는 일</strong> — <code>re</code> 는 패턴 문자열을 파싱해
 내부 옵코드 열로 <strong>컴파일</strong>한 <code>Pattern</code> 객체를 만듭니다. <code>re.match(패턴문자열, 값)</code> 처럼
 매번 부르면 <code>re</code> 가 내부 캐시(<code>_cache</code>, 기본 512개)에서 찾아 주기는 하지만,
 그래도 문자열을 키로 딕셔너리를 조회하는 비용은 남고, 캐시가 가득 차면 가장 오래 안 쓴
@@ -1492,8 +1540,7 @@ output.out_lines             ── stdout 으로 출력
 </table></div>
 <p><code>domain/</code> 패키지에는 로거가 <strong>하나도 없습니다</strong> — 도메인은 화면도 파일도 로그도 모르는 순수 계층이라 <code>logging</code> 을 import 조차 하지 않습니다 — <a href="04-architecture.html">04. 아키텍처</a>의 계층 규칙이 코드로 지켜지는 자리입니다.</p>
 <p>이름의 점(<code>.</code>)이 만드는 부모-자식 관계 덕분에 <code>budget_app.storage</code> 로거의 레코드는 부모 <code>budget_app</code> 로 전파(propagate)됩니다. 그래서 <code>setup_logging</code> 이 루트 하나만 설정해도 저장소 로그가 함께 나오고, 필요하면 <code>logging.getLogger("budget_app.storage").setLevel(...)</code> 로 <strong>저장소 로그만</strong> 따로 조일 수 있습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 로거 계층은 문자열 하나로 만들어집니다</strong> — <code>logging.getLogger(name)</code> 은
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 로거 계층은 문자열 하나로 만들어집니다</strong> — <code>logging.getLogger(name)</code> 은
 모듈 전역의 <code>Logger.manager.loggerDict</code> 라는 dict 에서 그 이름을 찾고, 없으면 만들어
 <strong>캐시</strong>합니다(그래서 같은 이름으로 몇 번을 불러도 항상 같은 객체입니다).
 부모는 이름을 마지막 <code>.</code> 에서 잘라 거슬러 올라가며 찾습니다 —
@@ -1505,8 +1552,7 @@ output.out_lines             ── stdout 으로 출력
 → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong>%-지연 포맷팅.</strong> <a href="02-python-basics.html">02 §4.2</a>에서 다룬 내용이 그대로 적용됩니다. <code>logger.debug(config.LOG_CALL, func.__name__)</code> 처럼 <strong>템플릿과 인자를 분리해서</strong> 넘기면 문자열 결합이 <strong>그 로그가 실제로 출력될 때만</strong> 수행됩니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — "출력될 때만"의 정확한 경로</strong> — <code>logger.debug(msg, *args)</code> 는 가장 먼저
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — "출력될 때만"의 정확한 경로</strong> — <code>logger.debug(msg, *args)</code> 는 가장 먼저
 <code>self.isEnabledFor(DEBUG)</code> 를 확인하고, <strong>거짓이면 그 자리에서 반환</strong>합니다.
 참일 때만 <code>LogRecord</code> 를 만드는데, 이때도 <code>record.msg = msg</code>, <code>record.args = args</code> 로
 <strong>따로 보관할 뿐 결합하지 않습니다.</strong> 실제 <code>msg % args</code> 는 핸들러가 포매팅 단계에서
@@ -1536,8 +1582,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 <p><code>force=True</code> 는 3.8+ 옵션으로 "이미 핸들러가 붙어 있어도 제거하고 다시 설정하라"는 뜻입니다. 테스트에서 <code>main()</code> 을 여러 번 부를 때 핸들러가 중복 등록되어 로그가 두 번씩 찍히는 문제를 막습니다.</p>
 <h3 id="83-timeperf_counter-구간-시간-측정">8.3 time.perf_counter — 구간 시간 측정</h3>
 <p><code>measure_time</code>(decorators.py:50-66)은 <code>time.time()</code> 이 아니라 <code>time.perf_counter()</code> 를 씁니다. <code>perf_counter</code> 는 <strong>경과 시간 측정 전용 고해상도 시계</strong>로, 시스템 시각 변경(NTP 동기화 등)의 영향을 받지 않고 단조 증가가 보장됩니다. 두 번 읽어 뺀 차이(초 단위)를 <code>* 1000</code> 으로 밀리초로 바꿔 <code>%.2fms</code>(decorators.py:32 의 <code>LOG_TOOK</code>)로 기록합니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 세 시계의 차이</strong> — <code>time.time()</code> 은 <strong>벽시계(wall clock)</strong> 로,
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 세 시계의 차이</strong> — <code>time.time()</code> 은 <strong>벽시계(wall clock)</strong> 로,
 1970년 기준 초를 돌려주며 NTP 보정이나 사용자의 시각 변경으로 <strong>거꾸로 갈 수 있습니다.</strong>
 구간 측정에 쓰면 음수 시간이 나올 수 있다는 뜻입니다. <code>time.monotonic()</code> 은 되감기지
 않는 것을 보장하고, <code>time.perf_counter()</code> 는 거기에 더해 <strong>그 플랫폼에서 구할 수 있는
@@ -1557,8 +1602,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 
 <p>즉 1월 5일 거래가 1월 요약·검색·내보내기에서 <strong>조용히 사라집니다.</strong> <code>strftime</code> 으로 되찍으면 표기가 하나로 강제되고, 기존 파일에 남아 있던 비정규 표기도 <strong>읽는 순간 <code>__post_init__</code> 을 다시 지나므로 자동으로 치유</strong>됩니다(§1.4).</p>
 <p>문자열 날짜 비교가 실제로 일어나는 곳은 <code>SearchFilter.matches</code> 안이 아니라 명세 객체입니다 — <code>matches</code> 는 <code>self.spec.is_satisfied_by(tx)</code> 로 위임만 하고(domain/queries.py:80-82), 비교는 <code>DateFrom.is_satisfied_by</code>(domain/specs.py:178-179)의 <code>tx.date &gt;= self.value</code> 입니다. <code>DateFrom.__init__</code> 역시 <code>validators.parse_date</code> 로 <strong>비교 상대편도 정규화</strong>하므로(domain/specs.py:175-176), 비교의 양쪽이 같은 표기임이 보장됩니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>strptime</code> 은 정규식으로 돕니다</strong> — <code>datetime.strptime</code> 은 C 라이브러리
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>strptime</code> 은 정규식으로 돕니다</strong> — <code>datetime.strptime</code> 은 C 라이브러리
 호출이 아니라 순수 파이썬 모듈 <code>_strptime</code> 의 일입니다. 형식 문자열의 <code>%Y</code>·<code>%m</code>·<code>%d</code> 를
 대응하는 정규식 조각(<code>(?P&lt;Y&gt;\d\d\d\d)</code> 같은)으로 치환해 <strong>패턴 하나를 만들어 컴파일</strong>한 뒤
 (그 결과를 형식별로 캐시합니다) 값에 <code>match</code> 를 겁니다. 그래서 실패 메시지가
@@ -1616,8 +1660,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </code></pre></div>
 
 <p>인덱스(<code>row[3]</code>) 대신 이름(<code>row["amount"]</code>)으로 접근하므로 <strong>컬럼 순서가 달라도 동작</strong>하고, 그래서 <code>id</code> 컬럼을 <strong>선택</strong>으로 추가할 수 있었습니다. <code>_check_header</code>(storage/csv_io.py:90-104)의 <code>reader.fieldnames or []</code> 는 빈 파일(fieldnames 가 <code>None</code>)에서도 안전하게 검사하기 위한 방어 표현입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>yield from</code> 이 넘기는 것은 값만이 아닙니다</strong> — <code>read_rows</code> 의 마지막 줄
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>yield from</code> 이 넘기는 것은 값만이 아닙니다</strong> — <code>read_rows</code> 의 마지막 줄
 <code>yield from enumerate(reader, ...)</code> 는 "그 반복자가 끝날 때까지 값을 그대로 통과시켜라"라는
 <strong>위임(delegation)</strong> 입니다(PEP 380, 3.3). <code>for x in it: yield x</code> 와 값 흐름은 같지만,
 여기서 실제로 중요한 것은 <strong><code>with</code> 블록이 이 <code>yield from</code> 위에서 계속 살아 있다</strong>는
@@ -1650,8 +1693,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </code></pre></div>
 
 <p><code>include_id</code> 에 따라 필드 목록 자체를 바꿉니다 — <code>DictWriter</code> 는 <code>fieldnames</code> 에 없는 키를 dict 에 담아 넘기면 <code>ValueError</code> 를 내므로, <code>_to_row</code> 도 같은 플래그를 받아 <code>id</code> 키를 넣을지 결정합니다(storage/csv_io.py:151-163).</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>newline=""</code> 이 왜 붙어 있나</strong> — <code>csv</code> 모듈이 <strong>직접 요구하는 규약</strong>입니다.
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>newline=""</code> 이 왜 붙어 있나</strong> — <code>csv</code> 모듈이 <strong>직접 요구하는 규약</strong>입니다.
 <code>csv.writer</code> 는 줄 끝을 스스로 <code>\r\n</code> 으로 씁니다(RFC 4180). 그런데 텍스트 파일을
 기본 모드로 열면 파이썬의 줄바꿈 변환기가 Windows 에서 <code>\n</code> 을 다시 <code>\r\n</code> 으로 바꿔
 <strong><code>\r\r\n</code> 이라는 빈 줄 섞인 파일</strong>이 나옵니다. <code>newline=""</code> 은 그 변환을 끄는 것이고,
@@ -1796,6 +1838,9 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 
 <p>이 구조에서는 <strong>AND 말고는 표현할 방법이 없습니다.</strong> <code>--category food --category cafe</code>(둘 중 하나)나 "이 태그는 제외" 같은 요구가 오면 dataclass 필드와 <code>matches</code> 를 동시에 고쳐야 하고, 조합이 늘수록 if 가 곱해집니다.</p>
 <p><strong>적용 후.</strong> 조건 하나를 객체 하나로 만들고 연산자로 조합합니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 체(거름망)를 겹쳐 놓고 거래를 부어 통과한 것만 받는 구조입니다. 체 한 장이 조건 하나이고, 조건이 늘면 if 문을 고치는 대신 체를 한 장 더 얹습니다. <code>&amp;</code> 는 두 체를 위아래로 겹치는 것, <code>|</code> 는 둘 중 아무 쪽이나 통과하면 되게 나란히 두는 것, <code>~</code> 는 체를 뒤집어 걸린 쪽만 받는 것입니다.
+다만 이 비유는 지금 실제로 겹쳐 쓰는 체가 <strong>AND(전부 통과) 하나뿐</strong>이라는 데서 깨집니다 — 아래의 <code>_build_spec</code> 은 조건이 하나라도 있으면 <code>And</code> 만 조립하고(하나도 없으면 <code>Always</code>), <code>|</code> 와 <code>~</code> 는 "카테고리 A 또는 B" 같은 요구가 왔을 때 if 사다리를 곱하지 않으려고 미리 마련해 둔 것입니다.</p>
+</blockquote>
 <p>budget_app/domain/specs.py:76-91</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Spec</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 하나가 조건을 만족하는지 판단하는 명세.&quot;&quot;&quot;</span>
@@ -1816,8 +1861,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </code></pre></div>
 
 <p><code>__and__</code>/<code>__or__</code>/<code>__invert__</code> 를 오버로딩하면 명세 조합이 불리언 식과 같은 모양이 됩니다. 파이썬은 <code>and</code>/<code>or</code> <strong>키워드</strong>를 오버로딩할 수 없어서 비트 연산자를 빌려 쓰는 것이 이 패턴의 표준 관용구입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>and</code> 는 왜 오버로딩할 수 없나</strong> — 훅이 없어서가 아니라 <strong>연산자가 아니기
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>and</code> 는 왜 오버로딩할 수 없나</strong> — 훅이 없어서가 아니라 <strong>연산자가 아니기
 때문</strong>입니다. <code>a &amp; b</code> 는 바이트코드 <code>BINARY_OP</code> 하나로 컴파일되고, 인터프리터가
 <code>type(a).__and__(a, b)</code> 를 부릅니다(<code>NotImplemented</code> 면 <code>type(b).__rand__</code> 로 넘어갑니다).
 반면 <code>a and b</code> 는 <strong>점프 명령</strong>으로 컴파일됩니다 — <code>a</code> 의 진릿값을 보고 거짓이면 <code>b</code> 를
@@ -1828,7 +1872,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 중요합니다 — <code>&amp;</code> 가 <code>|</code> 보다 강하므로 <code>A | B &amp; C</code> 는 <code>A | (B &amp; C)</code> 이고,
 예시 코드가 <code>(InCategory("food") | InCategory("cafe"))</code> 를 괄호로 감싼 이유가 이것입니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>⚙️ 내부 동작 — <code>ABC</code> + <code>@abstractmethod</code> 가 인스턴스화를 막는 기제</strong>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>ABC</code> + <code>@abstractmethod</code> 가 인스턴스화를 막는 기제</strong>
 <code>abc.ABC</code> 는 <code>metaclass=ABCMeta</code> 를 달아 둔 빈 클래스일 뿐입니다. <code>@abstractmethod</code> 는
 함수에 <code>__isabstractmethod__ = True</code> 라는 <strong>표시만</strong> 붙이고, 실제 일은 <code>ABCMeta</code> 가 합니다 —
 클래스를 만들 때 본문과 조상들을 훑어 아직 구현되지 않은 추상 메서드 이름을 모아
@@ -1949,8 +1993,7 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
 </code></pre></div>
 
 <p><code>with</code> 를 쓰는 이유는 예외로 빠져나가는 경로에서도 <code>.tmp</code> 를 반드시 치우기 위해서입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 / ⚙️ 내부 동작 — <code>with</code> 는 <code>__enter__</code>/<code>__exit__</code> 두 메서드로 풀립니다</strong>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 / ⚙️ 내부 동작 — <code>with</code> 는 <code>__enter__</code>/<code>__exit__</code> 두 메서드로 풀립니다</strong>
 <code>with</code> 문은 PEP 343 으로 파이썬 2.5 에 들어왔고, <code>with UnitOfWork() as uow:</code> 는 대략
 "객체를 만들고 → <code>__enter__()</code> 의 <strong>반환값</strong>을 <code>uow</code> 에 담고 → 본문을 <code>try</code> 로 감싸
 → 어떻게 끝나든 <code>__exit__(예외타입, 예외값, 트레이스백)</code> 를 부른다"로 풀립니다.
@@ -2100,7 +2143,7 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
 <p>과제 방어 때는 이 그림 순서대로 — "규칙은 한 곳에 정의되고(§2.2), 모델이 생성자에서 그것을 강제하며(§1.4), 데이터는 제너레이터로 흐르되 읽기 경로가 목적에 따라 둘로 나뉘고(§3.2), 공통 관심사는 데코레이터로 분리되며 그 데코레이터끼리도 의존 방향에 따라 갈라지고(§4.4), 실패는 계층 공통 예외로 수렴한다(§5.1)" — 설명하면 코드 전체의 설계 의도를 일관된 이야기로 전달할 수 있습니다.</p>
 <p>계층(도메인/저장소/서비스/CLI) 관점의 큰 그림은 <a href="04-architecture.html">04. 아키텍처</a>에서 이어집니다.</p>
 <div class="pager"><span><a href="02-python-basics.html">← 02. 이 코드에 쓰인 파이썬 기초 문법</a></span><span><a href="04-architecture.html">04. 아키텍처 — 계층 구조와 설계 원칙 →</a></span></div>
-<footer>docs/03-python-advanced.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/03-python-advanced.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

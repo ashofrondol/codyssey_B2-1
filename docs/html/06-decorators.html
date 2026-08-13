@@ -11,6 +11,59 @@
 <nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html" class="current"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
 <main>
 <h1 id="06-횡단-관심사와-예외-처리-decorators-error_handler">06. 횡단 관심사와 예외 처리 — decorators / error_handler</h1>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#쉬운-말로-먼저">쉬운 말로 먼저</a></li><li><a href="#1-이-문서에서-배우는-것">1. 이 문서에서 배우는 것</a></li><li><a href="#2-횡단-관심사-데코레이터로-분리하는-것들">2. 횡단 관심사 — 데코레이터로 분리하는 것들</a></li><li><a href="#3-log_call-호출반환-로그">3. log_call — 호출/반환 로그</a></li><li><a href="#4-measure_time-실패해도-시간은-기록한다">4. measure_time — 실패해도 시간은 기록한다</a></li><li><a href="#5-handle_errors-예외-종료-코드-변환기-완전-해설">5. handle_errors — 예외 → 종료 코드 변환기 (완전 해설)</a></li><li><a href="#6-except-순서를-검증하는-법">6. except 순서를 검증하는 법</a></li><li><a href="#7-종료-코드-표">7. 종료 코드 표</a></li><li><a href="#8-정리-과제-방어용-요약">8. 정리 — 과제 방어용 요약</a></li></ul></details><h2 id="쉬운-말로-먼저">쉬운 말로 먼저</h2>
+<p>이 프로그램에는 어느 기능에나 똑같이 따라붙는 잔일이 몇 가지 있습니다. 언제 불렸는지 적어 두기, 얼마나 걸렸는지 재기, 일이 잘못됐을 때 사용자에게 알리기입니다. 이런 잔일을 기능마다 하나하나 적어 넣으면 정작 그 기능이 하려던 일이 잔일에 묻히고, 규칙이 바뀔 때마다 열 몇 군데를 똑같이 고쳐야 합니다. 그래서 이 셋을 따로 떼어, 기능 위에 한 줄만 얹으면 자동으로 따라붙는 장치로 만들었습니다. 문서의 앞쪽 절반이 그 장치 이야기입니다.</p>
+<p>뒤쪽 절반은 "일이 잘못됐을 때" 쪽입니다. 파일이 없을 수도, 사용자가 이상한 값을 넣었을 수도, 프로그램 자체에 잘못이 있을 수도 있는데 — 원인이 다르면 건네야 할 말도 다르고, 프로그램이 끝나며 남기는 결과 보고도 달라야 합니다. 이 문서는 그 구분을 어떤 기준으로 지었고 왜 하필 지금의 순서로 적혀 있는지를 다룹니다.</p>
+<p><strong>이 문서에 자주 나오는 말</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>말</th>
+<th>쉬운 뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>데코레이터</td>
+<td>원래 함수의 코드는 한 글자도 고치지 않은 채, 그 앞뒤에 다른 처리를 끼워 넣는 장치. 소스를 안 건드릴 뿐 동작까지 그대로는 아니어서, 필요하면 결과나 예외까지 바꿔치기합니다(§5 의 <code>@handle_errors</code> 가 예외를 종료 코드로 바꿉니다)</td>
+</tr>
+<tr>
+<td>횡단 관심사</td>
+<td>하는 일은 서로 달라도 어디에나 똑같이 필요한 부대 처리(기록 남기기, 시간 재기, 오류 알리기)</td>
+</tr>
+<tr>
+<td>예외</td>
+<td>하던 일을 그 자리에서 멈추고 사정을 위로 올려 보내는 신고. 잘못됐을 때가 대부분이지만, <code>Ctrl+C</code> 처럼 "그만하자"는 신호도 같은 길로 올라옵니다(§5.2 의 첫 부류)</td>
+</tr>
+<tr>
+<td>except 절</td>
+<td>올라온 신고를 받는 창구. 어떤 종류의 신고를 받을지가 창구마다 정해져 있습니다</td>
+</tr>
+<tr>
+<td>종료 코드</td>
+<td>프로그램이 끝나며 말 대신 숫자 하나로 남기는 결과 보고. 0 이면 "잘 끝났다"입니다</td>
+</tr>
+<tr>
+<td>트레이스백</td>
+<td>문제가 어디를 거쳐 어디서 터졌는지 적힌 경로 기록. 개발자가 원인을 찾을 때 봅니다</td>
+</tr>
+<tr>
+<td>상속</td>
+<td>어떤 종류가 다른 종류를 더 좁게 나눈 것. "파일 없음"은 "입출력 문제"의 한 갈래입니다</td>
+</tr>
+<tr>
+<td>stderr</td>
+<td>결과가 아니라 사정을 알리는 별도 출구. 계산 결과는 stdout 이라는 다른 출구로 나갑니다</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>바쁘면 여기만</strong></p>
+<ul>
+<li><strong>§2 횡단 관심사</strong> — 왜 이 세 가지를 기능 본문 밖으로 빼냈는지, 문서 전체의 출발점입니다.</li>
+<li><strong>§5.2 except 체인</strong> — 오류를 네 부류로 나눈 기준과 "순서가 곧 정책"인 이유가 여기 있습니다.</li>
+<li><strong>§7 종료 코드 표</strong> — 프로그램이 남기는 숫자 여덟 개의 뜻이 한 표에 정리돼 있습니다.</li>
+</ul>
+<hr>
 <p><code>@log_call</code>, <code>@measure_time</code>, <code>@handle_errors</code> 세 데코레이터가 무엇을 하고, <strong>왜 두 파일로 나뉘어 있으며</strong>, 예외가 어떻게 사용자 메시지와 종료 코드로 바뀌는지를 완전히 해설합니다.</p>
 <blockquote>
 <p><strong>난이도</strong>: 🟡 중급</p>
@@ -18,7 +71,7 @@
 <p><strong>함께 보면 좋은 문서</strong>: <a href="12-syntax-and-stdlib.html">12. 문법의 출처와 표준 라이브러리 내부</a> — 이 문서 곳곳의 🔎/⚙️ 노트가 가리키는 상세 해설이 그곳에 있습니다. 특히 §1-C(데코레이터·클로저·예외·<code>try/finally</code>)와 §2-B(<code>logging</code>·<code>functools</code>·<code>errno</code>)가 짝입니다.</p>
 </blockquote>
 <hr>
-<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#1-이-문서에서-배우는-것">1. 이 문서에서 배우는 것</a></li><li><a href="#2-횡단-관심사-데코레이터로-분리하는-것들">2. 횡단 관심사 — 데코레이터로 분리하는 것들</a></li><li><a href="#3-log_call-호출반환-로그">3. log_call — 호출/반환 로그</a></li><li><a href="#4-measure_time-실패해도-시간은-기록한다">4. measure_time — 실패해도 시간은 기록한다</a></li><li><a href="#5-handle_errors-예외-종료-코드-변환기-완전-해설">5. handle_errors — 예외 → 종료 코드 변환기 (완전 해설)</a></li><li><a href="#6-except-순서를-검증하는-법">6. except 순서를 검증하는 법</a></li><li><a href="#7-종료-코드-표">7. 종료 코드 표</a></li><li><a href="#8-정리-과제-방어용-요약">8. 정리 — 과제 방어용 요약</a></li></ul></details><h2 id="1-이-문서에서-배우는-것">1. 이 문서에서 배우는 것</h2>
+<h2 id="1-이-문서에서-배우는-것">1. 이 문서에서 배우는 것</h2>
 <ol>
 <li><strong>횡단 관심사(cross-cutting concern)</strong> 란 무엇이고 왜 데코레이터로 분리하는가</li>
 <li>데코레이터 셋이 <strong>두 파일로 나뉜 이유</strong> — 관측 vs 표현</li>
@@ -28,6 +81,13 @@
 <hr>
 <h2 id="2-횡단-관심사-데코레이터로-분리하는-것들">2. 횡단 관심사 — 데코레이터로 분리하는 것들</h2>
 <p><strong>개념.</strong> "어느 함수에나 붙을 수 있고, 그 함수의 본래 목적과는 무관한" 처리를 횡단 관심사라고 합니다. 로깅, 시간 측정, 인증, 트랜잭션, 예외 변환이 대표적입니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 부서마다 하는 일은 다르지만, 어느 서류에나 접수 도장은 찍힙니다.
+도장 찍는 절차를 부서별 업무 설명서마다 적어 두면 같은 문장이 열 몇 번 복사되고,
+도장 규정이 바뀌는 날 열 몇 곳을 똑같이 고쳐야 합니다. 접수 창구를 하나 두고 서류가
+거기를 지나게 하면, 업무 설명서에는 본래 일만 남습니다. 데코레이터가 그 창구입니다.
+다만 이 비유는 시점에서 깨집니다 — 창구는 서류가 들어올 때 한 번이지만, 데코레이터는
+들어갈 때와 나올 때 양쪽에 끼어들 수 있습니다(§3 의 <code>call</code>/<code>done</code> 한 쌍이 그 예입니다).</p>
+</blockquote>
 <p>이런 처리를 각 함수 본문에 넣으면 이렇게 됩니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — 횡단 관심사가 본문에 섞인 코드</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date</span><span class="p">,</span> <span class="n">type_</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">memo</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -83,10 +143,10 @@
 </code></pre></div>
 
 <p><strong><code>@handle_errors</code> 가 한 곳뿐인 것이 중요합니다.</strong> 이전에는 CLI 핸들러 13개에 각각 붙어 있었지만, 지금은 <code>_dispatch</code> 하나에만 붙습니다. 이유는 §5 와 <code>cli/app.py:63-77</code> 의 docstring 에 있습니다 — 컨텍스트 조립(<code>AppContext(...)</code>, <code>prepare()</code>)이 데코레이터 <strong>밖</strong>에 있으면 <code>--data-dir</code> 오타 하나로 원시 트레이스백이 새어 나갔기 때문입니다. 방패는 파일을 여는 코드까지 감싸야 방패입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>@데코레이터</code> 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다.
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@데코레이터</code> 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다.
 <code>@handle_errors</code> 뒤에 <code>def _dispatch(...)</code> 를 쓰면 파이썬은 함수를 정의한 뒤
-<code>_dispatch = handle_errors(_dispatch)</code> 를 실행합니다. 즉 데코레이터는 <strong>문법 설탕</strong>이고,
+<code>_dispatch = handle_errors(_dispatch)</code> 를 실행합니다. 즉 데코레이터는 <strong>문법 설탕</strong>(없어도
+할 수 있는 일을 짧게 쓰게 해 주는 표기)이고,
 새로운 능력이 아니라 "정의 직후 이름에 재대입"의 짧은 표기입니다.
 클래스에 붙이는 <code>@dataclass</code> 형태는 PEP 3129 로 파이썬 3.0 에 추가된 별개 문법이며,
 이 소스에서는 <code>domain/entities.py</code> 등이 씁니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
@@ -147,6 +207,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 </ol>
 <hr>
 <h2 id="3-log_call-호출반환-로그">3. <code>log_call</code> — 호출/반환 로그</h2>
+<p>함수가 언제 불렸고 언제 끝났는지를 기록으로 남기는 데코레이터입니다. 본래 하던 일에는 손대지 않고, 그 앞뒤에 로그 한 줄씩만 더합니다. 열한 줄짜리 짧은 코드지만 파이썬 관용구가 셋이나 들어 있어, 하나씩 뜯어볼 값어치가 있습니다.</p>
 <p>budget_app/decorators.py:37-47</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_call</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;함수 호출/반환을 DEBUG 로그로 남긴다.&quot;&quot;&quot;</span>
@@ -165,10 +226,15 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <ol>
 <li><code>@functools.wraps(func)</code> — 원본의 <code>__name__</code>/<code>__doc__</code> 등을 wrapper 로 복사합니다. 이게 없으면 <code>TransactionService.delete</code> 의 정체가 밖에서 볼 때 <code>&lt;function log_call.&lt;locals&gt;.wrapper&gt;</code> 로 바뀌어, <code>help()</code>·트레이스백·<code>inspect</code> 가 전부 원본을 놓칩니다.</li>
 <li><code>*args, **kwargs</code> — 어떤 시그니처의 함수든 그대로 통과시킵니다.</li>
-<li><code>logger.debug(템플릿, 인자)</code> — %-지연 포맷팅. DEBUG 가 꺼져 있으면 문자열을 아예 만들지 않습니다.</li>
+<li><code>logger.debug(템플릿, 인자)</code> — %-지연 포맷팅(문장을 미리 완성해 두지 않고, 정말 출력할 때가 되어서야 만드는 방식). DEBUG 가 꺼져 있으면 문자열을 아예 만들지 않습니다.</li>
 </ol>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>functools.wraps</code></strong> — 이것 자체가 데코레이터 팩토리입니다.
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 선물을 포장하면 겉만 보고는 안에 뭐가 들었는지 모릅니다.
+<code>functools.wraps</code> 는 원래 상자에 붙어 있던 이름표를 포장지 겉에 그대로 옮겨 붙이는
+일입니다. 그래서 포장한 뒤에도 "이건 <code>delete</code> 다"라고 읽힙니다.
+다만 이 비유는 정체에서 깨집니다 — 이름표를 옮겨도 포장지는 여전히 포장지입니다.
+<code>TransactionService.delete</code> 로 꺼내지는 것은 원본이 아니라 <code>wrapper</code> 이고, 원본은
+<code>__wrapped__</code> 라는 별도 자리에 남아 있습니다(바로 아래에서 확인합니다).</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>functools.wraps</code></strong> — 이것 자체가 데코레이터 팩토리입니다.
 <code>wraps(func)</code> 는 <code>partial(update_wrapper, wrapped=func)</code> 를 돌려주고, 그것이
 <code>wrapper</code> 에 적용되면서 <code>functools.WRAPPER_ASSIGNMENTS</code> 에 든 속성들을 <strong>대입</strong>하고
 <code>WRAPPER_UPDATES</code>(<code>('__dict__',)</code>)에 든 것은 <code>update()</code> 로 <strong>병합</strong>한 뒤,
@@ -193,9 +259,8 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <span class="o">&lt;</span><span class="n">function</span> <span class="n">TransactionService</span><span class="o">.</span><span class="n">delete</span> <span class="n">at</span> <span class="mi">0</span><span class="n">x</span><span class="o">...&gt;</span>
 </code></pre></div>
 
-<p>여기서 <code>d.__name__</code> 이 <code>'wrapper'</code> 가 아니라 <code>'delete'</code> 인 것이 요점입니다. 다만 <code>log_call</code> 의 로그 문구는 <code>wrapper.__name__</code> 이 아니라 <strong>클로저에 잡힌 <code>func.__name__</code></strong> 을 쓰므로, <code>wraps</code> 가 없어도 로그 자체는 <code>call delete</code> 로 정확히 찍힙니다. <code>wraps</code> 가 실제로 구해 주는 것은 <code>help()</code>, 트레이스백, <code>inspect</code>, 그리고 "이 함수 이름이 뭐냐"고 묻는 다른 도구들입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 클로저</strong> — <code>wrapper</code> 는 자기 지역변수가 아닌 <code>func</code> 를 쓰므로
+<p>여기서 <code>d.__name__</code> 이 <code>'wrapper'</code> 가 아니라 <code>'delete'</code> 인 것이 요점입니다. 다만 <code>log_call</code> 의 로그 문구는 <code>wrapper.__name__</code> 이 아니라 <strong>클로저에 잡힌 <code>func.__name__</code></strong> 을 쓰므로 — 클로저란 바깥 함수가 끝난 뒤에도 그 안의 변수를 계속 붙잡고 있는 상태를 말합니다 — <code>wraps</code> 가 없어도 로그 자체는 <code>call delete</code> 로 정확히 찍힙니다. <code>wraps</code> 가 실제로 구해 주는 것은 <code>help()</code>, 트레이스백, <code>inspect</code>, 그리고 "이 함수 이름이 뭐냐"고 묻는 다른 도구들입니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 클로저</strong> — <code>wrapper</code> 는 자기 지역변수가 아닌 <code>func</code> 를 쓰므로
 파이썬이 이를 <strong>자유변수</strong>로 분류하고, 바깥 함수의 <code>func</code> 를 셀(cell) 객체에 담아
 <code>wrapper.__closure__</code> 에 매답니다. 그래서 <code>log_call</code> 이 반환된 뒤에도 <code>func</code> 가
 살아 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
@@ -206,15 +271,14 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <span class="p">[</span><span class="o">&lt;</span><span class="n">function</span> <span class="n">TransactionService</span><span class="o">.</span><span class="n">delete</span> <span class="n">at</span> <span class="mi">0</span><span class="n">x</span><span class="o">...&gt;</span><span class="p">]</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code>*args, **kwargs</code></strong> — 함수 정의에서 <code>*이름</code> 은 남은 위치 인자를
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>*args, **kwargs</code></strong> — 함수 정의에서 <code>*이름</code> 은 남은 위치 인자를
 <strong>튜플</strong>로, <code>**이름</code> 은 남은 키워드 인자를 <strong>dict</strong> 로 묶습니다(데코레이터보다 훨씬
 오래된 초창기 문법). 호출부의 <code>func(*args, **kwargs)</code> 는 반대로 <strong>푸는(unpack)</strong> 동작입니다.
 데코레이터가 어떤 시그니처든 통과시킬 수 있는 이유가 이 한 쌍이고, 동시에 <strong>정적으로
 시그니처를 알 수 없는 이유</strong>이기도 합니다. 그래서 타입 힌트가
 <code>Callable[..., Any]</code> — <code>...</code>(Ellipsis 객체)가 "인자 목록은 검사하지 않음"을 뜻합니다.
 → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
-<p><strong>⚙️ 내부 동작 — <code>logger.debug(템플릿, 인자)</code></strong> — <code>Logger.debug</code> 는 먼저
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>logger.debug(템플릿, 인자)</code></strong> — <code>Logger.debug</code> 는 먼저
 <code>isEnabledFor(DEBUG)</code> 로 레벨을 확인하고, 통과할 때만 <code>LogRecord</code> 를 만들어 인자를
 <code>record.args</code> 에 <strong>그대로 보관</strong>합니다. <code>템플릿 % args</code> 가 실행되는 시점은 포매터가
 <code>record.getMessage()</code> 를 부를 때, 즉 실제로 출력이 확정된 뒤입니다. 그래서 DEBUG 가
@@ -233,6 +297,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <p>앞의 <code>budget_app</code> 은 <code>%(name)s</code>(= <code>config.LOGGER_NAME</code>)이고, <code>42</code>/<code>44</code> 는 <code>%(lineno)d</code> 입니다. <strong><code>logger.debug</code> 를 호출한 줄 번호</strong>이지 <code>add</code> 의 줄 번호가 아닙니다 — decorators.py:42 와 :44 가 그 두 자리입니다. 로그의 출처가 데코레이터라는 사실이 포맷에 그대로 드러납니다(포맷 정의는 <code>cli/messages.py:17</code> 의 <code>LOG_FORMAT_DEBUG</code>).</p>
 <hr>
 <h2 id="4-measure_time-실패해도-시간은-기록한다">4. <code>measure_time</code> — 실패해도 시간은 기록한다</h2>
+<p>함수가 몇 밀리초 걸렸는지를 재서 로그로 남기는 데코레이터입니다. 여기서 눈여겨볼 것은 두 가지입니다. 하나는 <strong>중간에 실패해도 시간이 찍힌다</strong>는 점이고, 다른 하나는 시간을 재는 데 쓰는 시계를 <strong>일부러 골랐다</strong>는 점입니다.</p>
 <p>budget_app/decorators.py:50-66</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">measure_time</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;함수 실행 시간을 DEBUG 로그로 남긴다.</span>
@@ -254,17 +319,29 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 </code></pre></div>
 
 <p><strong><code>try/finally</code> 가 핵심입니다.</strong> <code>finally</code> 는 <code>try</code> 에서 return 을 하든 예외가 나든 반드시 실행됩니다. docstring 이 밝히듯, 실패한 호출의 소요 시간을 알아야 "느려서 문제"와 "즉시 터짐"을 구분할 수 있습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code>return</code> 과 <code>finally</code></strong> — <code>try</code> 안의 <code>return func(...)</code> 는
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 건물에 출구가 하나뿐이라고 해 봅시다. 일을 잘 마치고 나가든
+사고가 나서 뛰쳐나가든 그 문을 지나야 하고, 문 옆에 시계가 있으니 어느 쪽이든
+나간 시각이 적힙니다. <code>finally</code> 가 그 출구입니다.
+다만 이 비유는 손을 대는 순간 깨집니다 — 출구에서 들고 나가던 짐을 바꿔치기하면
+결과가 달라지듯, <code>finally</code> 안에 <code>return</code> 이나 <code>raise</code> 를 쓰면 원래 나가던 값이나
+예외가 삼켜집니다. 그래서 이 코드는 출구에서 기록만 하고 아무것도 건드리지 않습니다.</p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>return</code> 과 <code>finally</code></strong> — <code>try</code> 안의 <code>return func(...)</code> 는
 ① 오른쪽 식을 먼저 <strong>평가해 반환값을 확정</strong>하고, ② <code>finally</code> 블록을 실행한 뒤,
 ③ 그제야 프레임을 빠져나갑니다. 그래서 <code>finally</code> 안에서 <code>elapsed</code> 를 계산해도
 이미 확정된 반환값은 바뀌지 않습니다. 반대로 <code>finally</code> 안에 <code>return</code> 이나 <code>raise</code>
 를 쓰면 <strong>원래 나가던 값/예외를 삼켜 버리므로</strong> 이 코드는 로그만 남깁니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
-<p><strong><code>time.perf_counter()</code> 를 쓰는 이유</strong>는 <code>time.time()</code> 과 달리 <strong>단조 증가가 보장</strong>되기 때문입니다. NTP 동기화로 시스템 시각이 뒤로 가면 <code>time.time()</code> 차이는 음수가 될 수 있습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 두 시계의 차이</strong> — <code>time.time()</code> 은 <strong>벽시계</strong>(1970-01-01 기준
+<p><strong><code>time.perf_counter()</code> 를 쓰는 이유</strong>는 <code>time.time()</code> 과 달리 <strong>단조 증가</strong>(값이 뒤로 가는 일 없이 늘 앞으로만 감)<strong>가 보장</strong>되기 때문입니다. NTP 동기화로 시스템 시각이 뒤로 가면 <code>time.time()</code> 차이는 음수가 될 수 있습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 벽시계와 스톱워치의 차이입니다. 벽시계는 "지금 몇 시"를 알려
+주지만 누가 바늘을 맞추면 시각이 뒤로 갈 수 있고, 그러면 그 사이에 잰 소요 시간이
+음수로 나올 수도 있습니다 — 되돌린 폭이 실제로 걸린 시간보다 클 때 그렇습니다.
+스톱워치는 지금이 몇 시인지는 모르는 대신 누르고 나면 뒤로 가지 않습니다.
+소요 시간을 재는 데는 스톱워치가 맞습니다.
+다만 이 비유는 기준점에서 깨집니다 — 스톱워치는 0 에서 시작하지만 <code>perf_counter()</code>
+는 시작값이 아예 정의돼 있지 않아, 값 하나만 봐서는 아무 뜻도 없고 오직 두 값의
+차이만 뜻이 있습니다.</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 두 시계의 차이</strong> — <code>time.time()</code> 은 <strong>벽시계</strong>(1970-01-01 기준
 유닉스 시각)라 값 자체에 의미가 있지만 시스템이 조정하면 뒤로 갈 수 있습니다.
 <code>time.perf_counter()</code> 는 <strong>기준점이 정의되지 않은</strong> 고해상도 카운터라 절대값은
 무의미하고 오직 <strong>차이만</strong> 뜻이 있으며, 대신 단조성이 보장됩니다. 파이썬이
@@ -293,6 +370,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 
 <hr>
 <h2 id="5-handle_errors-예외-종료-코드-변환기-완전-해설">5. <code>handle_errors</code> — 예외 → 종료 코드 변환기 (완전 해설)</h2>
+<p>세 데코레이터 중 가장 길고, 프로그램 전체에서 단 한 곳에만 붙습니다. 하는 일은 한 문장으로 요약됩니다 — 아래에서 올라온 신고를 종류별로 받아, 사용자에게 건넬 한두 줄과 셸에 남길 숫자로 바꿉니다. 아래에서 반환값 규약(§5.1), 창구를 세우는 순서(§5.2), 부류별 처리(§5.3~§5.6) 순으로 봅니다.</p>
 <h3 id="51-시그니처와-반환값-규약">5.1 시그니처와 반환값 규약</h3>
 <p>budget_app/cli/error_handler.py:20-21 / 45-54</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_errors</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
@@ -318,13 +396,12 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 </code></pre></div>
 
 <p><code>is None</code> 은 <strong>의도를 정확히</strong> 표현합니다 — "아무것도 반환하지 않았으면 성공".</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code>A if 조건 else B</code></strong> — 조건식(conditional expression)은 PEP 308 로
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>A if 조건 else B</code></strong> — 조건식(conditional expression)은 PEP 308 로
 파이썬 2.5 에 들어왔습니다. <code>if</code> <strong>문</strong>과 달리 <strong>값을 만드는 식</strong>이라 <code>return</code> 뒤에
 바로 올 수 있습니다. 읽는 순서가 가운데(<code>조건</code>)부터라 낯설지만,
 <code>config.EXIT_OK if result is None else result</code> 는 "result 가 None 이면 EXIT_OK,
 아니면 result" 그대로입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작 — <code>is None</code> 과 <code>== None</code> 의 차이</strong> — <code>is</code> 는 <strong>객체 동일성</strong>(주소 비교)
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>is None</code> 과 <code>== None</code> 의 차이</strong> — <code>is</code> 는 <strong>객체 동일성</strong>(주소 비교)
 이라 오버로딩이 불가능합니다. <code>None</code> 은 인터프리터에 단 하나만 존재하는 싱글턴이므로
 <code>x is None</code> 은 항상 정확하고, <code>__eq__</code> 를 정의한 객체가 끼어들어 결과를 바꿀 수
 없습니다. <code>== None</code> 은 상대 객체의 <code>__eq__</code> 를 부르므로 그 보장이 없습니다.
@@ -355,6 +432,16 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
       <span class="err">``</span><span class="ne">OSError</span><span class="err">``</span> <span class="n">의</span> <span class="n">자식이므로</span> <span class="n">마지막</span> <span class="err">``</span><span class="ne">OSError</span><span class="err">``</span> <span class="n">보다</span> <span class="n">위에</span> <span class="n">둔다</span><span class="o">.</span>
 </code></pre></div>
 
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 민원실에 창구를 여럿 두었는데, 들어온 사람이 앞에서부터 훑어
+처음 "여기 해당됩니다" 하는 창구로 들어간다고 해 봅시다. 이때 "무엇이든 받습니다"
+창구를 맨 앞에 세우면 뒤쪽의 전문 창구에는 영원히 아무도 오지 않습니다. 좁은 창구가
+앞, 넓은 창구가 뒤여야 합니다. except 절을 세우는 순서가 정확히 이것입니다.
+단, 넓고 좁음이 갈리는 것은 한쪽이 다른 쪽의 갈래일 때뿐입니다 — 서로 남남인 창구끼리는
+순서를 바꿔도 결과가 같습니다(아래 표의 "상속 제약"과 "의미적 분류"가 그 둘입니다).
+다만 이 비유는 고르는 주체에서 깨집니다 — 실제 민원인은 자기에게 맞는 창구를 보고
+갈 수 있지만, 파이썬은 위에서부터 처음 맞는 창구에 무조건 넣습니다. "가장 알맞은
+창구"를 대신 찾아 주지 않습니다.</p>
+</blockquote>
 <p><strong>이 docstring 이 왜 중요한가.</strong> except 순서에는 두 종류의 제약이 섞여 있습니다.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -378,8 +465,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 </tbody>
 </table></div>
 <p>둘을 구분해 적어 두면, 나중에 절을 추가할 사람이 <strong>무엇을 어겨선 안 되고 무엇이 취향인지</strong> 알 수 있습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 왜 "순서가 곧 정책"인가</strong> — <code>try</code> 본문에서 예외가 나면 인터프리터는
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 왜 "순서가 곧 정책"인가</strong> — <code>try</code> 본문에서 예외가 나면 인터프리터는
 except 절을 <strong>위에서 아래로 한 번씩</strong> 훑으며, 각 절의 예외 클래스에 대해
 <code>issubclass(발생한_예외의_타입, 절의_타입)</code> 에 해당하는 판정을 합니다. 그리고
 <strong>처음 참이 되는 절 하나만</strong> 실행하고 나머지는 건너뜁니다 — "가장 구체적인 절"을
@@ -401,8 +487,14 @@ except 절을 <strong>위에서 아래로 한 번씩</strong> 훑으며, 각 절
 </code></pre></div>
 
 <p><strong><code>BrokenPipeError</code> 는 유일하게 "처리하지 않는" 절입니다.</strong> 인자 없는 <code>raise</code> 는 "지금 잡은 예외를 그대로 재전파"입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — 인자 없는 <code>raise</code></strong> — 이 형태는 인터프리터가 들고 있는
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 상대가 전화를 먼저 끊었는데 이쪽은 아직 할 말이 남은 상황입니다.
+여기서 "여보세요? 안 들리세요?"라고 더 말해 봐야 같은 일이 한 번 더 벌어질 뿐입니다.
+그래서 이 절만은 아무 말도 보태지 않고 상황을 그대로 위로 넘깁니다. 할 일은 말을
+잇는 게 아니라 수화기를 내려놓는 것이고, 그 일은 맨 위의 <code>main()</code> 이 합니다.
+다만 이 비유는 뒷정리에서 깨집니다 — 전화는 끊으면 그만이지만, 프로그램은 끝나는
+순간 아직 내보내지 못한 출력을 한 번 더 밀어내려 하므로 그 몫까지 막아 줘야 합니다.
+아래 <code>_silence_broken_pipe()</code> 가 하는 일이 그것입니다.</p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처 — 인자 없는 <code>raise</code></strong> — 이 형태는 인터프리터가 들고 있는
 <strong>현재 처리 중인 예외</strong>(<code>sys.exc_info()</code> 가 돌려주는 그 3-튜플)를 다시 던집니다.
 <code>raise BrokenPipeError()</code> 라고 새로 만들어 던지는 것과 결정적으로 다른 점은
 <strong>원래의 트레이스백이 그대로 이어진다</strong>는 것입니다 — 어디서 처음 터졌는지가
@@ -422,7 +514,7 @@ to re-raise</code> 가 납니다. → <a href="12-syntax-and-stdlib.html">12 §1
 <span class="ne">RuntimeError</span><span class="p">:</span> <span class="n">No</span> <span class="n">active</span> <span class="n">exception</span> <span class="n">to</span> <span class="n">reraise</span>
 </code></pre></div>
 
-<p>왜 여기서 처리하지 않는가 — <code>list | head</code> 에서 <code>head</code> 가 먼저 닫히면 stdout 이 깨진 상태입니다. 이 상황에서 <code>output.err(...)</code> 를 부르면 <code>err()</code> 안의 <code>sys.stdout.flush()</code> 가 또 <code>BrokenPipeError</code> 를 냅니다(그래서 <code>output.err</code> 도 그 예외를 삼키도록 되어 있습니다 — cli/output.py:60-65). 근본 해결은 <strong>stdout 을 통째로 블랙홀로 갈아끼우는 것</strong>이고, 그 일은 <code>main()</code> 이 합니다.</p>
+<p>왜 여기서 처리하지 않는가 — <code>list | head</code>(가운데 <code>|</code> 는 앞 명령의 출력을 뒤 명령의 입력으로 잇는 파이프입니다)에서 <code>head</code> 가 먼저 닫히면 stdout 이 깨진 상태입니다. 이 상황에서 <code>output.err(...)</code> 를 부르면 <code>err()</code> 안의 <code>sys.stdout.flush()</code> 가 또 <code>BrokenPipeError</code> 를 냅니다(그래서 <code>output.err</code> 도 그 예외를 삼키도록 되어 있습니다 — cli/output.py:60-65). 근본 해결은 <strong>stdout 을 통째로 블랙홀로 갈아끼우는 것</strong>이고, 그 일은 <code>main()</code> 이 합니다.</p>
 <p>budget_app/cli/app.py:50-58</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
@@ -436,8 +528,7 @@ to re-raise</code> 가 납니다. → <a href="12-syntax-and-stdlib.html">12 §1
 </code></pre></div>
 
 <p><strong><code>KeyboardInterrupt</code> 는 명시적으로 잡아야 합니다.</strong> <code>BaseException</code> 직계라 마지막 <code>except Exception</code> 이 못 잡습니다. 종료 코드 130 은 유닉스 관례(128 + SIGINT 신호 번호 2)입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 130 이라는 숫자의 출처</strong> — 유닉스 셸(bash 등)은 자식 프로세스가
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 130 이라는 숫자의 출처</strong> — 유닉스 셸(bash 등)은 자식 프로세스가
 <strong>신호에 의해 죽었을 때</strong> 그 사실을 <code>128 + 신호번호</code> 로 보고합니다. <code>Ctrl+C</code> 가
 보내는 SIGINT 의 번호가 2 이므로 128 + 2 = 130 입니다. 이 프로그램은 실제로 신호에
 죽는 대신 <code>KeyboardInterrupt</code> 를 잡아 <strong>직접 130 을 반환</strong>하지만, 숫자를 관례에
@@ -445,7 +536,7 @@ to re-raise</code> 가 납니다. → <a href="12-syntax-and-stdlib.html">12 §1
 판별할 수 있습니다. 참고로 <code>os.open</code>/신호 번호처럼 이 관례는 유닉스의 것이고,
 Windows 에는 신호로 죽는 개념이 없어 이 값은 순수한 약속입니다.
 → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
-<p><strong>⚙️ 내부 동작 — <code>Ctrl+C</code> 가 예외가 되는 경로</strong> — OS 가 SIGINT 를 보내면 CPython 의
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>Ctrl+C</code> 가 예외가 되는 경로</strong> — OS 가 SIGINT 를 보내면 CPython 의
 C 레벨 신호 핸들러가 플래그만 세우고 즉시 돌아옵니다. 인터프리터는 바이트코드
 사이의 안전한 지점에서 그 플래그를 확인해 그때 <code>KeyboardInterrupt</code> 를 <strong>일으킵니다</strong>.
 그래서 <code>input()</code> 으로 대기 중이든 계산 중이든 결국 파이썬 예외로 나타나고,
@@ -472,8 +563,7 @@ C 레벨 신호 핸들러가 플래그만 세우고 즉시 돌아옵니다. 인�
 </ul>
 <p><code>if exc.hint:</code> 검사가 있으므로 힌트 없는 <code>AppError</code>(예: <code>ERR_REPLACE_SELF</code>)도 정상 동작합니다.</p>
 <p><strong>순서 제약</strong>: <code>ValidationError</code> 는 <code>ValueError</code> 의 자식, <code>AppError</code> 는 <code>Exception</code> 직계로 <strong>서로 상속 관계가 없습니다.</strong> 따라서 이 둘의 순서는 바꿔도 동작이 같습니다 — 의미적 분류상 "더 구체적인 것 먼저"로 배치했을 뿐입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code>except E as exc:</code></strong> — 예전에는 <code>except E, exc:</code> 라고 콤마로 썼는데,
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>except E as exc:</code></strong> — 예전에는 <code>except E, exc:</code> 라고 콤마로 썼는데,
 <code>except (A, B):</code> 와 헷갈려 "A 를 잡고 B 에 대입"으로 오해하는 사고가 잦았습니다.
 그래서 PEP 3110 이 <code>as</code> 키워드 형태로 바꿨습니다(파이썬 3 에서는 <code>as</code> 만 유효).
 함께 바뀐 규칙이 하나 더 있습니다 — <strong><code>exc</code> 는 except 절이 끝나는 순간 자동으로
@@ -481,7 +571,7 @@ C 레벨 신호 핸들러가 플래그만 세우고 즉시 돌아옵니다. 인�
 예외를 참조하는 순환을 끊기 위해서입니다. 그래서 <code>except AppError as exc:</code> 블록
 바깥에서 <code>exc</code> 를 쓰면 <code>NameError</code> 가 납니다. 이 코드가 값을 절 안에서 전부
 소비하고 나가는 이유이기도 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작 — <code>MSG_ERROR_LINE.format(msg=exc)</code></strong> — <code>str.format</code> 은 <code>{msg}</code> 자리에
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>MSG_ERROR_LINE.format(msg=exc)</code></strong> — <code>str.format</code> 은 <code>{msg}</code> 자리에
 넣을 때 <code>format(값, "")</code> 을 부르고, 포맷 스펙이 비어 있으면 그것은 결국 <code>str(값)</code>
 입니다. 예외 객체의 <code>str()</code> 은 <code>BaseException.args</code> 를 문자열로 만든 것이라,
 <code>ValidationError("금액은 정수여야 합니다")</code> 는 그 메시지 하나만 남습니다.
@@ -496,10 +586,10 @@ C 레벨 신호 핸들러가 플래그만 세우고 즉시 돌아옵니다. 인�
 </code></pre></div>
 
 <p>이 부류에는 절이 여섯 개 있습니다 — <code>FileNotFoundError</code> / <code>IsADirectoryError</code> / <code>NotADirectoryError</code> / <code>PermissionError</code> / <code>UnicodeDecodeError</code> / <code>OSError</code>. 앞의 넷은 전부 <code>OSError</code> 의 자식이라 <strong>마지막 <code>OSError</code> 보다 위에 있어야</strong> 합니다. 이것이 상속 제약입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code>FileNotFoundError</code> 라는 이름 자체</strong> — 예전에는 이런 구분이
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>FileNotFoundError</code> 라는 이름 자체</strong> — 예전에는 이런 구분이
 없어서 <code>except IOError as e:</code> 로 잡은 다음 <code>if e.errno == errno.ENOENT:</code> 로 직접
-갈라야 했습니다. PEP 3151 이 이 <code>errno</code> 검사를 <strong>예외 계층으로 승격</strong>시켜,
+갈라야 했습니다(<code>errno</code> 는 운영체제가 실패 원인을 숫자로 알려 주는 값입니다).
+PEP 3151 이 이 <code>errno</code> 검사를 <strong>예외 계층으로 승격</strong>시켜,
 OS 가 돌려준 errno 값에 따라 파이썬이 알아서 <code>FileNotFoundError</code>(ENOENT),
 <code>PermissionError</code>(EACCES/EPERM), <code>IsADirectoryError</code>(EISDIR),
 <code>NotADirectoryError</code>(ENOTDIR) 를 만들어 줍니다. 그래서 이 except 체인이
@@ -508,8 +598,7 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong><code>exc.filename or exc</code> 관용구.</strong> 파이썬의 파일 관련 예외는 <code>filename</code> 속성에 경로를 담아 주지만, 항상 채워지는 것은 아닙니다. 없으면 예외 객체 자체를 문자열로 씁니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code>A or B</code> 가 불리언이 아니다</strong> — 파이썬의 <code>or</code> 는 참/거짓을
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>A or B</code> 가 불리언이 아니다</strong> — 파이썬의 <code>or</code> 는 참/거짓을
 돌려주는 것이 아니라 <strong>평가한 피연산자 자체</strong>를 돌려줍니다. <code>A</code> 가 truthy 면 <code>A</code>,
 아니면 <code>B</code> 입니다. <code>exc.filename</code> 이 <code>None</code> 이거나 빈 문자열이면 falsy 라
 <code>exc</code> 로 넘어갑니다. 같은 성질을 §5.1 의 반환값 규약에서는 <strong>일부러 피했다</strong>는
@@ -524,8 +613,7 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 </code></pre></div>
 
 <p>한국 사용자의 CSV 가 CP949 로 저장되는 일이 흔하다는 현실을 반영한 안내입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>UnicodeDecodeError</code> 는 어디서 나오나</strong> — 이 예외를 던지는 것은
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>UnicodeDecodeError</code> 는 어디서 나오나</strong> — 이 예외를 던지는 것은
 <code>open(..., encoding="utf-8")</code> 이 만든 텍스트 래퍼의 <strong>디코딩 단계</strong>입니다. 바이트를
 문자로 옮기다 UTF-8 규칙에 맞지 않는 바이트열을 만나면 코덱이 실패를 알리고,
 오류 처리 방식이 기본값(<code>strict</code>)이면 그대로 예외가 됩니다. 예외 객체는 원인을
@@ -539,7 +627,7 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 </code></pre></div>
 
 <p><code>exc.encoding</code>(<code>'utf-8'</code>) / <code>exc.object</code>(문제의 바이트열) / <code>exc.start</code>·<code>exc.end</code>(위치) / <code>exc.reason</code>(사유)이 전부 채워져 있습니다. 이 코드가 그 값들을 화면에 노출하지 않는 이유는 <strong>사용자가 할 일이 "UTF-8 로 다시 저장"뿐</strong>이기 때문입니다 — 바이트 오프셋을 알려 줘도 행동이 달라지지 않습니다.</p>
-<p><strong><code>OSError</code> 포괄 절</strong>은 디스크 가득 참(ENOSPC), 파일 잠금 같은 나머지를 받습니다. 원자적 쓰기 중 디스크가 차면 여기로 옵니다 — 그리고 임시 파일에 쓰던 중이므로 <strong>원본은 무사합니다</strong>.</p>
+<p><strong><code>OSError</code> 포괄 절</strong>은 디스크 가득 참(ENOSPC), 파일 잠금 같은 나머지를 받습니다. 원자적 쓰기(임시 파일에 다 쓴 뒤 이름만 갈아 끼워, <strong>대상 파일 하나가 반쯤 쓰인 모습으로는 보이지 않게</strong> 하는 저장 방식 — 여기까지가 이 방식이 지켜 주는 범위이고, 남는 한계는 <a href="07-repository.html">07 문서</a>에 있습니다) 중 디스크가 차면 여기로 옵니다 — 그리고 임시 파일에 쓰던 중이므로 <strong>원본은 무사합니다</strong>.</p>
 <h3 id="56-부류-4-최후-방어선">5.6 부류 4 — 최후 방어선</h3>
 <p>budget_app/cli/error_handler.py:105-109</p>
 <div class="codehilite"><pre><span></span><code>        <span class="c1"># ---------- (4) 최후 방어선 — 분류 밖의 버그 ----------</span>
@@ -555,8 +643,7 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 </code></pre></div>
 
 <p><strong><code># noqa: BLE001</code></strong> 은 린터(Ruff)의 "blind except" 경고를 끄는 표기입니다. 보통 <code>except Exception</code> 은 나쁜 습관이지만, <strong>CLI 최상위에서는 정당합니다</strong> — 사용자에게 원시 트레이스백만 던지고 끝내는 것보다 한 줄 요약과 종료 코드를 주는 편이 낫기 때문입니다. 그 의도를 주석으로 명시해 두었습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처 — <code># noqa: 코드</code></strong> — <code>noqa</code>("no quality assurance")는 flake8 이
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code># noqa: 코드</code></strong> — <code>noqa</code>("no quality assurance")는 flake8 이
 정착시킨 <strong>줄 단위 억제 주석</strong>이고 Ruff 가 그대로 이어받았습니다. 코드를 붙이면
 그 규칙 하나만, 안 붙이면 그 줄의 모든 경고가 꺼집니다. <code>BLE</code> 접두사는
 flake8-blind-except 플러그인에서 온 것이고 <code>BLE001</code> 이 "구체적이지 않은 예외를
@@ -565,8 +652,7 @@ flake8-blind-except 플러그인에서 온 것이고 <code>BLE001</code> 이 "�
 <strong>"이건 실수가 아니라 의도"라는 표시</strong>로 읽는 편이 정확합니다.</p>
 </blockquote>
 <p><strong><code>logger.exception(...)</code> 이 이 절의 핵심입니다.</strong> 스택트레이스를 버리는 게 아니라 <strong>로그로 옮깁니다.</strong></p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>logger.exception(msg)</code></strong> — 이것은 <code>logger.error(msg, exc_info=True)</code>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>logger.exception(msg)</code></strong> — 이것은 <code>logger.error(msg, exc_info=True)</code>
 와 정확히 같습니다(<code>logging/__init__.py</code> 의 <code>Logger.exception</code> 이 한 줄로 그렇게
 위임합니다). <code>exc_info=True</code> 를 주면 로깅이 <code>sys.exc_info()</code> 를 읽어 그 3-튜플을
 <code>LogRecord.exc_info</code> 에 담고, 포매터가 <code>formatException()</code> 에서 <code>traceback</code> 모듈로
@@ -589,8 +675,7 @@ KeyError: &#39;nope&#39;
 
 <p><strong>정책이 부류마다 다르다</strong>는 것이 요점입니다. 사용자가 고칠 수 있는 앞의 세 부류(§5.3~§5.5)는 여전히 한두 줄로 끝나고 트레이스백이 없습니다. 마지막 부류만 "프로그램이 예상하지 못한 상태"이므로, 감추는 것보다 <strong>신고할 수 있게 하는 편</strong>을 택했습니다. 힌트 문구가 <code>--debug</code> 를 안내하는 것은 그때 <code>%(asctime)s %(name)s:%(lineno)d</code> 까지 붙은 상세 포맷(<code>LOG_FORMAT_DEBUG</code>)으로 바뀌고 다른 DEBUG 로그도 함께 보이기 때문입니다.</p>
 <p><strong>그리고 <code>setup_logging</code> 이 로그를 화면에 얹는 유일한 지점입니다.</strong> <code>cli/app.py:87-88</code> 의 주석이 그 의존을 명시합니다 — <code>main()</code> 이 <code>output.setup_logging()</code> 을 부르지 않으면 로거에 핸들러가 하나도 붙지 않습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나(주의: 소스 주석보다 이쪽이 현재 사실)</strong>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나(주의: 소스 주석보다 이쪽이 현재 사실)</strong>
 — <code>logging.getLogger("budget_app")</code> 로 만든 로거는 처리를 부모(루트)에게 전파하는데,
 루트에도 핸들러가 없으면 <code>logging.lastResort</code> 라는 <strong>최후 수단 핸들러</strong>가 대신
 받습니다. 이것은 stderr 로 쓰는 핸들러이고 레벨이 WARNING 이라, ERROR 로 찍는
@@ -607,6 +692,7 @@ KeyError: &#39;nope&#39;
 <p><code>cli/output.py:82-85</code> 와 <code>cli/app.py:87-88</code> 의 주석은 "<code>setup_logging</code> 이 없으면 스택트레이스가 어디에도 남지 않는다"고 적고 있는데, 이것은 이 절이 <strong><code>logger.debug(..., exc_info=True)</code> 였던 시절의 설명</strong>입니다. ERROR 로 올린 지금은 <code>lastResort</code> 덕분에 살아남습니다. 그래도 <code>setup_logging</code> 이 하는 일은 그대로 남습니다 — 레벨을 정하고(<code>--debug</code> → DEBUG), 포맷을 붙이고, <code>force=True</code> 로 재호출 시에도 설정을 확정합니다(<code>cli/output.py:94-99</code>).</p>
 <hr>
 <h2 id="6-except-순서를-검증하는-법">6. except 순서를 검증하는 법</h2>
+<p>앞 절의 순서가 정말 맞는지는 눈대중 대신 파이썬에게 직접 물어 확인할 수 있습니다. 물어볼 것은 하나뿐입니다 — "이 예외가 저 예외의 한 갈래인가". 한 갈래라면 좁은 쪽이 반드시 위에 와야 합니다.</p>
 <p>예외 상속 계층을 그림으로 정리합니다.</p>
 <div class="codehilite"><pre><span></span><code>BaseException
 ├── KeyboardInterrupt                (Ctrl+C — Exception 이 아님!)
@@ -636,8 +722,7 @@ KeyError: &#39;nope&#39;
 <span class="kc">False</span>                                    <span class="c1"># ← 그래서 명시적으로 잡아야 한다</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>__mro__</code> 가 정확히 무엇인가</strong> — MRO(Method Resolution Order)는
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>__mro__</code> 가 정확히 무엇인가</strong> — MRO(Method Resolution Order)는
 클래스가 이름을 찾을 때 훑는 <strong>순서가 확정된 클래스 목록</strong>이며, 파이썬은 이를 C3
 선형화 알고리즘으로 계산해 클래스 생성 시점에 <code>__mro__</code> 튜플로 저장합니다.
 <code>issubclass(A, B)</code> 는 대체로 "<code>B</code> 가 <code>A.__mro__</code> 안에 있는가"이므로, <code>__mro__</code> 를
@@ -720,9 +805,19 @@ KeyError: &#39;nope&#39;
                 <span class="n">messages</span><span class="o">.</span><span class="n">ERR_TX_NOT_FOUND</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tx_id</span><span class="o">=</span><span class="n">tx_id</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_LIST_ID</span>
 </code></pre></div>
 
-<p><strong>저장소는 "없었다"는 사실만 보고</strong>(<code>False</code>), <strong>서비스가 그것을 "오류"로 판정</strong>합니다(<code>AppError</code>). 왜 이렇게 나누는가 — "id 가 없다"가 항상 오류인 것은 아니기 때문입니다. 예를 들어 "있으면 지우고 없으면 넘어가는" 멱등 삭제를 나중에 추가한다면, 저장소는 그대로 두고 서비스만 바꾸면 됩니다.</p>
+<p><strong>저장소는 "없었다"는 사실만 보고</strong>(<code>False</code>), <strong>서비스가 그것을 "오류"로 판정</strong>합니다(<code>AppError</code>). 왜 이렇게 나누는가 — "id 가 없다"가 항상 오류인 것은 아니기 때문입니다. 예를 들어 "있으면 지우고 없으면 넘어가는" 멱등 삭제(같은 명령을 몇 번 반복해도 결과가 달라지지 않는 삭제)를 나중에 추가한다면, 저장소는 그대로 두고 서비스만 바꾸면 됩니다.</p>
 <hr>
 <h2 id="7-종료-코드-표">7. 종료 코드 표</h2>
+<p>프로그램이 끝나면서 셸에 남기는 숫자를 모아 둔 표입니다. 화면 메시지와 달리 이 숫자를 읽는 것은 사람이 아니라 다른 프로그램입니다. 셸 스크립트가 "방금 그 명령이 성공했나"를 판단할 근거가 이것뿐이라, 값마다 뜻을 정해 두었습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 심부름을 보냈더니 돌아와서 말 대신 숫자 하나만 적어 내는 것과
+같습니다. 0 은 "잘 다녀왔습니다"이고, 나머지 숫자는 각각 다른 사정입니다. 하필 숫자인
+이유는 이 보고를 받는 쪽이 사람이 아니라 다른 프로그램이라, 문장은 읽을 줄 몰라도
+숫자는 곧바로 견줄 수 있기 때문입니다.
+다만 이 비유는 담을 수 있는 양에서 깨집니다 — 숫자 한 개로는 사정을 자세히 전할 수
+없고, 셸이 탈 없이 받아 주는 폭도 좁습니다(유닉스에서는 0~255 를 넘으면 잘립니다 —
+자세한 조건은 아래 ⚙️ 상자에 있습니다). 그래서 자세한 이야기는 §5 에서 본 대로
+stderr 로 따로 내보냅니다.</p>
+</blockquote>
 <p>budget_app/cli/config.py:22-29</p>
 <div class="codehilite"><pre><span></span><code><span class="n">EXIT_OK</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">EXIT_ERROR</span> <span class="o">=</span> <span class="mi">1</span>
@@ -810,8 +905,7 @@ KeyError: &#39;nope&#39;
 <span class="nv">$LASTEXITCODE</span><span class="w">    </span><span class="c1"># PowerShell → 4</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 반환값이 셸의 숫자가 되기까지</strong> — 이 프로그램의 함수들은 종료 코드를
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 반환값이 셸의 숫자가 되기까지</strong> — 이 프로그램의 함수들은 종료 코드를
 <strong>반환만</strong> 하고, 실제로 프로세스를 끝내는 것은 <code>budget_app/__main__.py:8</code> 의
 <code>sys.exit(main())</code> 한 줄뿐입니다. <code>sys.exit(n)</code> 은 즉시 죽는 것이 아니라
 <code>SystemExit(n)</code> 예외를 던지고, 아무도 잡지 않으면 인터프리터가 정리 작업(버퍼
@@ -837,7 +931,7 @@ KeyError: &#39;nope&#39;
 <hr>
 <p><strong>다음 문서</strong>: <a href="07-repository.html">07. 저장소 계층</a> — 스트리밍 읽기, 원자적 교체, 손상 줄 보존, ID 발급.</p>
 <div class="pager"><span><a href="05-config-and-models.html">← 05. 설정·검증·모델 — config / messages / validators / errors / entities</a></span><span><a href="07-repository.html">07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work) →</a></span></div>
-<footer>docs/06-decorators.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/06-decorators.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

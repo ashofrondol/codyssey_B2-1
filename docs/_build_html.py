@@ -41,6 +41,18 @@ PAGES = [
 
 MD_LINK_RE = re.compile(r"\]\(\./([0-9A-Za-z-]+)\.md(#[^)]*)?\)")
 
+# 인용문 상자에 종류별 색을 준다. 마크다운에서는 전부 blockquote 라 구분이 안 되므로,
+# 첫머리의 이모지를 보고 클래스를 붙인다. ⚙️ 는 U+2699 뒤에 이모지 변형 선택자가
+# 붙기도 하고 안 붙기도 해서 기반 문자만 본다.
+CALLOUT_KINDS = (
+    ("💡", "tip"),  # 쉽게 말하면 — 비유
+    ("🔎", "origin"),  # 문법의 출처
+    ("⚙", "internals"),  # 내부 동작
+)
+BLOCKQUOTE_BLOCK = re.compile(r"<blockquote>(.*?)</blockquote>", re.S)
+#: 마커로 시작하는 문단 **앞**에서 자른다(lookahead 라 마커 자체는 다음 조각에 남는다)
+CALLOUT_SPLIT = re.compile(r"(?=<p><strong>(?:💡|🔎|⚙))")
+
 
 def md_title(text: str) -> str:
     for line in text.splitlines():
@@ -68,12 +80,20 @@ def build_css() -> str:
   --bg: #ffffff; --fg: #1f2328; --muted: #57606a; --border: #d0d7de;
   --accent: #0969da; --code-bg: #f6f8fa; --sidebar-bg: #f6f8fa;
   --quote: #57606a; --quote-border: #d0d7de; --current: #ddf4ff;
+  --tip-bg: #fff8e6; --tip-bd: #d4a72c;
+  --origin-bg: #eef6ff; --origin-bd: #4493f8;
+  --internals-bg: #f0f3f6; --internals-bd: #8b949e;
+  --plain-bg: #f2fbf5; --plain-bd: #2da44e;
 }}
 @media (prefers-color-scheme: dark) {{
   :root {{
     --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --border: #30363d;
     --accent: #4493f8; --code-bg: #161b22; --sidebar-bg: #10151c;
     --quote: #8b949e; --quote-border: #30363d; --current: #0c2d6b;
+    --tip-bg: #2a2213; --tip-bd: #b98b18;
+    --origin-bg: #12233b; --origin-bd: #316dca;
+    --internals-bg: #1a1f26; --internals-bd: #6e7681;
+    --plain-bg: #122a19; --plain-bd: #2f7f42;
   }}
 }}
 * {{ box-sizing: border-box; }}
@@ -112,6 +132,23 @@ a {{ color: var(--accent); }}
 blockquote {{
   margin: 1rem 0; padding: .2rem 1rem; color: var(--quote);
   border-left: 4px solid var(--quote-border);
+}}
+/* 💡 비유 / 🔎 문법의 출처 / ⚙️ 내부 동작 — 종류별로 색을 달리해
+   "비유만 훑기", "내부 동작만 훑기" 같은 읽기가 가능하게 한다. */
+blockquote.callout {{
+  color: var(--fg); border-radius: 0 8px 8px 0;
+  padding: .7rem 1rem; margin: 1.3rem 0;
+}}
+blockquote.callout > p:first-child {{ margin-top: 0; }}
+blockquote.callout > p:last-child {{ margin-bottom: 0; }}
+blockquote.callout.tip {{ background: var(--tip-bg); border-left-color: var(--tip-bd); }}
+blockquote.callout.origin {{ background: var(--origin-bg); border-left-color: var(--origin-bd); }}
+blockquote.callout.internals {{ background: var(--internals-bg); border-left-color: var(--internals-bd); }}
+/* 「쉬운 말로 먼저」 절 — 비전공자용 진입로라 눈에 띄어야 한다. */
+h2[id^="쉬운-말로-먼저"] {{
+  background: var(--plain-bg); border: 1px solid var(--plain-bd);
+  border-radius: 8px; padding: .5rem .8rem; border-bottom: none;
+  font-size: 1.25rem;
 }}
 code {{
   font-family: Consolas, "D2Coding", "Cascadia Mono", "Courier New", monospace;
@@ -189,6 +226,44 @@ def page_toc_html(toc_tokens: list[dict]) -> str:
     )
 
 
+def _kind_of(fragment: str) -> str | None:
+    for emoji, kind in CALLOUT_KINDS:
+        if emoji in fragment[:160]:
+            return kind
+    return None
+
+
+def tag_callouts(html: str) -> str:
+    """💡/🔎/⚙️ 상자를 각각 독립된 blockquote 로 떼어 내고 종류별 클래스를 붙인다.
+
+    두 가지 일을 한다.
+
+    1. **분리** — 마크다운은 빈 줄로 나란히 놓인 인용문을 **하나로 합친다**
+       (python-markdown 의 BlockQuoteProcessor 가 직전 형제가 blockquote 면 거기에
+       이어 붙인다). 그래서 마크다운 원문에서 상자 두 개를 떼어 놓아도 HTML 에서는
+       한 덩어리가 된다. 마커로 시작하는 문단 앞에서 잘라 각각을 제 상자로 만든다.
+    2. **분류** — 첫머리 이모지로 클래스를 준다. 색이 달라야 "비유는 건너뛰고
+       내부 동작만" 같은 훑어 읽기가 가능하다.
+    """
+
+    def repl(m: re.Match) -> str:
+        inner = m.group(1)
+        # 중첩 인용문은 비탐욕 매칭이 잘못 끊으므로 건드리지 않는다
+        if "<blockquote" in inner:
+            return m.group(0)
+        parts = [p for p in CALLOUT_SPLIT.split(inner) if p.strip()]
+        if not parts:
+            return m.group(0)
+        out = []
+        for part in parts:
+            kind = _kind_of(part)
+            cls = f' class="callout {kind}"' if kind else ""
+            out.append(f"<blockquote{cls}>{part}</blockquote>")
+        return "".join(out)
+
+    return BLOCKQUOTE_BLOCK.sub(repl, html)
+
+
 def convert(md_text: str) -> tuple[str, list[dict]]:
     md = markdown.Markdown(
         extensions=["tables", "fenced_code", "codehilite", "toc"],
@@ -201,6 +276,7 @@ def convert(md_text: str) -> tuple[str, list[dict]]:
     body = md.convert(md_text)
     body = body.replace("<table>", '<div class="table-wrap"><table>')
     body = body.replace("</table>", "</table></div>")
+    body = tag_callouts(body)
     return body, getattr(md, "toc_tokens", [])
 
 

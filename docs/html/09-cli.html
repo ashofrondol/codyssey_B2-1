@@ -11,14 +11,67 @@
 <nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html" class="current"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
 <main>
 <h1 id="09-cli-계층-cli-패키지-여섯-모듈">09. CLI 계층 — cli/ 패키지 여섯 모듈</h1>
-<p>사용자와 만나는 계층입니다. 리팩터 전 512줄짜리 <code>cli.py</code> 하나였던 것이 <code>cli/</code> 패키지 안의 <strong>여섯 모듈</strong>로 나뉘었습니다. 각각이 무엇을 담당하고 왜 나뉘었는지, 그리고 argparse·대화형 입력·BrokenPipe 처리의 상세를 다룹니다.</p>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#쉬운-말로-먼저">쉬운 말로 먼저</a></li><li><a href="#1-여섯-모듈의-분업">1. 여섯 모듈의 분업</a></li><li><a href="#2-parserpy-argparse-문법만">2. parser.py — argparse 문법만</a></li><li><a href="#3-promptspy-대화형-입력">3. prompts.py — 대화형 입력</a></li><li><a href="#4-presenterpy-출력하지-않고-반환한다">4. presenter.py — 출력하지 않고 반환한다</a></li><li><a href="#5-outputpy-채널-결정">5. output.py — 채널 결정</a></li><li><a href="#6-apppy-오케스트레이션과-진입점">6. app.py — 오케스트레이션과 진입점</a></li><li><a href="#7-정리-과제-방어용-요약">7. 정리 — 과제 방어용 요약</a></li></ul></details><h2 id="쉬운-말로-먼저">쉬운 말로 먼저</h2>
+<p>이 문서는 프로그램에서 사람과 직접 맞닿는 부분을 다룹니다. 이 가계부는 창이 뜨는 프로그램이 아니라 검은 화면에 <code>python -m budget_app list</code> 처럼 글자를 쳐서 쓰는 프로그램이라, 사람이 친 글자를 알아듣는 일부터 시작합니다. 이 저장소에는 <code>budget_app</code> 이라는 명령이 따로 설치되지 않으므로 실제로 치는 것은 늘 <code>python -m budget_app …</code> 이고, 짧은 <code>budget_app</code> 은 도움말의 usage 줄에만 나오는 이름입니다. 빠진 값을 되묻고, 계산 결과를 읽을 만한 줄로 바꾸고, 그 줄을 어디로 내보낼지 정하는 일까지가 전부 여기 모여 있습니다. 까다로운 이유는 이 부분이 상대하는 것이 사람만이 아니기 때문입니다. 사람은 오타를 내고, 도중에 그만두고, 조건을 엉뚱한 자리에 적습니다. 반대편에는 결과만 파일로 받아 가거나 앞의 세 줄만 읽고 떠나 버리는 다른 프로그램이 있습니다. 어느 쪽을 상대하든 이상한 메시지를 흘리거나 도중에 멈추지 않아야 하고, 그러기 위해 코드를 여섯 덩어리로 나눈 이야기가 이 문서입니다.</p>
+<p><strong>이 문서에 자주 나오는 말</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>말</th>
+<th>쉬운 뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>명령줄</td>
+<td>검은 화면에 프로그램 이름과 조건을 한 줄로 쳐서 실행하는 방식</td>
+</tr>
+<tr>
+<td>argparse</td>
+<td>그 한 줄을 어떤 칸으로 나눠 읽을지 미리 정해 두는 파이썬 기본 도구</td>
+</tr>
+<tr>
+<td>하위 명령</td>
+<td><code>python -m budget_app add</code> 의 <code>add</code> 처럼, 프로그램 안에서 다시 한 번 고르는 작은 메뉴</td>
+</tr>
+<tr>
+<td>핸들러</td>
+<td>고른 메뉴 하나를 실제로 처리하는 담당 함수</td>
+</tr>
+<tr>
+<td>프레젠터</td>
+<td>계산 결과를 사람이 읽을 문장으로 바꿔 주는 담당. 화면에 내보내지는 않습니다</td>
+</tr>
+<tr>
+<td>stdout / stderr</td>
+<td>프로그램이 글자를 내보내는 두 개의 출구. 앞은 결과, 뒤는 오류·안내</td>
+</tr>
+<tr>
+<td>버퍼링</td>
+<td>글자를 한 자씩 내보내지 않고 어느 정도 모았다가 한꺼번에 내보내는 것</td>
+</tr>
+<tr>
+<td>종료 코드</td>
+<td>프로그램이 끝나면서 남기는 숫자 한 개. 0 이면 정상, 그 밖의 숫자는 문제의 종류</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>바쁘면 여기만</strong></p>
+<ul>
+<li><strong>§1 여섯 모듈의 분업</strong> — 무엇을 왜 여섯 덩어리로 나눴는지가 표 하나에 들어 있습니다. 이 문서의 나머지는 그 표의 각 칸을 펼친 것입니다.</li>
+<li><strong>§2.4 <code>--debug</code> 와 <code>argparse.SUPPRESS</code></strong> — 사용자가 분명히 친 옵션이 조용히 사라지는 버그와 그 방어입니다. 이 문서에서 가장 값나가는 한 절입니다.</li>
+<li><strong>§7 정리</strong> — 나머지 내용을 질문·답변 일곱 쌍으로 압축해 두었습니다. 시간이 없으면 여기부터 읽고 궁금한 절로 거슬러 올라가면 됩니다.</li>
+</ul>
+<hr>
+<p>사용자와 만나는 계층입니다. 리팩터 전 512줄짜리 <code>cli.py</code> 하나였던 것이 <code>cli/</code> 패키지 안의 <strong>여섯 모듈</strong>로 나뉘었습니다. 각각이 무엇을 담당하고 왜 나뉘었는지를 먼저 보고, 그다음 세 가지 상세로 들어갑니다 — argparse(명령줄 한 줄을 칸으로 나눠 읽는 파이썬 기본 도구), 대화형 입력, BrokenPipe(결과를 받아 가던 상대가 먼저 가 버려 출력할 곳이 없어진 상황) 처리입니다.</p>
 <blockquote>
 <p><strong>난이도</strong>: 🟡 중급</p>
 <p><strong>먼저 읽으면 좋은 문서</strong>: <a href="04-architecture.html">04. 아키텍처</a>, <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a></p>
 <p><strong>문법·표준 라이브러리 참조</strong>: 본문 곳곳의 🔎/⚙️ 상자는 "이 관용구가 어느 PEP 에서 왔고 라이브러리 안에서 무슨 일을 하는가"를 압축한 것입니다. 더 깊은 설명은 <a href="12-syntax-and-stdlib.html">12. 문법과 표준 라이브러리</a>에 있습니다. 이 문서에서 특히 중요한 절은 argparse·logging 을 다루는 <a href="12-syntax-and-stdlib.html">12 §2-B</a>와 버퍼링·파이프를 다루는 <a href="12-syntax-and-stdlib.html">12 §3</a>입니다.</p>
 </blockquote>
 <hr>
-<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#1-여섯-모듈의-분업">1. 여섯 모듈의 분업</a></li><li><a href="#2-parserpy-argparse-문법만">2. parser.py — argparse 문법만</a></li><li><a href="#3-promptspy-대화형-입력">3. prompts.py — 대화형 입력</a></li><li><a href="#4-presenterpy-출력하지-않고-반환한다">4. presenter.py — 출력하지 않고 반환한다</a></li><li><a href="#5-outputpy-채널-결정">5. output.py — 채널 결정</a></li><li><a href="#6-apppy-오케스트레이션과-진입점">6. app.py — 오케스트레이션과 진입점</a></li><li><a href="#7-정리-과제-방어용-요약">7. 정리 — 과제 방어용 요약</a></li></ul></details><h2 id="1-여섯-모듈의-분업">1. 여섯 모듈의 분업</h2>
+<h2 id="1-여섯-모듈의-분업">1. 여섯 모듈의 분업</h2>
+<p>나눈 기준은 "이 파일을 고쳐야 할 이유"입니다. 이유가 다르면 파일도 다릅니다. 표에서 특히 볼 것은 마지막 칸입니다 — 각 모듈이 <strong>하지 않기로 한 일</strong>이 경계를 만듭니다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -75,8 +128,7 @@
 </table></div>
 <p>위 표는 <strong>책임의 분업</strong>을 보여 주는 여섯 축입니다. 실제 <code>cli/</code> 패키지에는 이 밖에 <code>handlers.py</code>(190줄, 명령 하나당 함수 하나 — §6.1), <code>messages.py</code>(121줄, 사용자에게 보이는 문장 상수), <code>config.py</code>(29줄, 기본값·한도·종료 코드)도 있습니다. 뒤 둘은 "값만 있는 모듈"이라 축으로 세지 않았습니다.</p>
 <p><strong><code>cli/__init__.py</code> 만 재수출을 합니다.</strong> <code>__main__.py</code> 의 <code>from .cli import main</code> 이 그대로 동작해야 하고, <code>main</code> 은 이 패키지가 밖에 내보이는 <strong>유일한 공개 심볼</strong>이기 때문입니다. <code>domain/</code> 과 <code>storage/</code> 의 <code>__init__.py</code> 는 docstring 만 두어, <code>from ..domain.entities import Transaction</code> 처럼 <strong>어느 파일이 무엇을 소유하는지</strong> 계속 보이게 합니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>from .cli import main</code> 의 앞점(<code>.</code>)은 <strong>명시적 상대 import</strong> 로, PEP 328 이 도입하고 파이썬 3 에서 유일한 상대 import 문법이 되었습니다(암묵적 상대 import 는 3.0 에서 제거). 점 하나는 "현재 패키지", 두 개(<code>from ..domain ...</code>)는 "부모 패키지"를 뜻하며, 이 계산은 실행 시 모듈의 <code>__package__</code> 값을 기준으로 이뤄집니다. 그래서 상대 import 가 있는 파일은 <strong>스크립트로 직접 실행할 수 없고</strong>(<code>__package__</code> 가 비어 있음) <code>python -m budget_app</code> 처럼 패키지로 실행해야 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>from .cli import main</code> 의 앞점(<code>.</code>)은 <strong>명시적 상대 import</strong> 로, PEP 328 이 도입하고 파이썬 3 에서 유일한 상대 import 문법이 되었습니다(암묵적 상대 import 는 3.0 에서 제거). 점 하나는 "현재 패키지", 두 개(<code>from ..domain ...</code>)는 "부모 패키지"를 뜻하며, 이 계산은 실행 시 모듈의 <code>__package__</code> 값을 기준으로 이뤄집니다. 그래서 상대 import 가 있는 파일은 <strong>스크립트로 직접 실행할 수 없고</strong>(<code>__package__</code> 가 비어 있음) <code>python -m budget_app</code> 처럼 패키지로 실행해야 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong><code>output.py</code> 가 이 패키지 안에 있는 것은 실측 결과입니다.</strong> 이 모듈을 import 하는 곳은 <code>app</code>·<code>error_handler</code>·<code>prompts</code> 셋뿐이고 전부 CLI 계층입니다(<a href="04-architecture.html">04 §1.2</a>).</p>
 <h3 id="11-왜-나눴나-고칠-이유가-넷이었다">1.1 왜 나눴나 — 고칠 이유가 넷이었다</h3>
@@ -126,12 +178,16 @@
 <p><strong>세 줄에 세 계층이 한 번씩</strong> — 서비스가 계산하고, 프레젠터가 문자열로 바꾸고, 출력 모듈이 채널을 고릅니다.</p>
 <hr>
 <h2 id="2-parserpy-argparse-문법만">2. <code>parser.py</code> — argparse 문법만</h2>
+<p>이 파일은 사람이 친 한 줄을 프로그램이 쓸 수 있는 값으로 바꾸는 일만 합니다. 무엇을 할지 고르거나 실제로 실행하는 일은 하지 않습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — argparse 는 <strong>주문서 양식</strong>입니다. 어떤 칸이 있고, 어느 칸이 필수이고, 어느 칸에는 정해진 몇 가지만 적을 수 있는지를 미리 인쇄해 두는 일입니다. 손님이 필수 칸을 비우거나 없는 메뉴를 적으면 창구가 양식을 그 자리에서 되돌려 주므로, 주방은 그 두 종류의 잘못된 주문서는 볼 일이 없습니다. 첫 칸에서 대분류를 고르면 그에 맞는 뒷장이 딸려 나오는 것이 하위 명령입니다 — <code>python -m budget_app category add</code> 의 <code>category</code> 가 대분류, <code>add</code> 가 그 뒷장의 소분류입니다.
+다만 이 비유는 <strong>창구가 보는 범위</strong>에서 깨집니다 — 창구가 되돌려 보내는 것은 빈 필수 칸, 목록에 없는 값, 그리고 숫자 칸에 숫자가 아닌 글자를 적은 경우까지입니다. 적힌 날짜가 실제로 있는 날인지, 금액이 양수인지는 창구가 아예 보지 않고 그대로 주방으로 넘어가며, 그것을 보는 것은 도메인 검증기와 서비스입니다(그래서 §2.8 처럼 종료 코드 2 에 이르는 길이 두 갈래입니다). 덧붙여 이 양식은 종이가 아니라 실행되는 코드라, 칸을 늘리는 일도 되돌려 보낼 때 찍히는 문구도 전부 파이썬 함수 호출로 만들어집니다.</p>
+</blockquote>
 <h3 id="21-왜-핸들러-함수-대신-문자열-키인가">2.1 왜 핸들러 함수 대신 문자열 키인가</h3>
 <p>budget_app/cli/parser.py:1-2</p>
 <div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;argparse 구성 — 명령줄 문법 정의만 담당한다.</span>
 </code></pre></div>
 
-<p><strong>순환 import 문제를 그림으로:</strong></p>
+<p><strong>순환 import 문제</strong>(두 파일이 서로를 import 해서, 먼저 읽히기 시작한 쪽이 아직 반쯤만 만들어진 상대를 보게 되는 상태)<strong>를 그림으로:</strong></p>
 <div class="codehilite"><pre><span></span><code>[방법 A — 함수 객체를 직접]        [방법 B — 문자열 키 (채택)]
 
 parser.py                          parser.py
@@ -147,8 +203,7 @@ parser.build_parser()              parser.build_parser()
    ✗ 순환!                            ✅ 한 방향
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>parser.set_defaults(handler="add")</code> 는 마법이 아니라 딕셔너리 갱신입니다. CPython 의 <code>argparse._ActionsContainer.set_defaults</code> 는 본문이 두 줄뿐입니다 — 넘긴 키워드를 파서의 <code>self._defaults</code> 딕셔너리에 <code>update</code> 하고, 같은 <code>dest</code> 를 가진 기존 액션이 있으면 그 액션의 <code>.default</code> 도 갈아 끼웁니다. 파싱이 끝날 때 <code>_defaults</code> 의 항목들이 아직 없는 속성만 골라 namespace 에 <code>setattr</code> 됩니다. 즉 <code>args.handler</code> 는 <strong>명령줄에 대응하는 문자열이 하나도 없는데도</strong> namespace 에 존재하는 값이고, 그 위에 <code>HANDLERS[args.handler]</code> 라는 <strong>딕셔너리 해시 조회</strong>가 얹혀 <code>if/elif</code> 사슬을 대신합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>parser.set_defaults(handler="add")</code> 는 마법이 아니라 딕셔너리 갱신입니다. CPython 의 <code>argparse._ActionsContainer.set_defaults</code> 는 본문이 두 줄뿐입니다 — 넘긴 키워드를 파서의 <code>self._defaults</code> 딕셔너리에 <code>update</code> 하고, 같은 <code>dest</code> 를 가진 기존 액션이 있으면 그 액션의 <code>.default</code> 도 갈아 끼웁니다. 파싱이 끝날 때 <code>_defaults</code> 의 항목들이 아직 없는 속성만 골라 namespace 에 <code>setattr</code> 됩니다. 즉 <code>args.handler</code> 는 <strong>명령줄에 대응하는 문자열이 하나도 없는데도</strong> namespace 에 존재하는 값이고, 그 위에 <code>HANDLERS[args.handler]</code> 라는 <strong>딕셔너리 해시 조회</strong>가 얹혀 <code>if/elif</code> 사슬을 대신합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="22-죽은-코드가-사라진-과정">2.2 죽은 코드가 사라진 과정</h3>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 리팩터 전 — 하위 명령 3개가 한 핸들러</span>
@@ -203,10 +258,12 @@ parser.build_parser()              parser.build_parser()
 </code></pre></div>
 
 <p>명령마다 함수를 나눈 이유는 <strong>한 함수가 120줄이 되는 것을 막기 위해서</strong>입니다. <code>build_parser</code> 본문만 보면 "이 프로그램에 명령이 11개 있다"가 한눈에 보입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>add_subparsers()</code> 가 돌려주는 <code>sub</code> 는 파서가 아니라 <strong><code>argparse._SubParsersAction</code> 이라는 액션 객체 하나</strong>입니다(로컬 3.13.1 에서 <code>type(sub).__name__</code> 으로 확인). 이 액션은 <code>nargs=argparse.PARSER</code>(문자열 <code>'A...'</code>)를 가진 <strong>위치 인자</strong>로 등록되므로 "첫 낱말 하나 + 그 뒤 전부"를 한 번에 삼킵니다. <code>sub.add_parser("list")</code> 는 완전히 새로운 <code>ArgumentParser</code> 를 만들어 액션 내부의 <code>_name_parser_map</code> 딕셔너리에 이름으로 등록하고 그 파서를 돌려줍니다. 그래서 <code>_add_list(sub)</code> 안에서 하는 일은 전부 <strong>그 하위 파서 객체</strong>에 대한 설정이고, 최상위 파서는 하위 명령의 옵션을 하나도 알지 못합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>add_subparsers()</code> 가 돌려주는 <code>sub</code> 는 파서가 아니라 <strong><code>argparse._SubParsersAction</code> 이라는 액션 객체 하나</strong>입니다(로컬 3.13.1 에서 <code>type(sub).__name__</code> 으로 확인). 이 액션은 <code>nargs=argparse.PARSER</code>(문자열 <code>'A...'</code>)를 가진 <strong>위치 인자</strong>로 등록되므로 "첫 낱말 하나 + 그 뒤 전부"를 한 번에 삼킵니다. <code>sub.add_parser("list")</code> 는 완전히 새로운 <code>ArgumentParser</code> 를 만들어 액션 내부의 <code>_name_parser_map</code> 딕셔너리에 이름으로 등록하고 그 파서를 돌려줍니다. 그래서 <code>_add_list(sub)</code> 안에서 하는 일은 전부 <strong>그 하위 파서 객체</strong>에 대한 설정이고, 최상위 파서는 하위 명령의 옵션을 하나도 알지 못합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="24-debug-와-argparsesuppress">2.4 <code>--debug</code> 와 <code>argparse.SUPPRESS</code></h3>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 같은 항목이 있는 양식을 두 장 겹쳐 쓴다고 생각해 보세요. 첫 장(모든 명령이 공유하는 양식)에 "데이터 폴더: ./mydata" 라고 적었는데, 둘째 장(명령별 양식)의 같은 칸을 담당자가 "비어 있으니 기본값이라도 적어 두자"며 "./data" 로 채워 버리면, 두 장을 겹쳐 읽는 사람은 첫 장에 적힌 답을 못 봅니다. <code>argparse.SUPPRESS</code> 는 그 담당자에게 <strong>"그 칸은 둘째 장에서 아예 지우라"</strong> 고 이르는 표시입니다. 칸 자체가 없어야 첫 장에 적힌 답이 살아남습니다.
+다만 이 비유는 <strong>"빈 칸"이라는 말</strong>에서 깨집니다 — 칸이 그대로 남아 있고 값만 비어 있으면(예: <code>default=None</code>) 그 빈 값이 첫 장의 답을 덮어 지웁니다. 겹쳐 읽는 규칙에 "비어 있으면 넘어간다"는 조건이 없기 때문인데, <code>SUPPRESS</code> 는 칸을 비우는 쪽이 아니라 칸을 만들지 않는 쪽이라 그 규칙에 걸릴 것 자체가 없습니다. 그리고 종이라면 위에 놓인 장이 이기겠지만, 여기서는 나중에 처리되는 하위 명령 쪽이 언제나 위에 놓입니다. 그 기계장치가 §2.4.1 입니다.</p>
+</blockquote>
 <p>budget_app/cli/parser.py:84-88 (실제 기본값은 최상위 파서 한 곳에만)</p>
 <div class="codehilite"><pre><span></span><code>    <span class="c1"># 실제 기본값은 여기 한 곳에만 있다 — 아래 파서들은 전부 SUPPRESS 다.</span>
     <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--debug&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">DEBUG_HELP</span><span class="p">)</span>
@@ -220,7 +277,7 @@ parser.build_parser()              parser.build_parser()
     <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--debug&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">SUPPRESS</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">DEBUG_HELP</span><span class="p">)</span>
 </code></pre></div>
 
-<p><strong><code>argparse.SUPPRESS</code> 의 동작.</strong> argparse 는 파싱 후 각 인자의 기본값을 namespace 에 채웁니다. 하위 파서가 나중에 처리되므로, 하위 파서 쪽 기본값이 상위에서 설정된 값을 <strong>덮어씁니다</strong>.</p>
+<p><strong><code>argparse.SUPPRESS</code> 의 동작.</strong> argparse 는 파싱이 끝나면 각 인자의 기본값을 namespace(파싱 결과를 담아 두는 값 보관함)에 채웁니다. 하위 파서는 상위 파서보다 나중에 처리됩니다. 그래서 하위 파서 쪽 기본값이 상위에서 이미 읽어 둔 값을 <strong>덮어씁니다</strong>.</p>
 <div class="codehilite"><pre><span></span><code>budget_app --debug list
     │
     ├─ 최상위 파서: --debug 를 봄 → args.debug = True
@@ -276,8 +333,7 @@ SUPPRESS {&#39;debug&#39;: True,  &#39;data_dir&#39;: &#39;./mydata&#39;, &#39;c
 </code></pre></div>
 
 <p><code>--debug</code> 를 분명히 쳤는데 첫 줄에서는 <code>False</code> 이고, <code>--data-dir ./mydata</code> 도 <code>./data</code> 로 되돌아갔습니다. <strong><code>_add_shared_options</code> 의 <code>default=argparse.SUPPRESS</code> 두 글자가 막고 있는 것이 바로 이 조용한 되돌림</strong>입니다. 소스 docstring(<code>parser.py:66-69</code>)이 "여기에 <code>default=DEFAULT_DATA_DIR</code> 를 주면 하위 파서가 앞에서 읽어 둔 값을 기본값으로 되돌려 버린다"고 적은 것이 이 실험입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — 같은 이유로 <code>main</code> 은 <code>args.debug</code> 가 아니라 <code>getattr(args, "debug", False)</code> 로 읽습니다. <code>argparse.Namespace</code> 는 <code>__getattr__</code> 를 정의하지 않는 평범한 객체라, 속성이 없으면 <code>AttributeError</code> 가 납니다. 최상위 파서에 <code>--debug</code> 가 있으므로 실제로는 항상 채워지지만, 두 인자 <code>getattr</code> 은 "이 값은 없을 수도 있다"는 SUPPRESS 계약을 코드로 적어 두는 표시이기도 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 같은 이유로 <code>main</code> 은 <code>args.debug</code> 가 아니라 <code>getattr(args, "debug", False)</code> 로 읽습니다. <code>argparse.Namespace</code> 는 <code>__getattr__</code> 를 정의하지 않는 평범한 객체라, 속성이 없으면 <code>AttributeError</code> 가 납니다. 최상위 파서에 <code>--debug</code> 가 있으므로 실제로는 항상 채워지지만, 두 인자 <code>getattr</code> 은 "이 값은 없을 수도 있다"는 SUPPRESS 계약을 코드로 적어 두는 표시이기도 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <h3 id="25-2단-명령의-옵션-자리-리팩터에서-고친-버그">2.5 2단 명령의 옵션 자리 — 리팩터에서 고친 버그</h3>
 <p>budget_app/cli/parser.py:58-76</p>
@@ -289,7 +345,7 @@ SUPPRESS {&#39;debug&#39;: True,  &#39;data_dir&#39;: &#39;./mydata&#39;, &#39;c
     <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--debug&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">SUPPRESS</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">DEBUG_HELP</span><span class="p">)</span>
 </code></pre></div>
 
-<p>이 함수 하나를 <strong>최상위 하위 파서(<code>list</code>, <code>category</code> …)와 2단 말단 파서(<code>category list</code> …) 양쪽</strong>에 붙입니다. argparse 가 하위 명령 이후의 인자를 말단 파서에게 넘기기 때문에, 말단에도 달아 두지 않으면 <code>category list --data-dir X</code> 가 "unrecognized arguments" 로 죽고 <code>category --data-dir X list</code> 처럼 옵션을 <strong>가운데</strong>에 끼워야만 동작합니다.</p>
+<p>이 함수 하나를 <strong>최상위 하위 파서(<code>list</code>, <code>category</code> …)와 2단 말단 파서(<code>category list</code> …) 양쪽</strong>에 붙입니다. 말단 파서란 <code>category list</code> 처럼 두 단계로 골라 들어간 <strong>마지막 단계의 양식</strong>입니다. argparse 는 하위 명령 이름 뒤에 오는 인자를 전부 그 말단 파서에게 넘깁니다. 그래서 말단에도 같은 옵션을 달아 두지 않으면 <code>category list --data-dir X</code> 가 "unrecognized arguments" 로 죽습니다. <code>category --data-dir X list</code> 처럼 옵션을 <strong>가운데</strong>에 끼워야만 동작하게 되는 것입니다.</p>
 <blockquote>
 <p><strong>함수가 하나로 합쳐진 경위</strong> — 이전에는 <code>_add_common_options</code>(기본값 있음)와 <code>_add_leaf_options</code>(SUPPRESS) 둘로 나뉘어 있었고, 차이는 <code>--data-dir</code> 의 기본값 하나뿐이었습니다. 그 기본값을 최상위 파서로 올리자 두 함수가 완전히 같아져 하나로 합쳤습니다. <strong>차이가 사라지면 함수도 사라져야 합니다.</strong></p>
 </blockquote>
@@ -323,13 +379,11 @@ $ python -m budget_app category --data-dir ./mydata list   ✅ 이렇게만 동�
 </code></pre></div>
 
 <p><strong><code>--no-id</code> 의 <code>action="store_false"</code></strong> 는 "이 플래그가 있으면 <code>include_id</code> 를 False 로"라는 뜻입니다. <code>set_defaults(include_id=True)</code> 와 짝을 이뤄 "기본 포함, 플래그로 제외"를 표현합니다. <code>--with-id</code> 대신 <code>--no-id</code> 로 만든 것은 <strong>기본값이 무엇인지 이름에서 드러나게</strong> 하기 위해서입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>action="store_false"</code> 는 문자열이 아니라 <strong>레지스트리 키</strong>입니다. argparse 는 파서마다 <code>_registries['action']</code> 딕셔너리를 두고 <code>"store_true"</code>/<code>"store_false"</code>/<code>"append"</code> 같은 이름을 클래스에 대응시켜 두었습니다. <code>"store_false"</code> 는 <code>_StoreFalseAction</code> 으로 풀리고, 그 <code>__init__</code> 은 <code>const=False, default=True</code> 를 넣은 채 <code>_StoreConstAction</code> 을 부릅니다. 즉 <strong><code>--no-id</code> 는 그 자체로 이미 <code>include_id=True</code> 가 기본</strong>이고, 코드의 <code>set_defaults(include_id=True)</code> 는 그 사실을 눈에 보이게 다시 적어 둔 것입니다(중복이지만 "기본이 포함"이라는 계약이 한 줄로 읽힙니다).</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>action="store_false"</code> 는 문자열이 아니라 <strong>레지스트리 키</strong>입니다. argparse 는 파서마다 <code>_registries['action']</code> 딕셔너리를 두고 <code>"store_true"</code>/<code>"store_false"</code>/<code>"append"</code> 같은 이름을 클래스에 대응시켜 두었습니다. <code>"store_false"</code> 는 <code>_StoreFalseAction</code> 으로 풀리고, 그 <code>__init__</code> 은 <code>const=False, default=True</code> 를 넣은 채 <code>_StoreConstAction</code> 을 부릅니다. 즉 <strong><code>--no-id</code> 는 그 자체로 이미 <code>include_id=True</code> 가 기본</strong>이고, 코드의 <code>set_defaults(include_id=True)</code> 는 그 사실을 눈에 보이게 다시 적어 둔 것입니다(중복이지만 "기본이 포함"이라는 계약이 한 줄로 읽힙니다).</p>
 <p>여기서 <code>dest="include_id"</code> 가 없으면 어떻게 될까요. argparse 는 긴 옵션 이름의 앞 대시를 떼고 남은 대시를 밑줄로 바꿔 <code>dest</code> 를 만들므로 <code>--no-id</code> → <strong><code>args.no_id</code></strong> 가 되고, "id 를 뺄까"라는 이중 부정이 핸들러까지 흘러갑니다. <code>dest</code> 하나로 <strong>명령줄의 이름(부정형)과 코드 안의 이름(긍정형)을 분리</strong>한 것입니다. <code>--from</code> 이 예약어라 <code>dest="from_"</code> 인 것도 같은 도구의 다른 용도입니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong><code>choices=list(config.ON_DUPLICATE_CHOICES)</code></strong> 는 상수를 그대로 씁니다. 정책을 추가하면 config 한 곳만 고치면 CLI 검증까지 따라옵니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>choices</code> 검사는 타입 변환 <strong>뒤에</strong> 일어납니다. argparse 는 <code>_get_value()</code> 로 <code>type=</code> 을 적용한 다음 <code>_check_value()</code> 에서 <code>value not in choices</code> 를 봅니다. 그래서 <code>choices</code> 에 담기는 값은 명령줄 문자열이 아니라 <strong>변환 결과</strong>여야 합니다. 이 소스에서는 <code>--type</code>·<code>--on-duplicate</code> 모두 <code>type=</code> 이 없어 문자열 그대로이므로 문제가 되지 않습니다. <code>ON_DUPLICATE_CHOICES</code>(<code>services/config.py:12</code>)와 <code>VALID_TYPES</code>(<code>domain/config.py:15</code>)는 둘 다 <strong>튜플</strong>이고, <code>list(...)</code> 로 감싼 것은 argparse 액션이 공용 상수 객체를 그대로 붙들지 않도록 사본을 넘기는 방어입니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>choices</code> 검사는 타입 변환 <strong>뒤에</strong> 일어납니다. argparse 는 <code>_get_value()</code> 로 <code>type=</code> 을 적용한 다음 <code>_check_value()</code> 에서 <code>value not in choices</code> 를 봅니다. 그래서 <code>choices</code> 에 담기는 값은 명령줄 문자열이 아니라 <strong>변환 결과</strong>여야 합니다. 이 소스에서는 <code>--type</code>·<code>--on-duplicate</code> 모두 <code>type=</code> 이 없어 문자열 그대로이므로 문제가 되지 않습니다. <code>ON_DUPLICATE_CHOICES</code>(<code>services/config.py:12</code>)와 <code>VALID_TYPES</code>(<code>domain/config.py:15</code>)는 둘 다 <strong>튜플</strong>이고, <code>list(...)</code> 로 감싼 것은 argparse 액션이 공용 상수 객체를 그대로 붙들지 않도록 사본을 넘기는 방어입니다.</p>
 </blockquote>
 <h3 id="27-needs_storage-backup-만-예외">2.7 <code>needs_storage</code> — backup 만 예외</h3>
 <p>budget_app/cli/parser.py:239-243</p>
@@ -361,8 +415,7 @@ $ python -m budget_app category --data-dir ./mydata list   ✅ 이렇게만 동�
 </code></pre></div>
 
 <p><code>--limit</code>(<code>_add_list</code>)와 <code>--top</code>(<code>_add_summary</code>)이 이 함수를 <code>type=</code> 으로 씁니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — argparse 의 <code>type=</code> 은 "타입"이 아니라 <strong>문자열 하나를 받는 아무 콜러블</strong>입니다. 값이 들어오면 <code>ArgumentParser._get_value()</code> 가 <code>type_func(arg_string)</code> 을 부르고, 그 주위를 세 갈래 <code>except</code> 로 감쌉니다 — <code>ArgumentTypeError</code> 면 <strong>예외 메시지를 그대로</strong> 오류 문구로 쓰고, <code>TypeError</code>/<code>ValueError</code> 면 <code>invalid &lt;타입이름&gt; value: &lt;값&gt;</code> 이라는 argparse 기본 문구로 바꿉니다. 셋 다 결국 <code>ArgumentError</code> 로 다시 던져지고, <code>parse_args</code> 가 그것을 잡아 <code>parser.error()</code> → usage 출력 → <code>sys.exit(2)</code> 로 끝납니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — argparse 의 <code>type=</code> 은 "타입"이 아니라 <strong>문자열 하나를 받는 아무 콜러블</strong>입니다. 값이 들어오면 <code>ArgumentParser._get_value()</code> 가 <code>type_func(arg_string)</code> 을 부르고, 그 주위를 세 갈래 <code>except</code> 로 감쌉니다 — <code>ArgumentTypeError</code> 면 <strong>예외 메시지를 그대로</strong> 오류 문구로 쓰고, <code>TypeError</code>/<code>ValueError</code> 면 <code>invalid &lt;타입이름&gt; value: &lt;값&gt;</code> 이라는 argparse 기본 문구로 바꿉니다. 셋 다 결국 <code>ArgumentError</code> 로 다시 던져지고, <code>parse_args</code> 가 그것을 잡아 <code>parser.error()</code> → usage 출력 → <code>sys.exit(2)</code> 로 끝납니다.</p>
 <p><code>int(raw)</code> 가 던지는 <code>ValueError</code> 를 굳이 잡아 <code>ArgumentTypeError</code> 로 바꿔 던지는 이유가 여기 있습니다. 그냥 흘려보내면 <code>invalid positive_int value: 'abc'</code> 라는 <strong>함수 이름이 노출된 영어 문구</strong>가 나오지만, 잡아서 다시 던지면 <code>messages.ERR_ARG_NOT_INT</code> 의 한국어 문장이 그대로 화면에 나옵니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong>이 경로는 <code>@handle_errors</code> 를 지나지 않습니다.</strong> 종료 코드 표를 정직하게 읽으려면 이 사실이 필요합니다.</p>
@@ -377,8 +430,7 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <li><strong>위치.</strong> 변환은 <code>main</code> 의 <code>parse_args(argv)</code> 안에서 일어납니다. <code>@handle_errors</code> 가 붙은 것은 그다음 줄의 <code>_dispatch</code> 이므로, 방패에 닿기 전에 프로세스가 끝납니다.</li>
 <li><strong>예외 계보.</strong> argparse 가 마지막에 던지는 것은 <code>SystemExit</code> 이고, 이것은 <code>Exception</code> 이 <strong>아니라</strong> <code>BaseException</code> 의 직속 자식입니다. <code>handle_errors</code> 의 마지막 그물인 <code>except Exception</code> 은 <code>SystemExit</code> 을 잡지 못합니다(로컬에서 <code>isinstance(SystemExit(2), Exception)</code> → <code>False</code> 로 확인).</li>
 </ol>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>SystemExit</code>·<code>KeyboardInterrupt</code> 를 <code>Exception</code> 이 아니라 <code>BaseException</code> 밑으로 옮긴 것은 PEP 352 이고 파이썬 2.5 에서 들어왔습니다(<code>GeneratorExit</code> 도 지금은 같은 자리에 있지만, 그것은 PEP 352 가 한 일이 아니라 파이썬 2.6 의 후속 정리입니다). 목적이 정확히 이것입니다 — <code>except Exception:</code> 으로 광범위하게 예외를 삼키는 코드가 <strong>"이제 그만 끝내라"는 신호까지 삼켜 버리는 사고</strong>를 막는 것. 그래서 <code>sys.exit()</code> 과 Ctrl+C 는 광범위한 <code>except</code> 를 뚫고 나갑니다. 이 소스가 <code>KeyboardInterrupt</code> 를 따로 한 줄 적어 잡는 것(<code>error_handler.py:61-63</code>)도 같은 이유입니다 — 안 적으면 안 잡힙니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>SystemExit</code>·<code>KeyboardInterrupt</code> 를 <code>Exception</code> 이 아니라 <code>BaseException</code> 밑으로 옮긴 것은 PEP 352 이고 파이썬 2.5 에서 들어왔습니다(<code>GeneratorExit</code> 도 지금은 같은 자리에 있지만, 그것은 PEP 352 가 한 일이 아니라 파이썬 2.6 의 후속 정리입니다). 목적이 정확히 이것입니다 — <code>except Exception:</code> 으로 광범위하게 예외를 삼키는 코드가 <strong>"이제 그만 끝내라"는 신호까지 삼켜 버리는 사고</strong>를 막는 것. 그래서 <code>sys.exit()</code> 과 Ctrl+C 는 광범위한 <code>except</code> 를 뚫고 나갑니다. 이 소스가 <code>KeyboardInterrupt</code> 를 따로 한 줄 적어 잡는 것(<code>error_handler.py:61-63</code>)도 같은 이유입니다 — 안 적으면 안 잡힙니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p>결론적으로 종료 코드 2(<code>EXIT_VALIDATION</code>)에 도달하는 길이 <strong>두 개</strong>입니다.</p>
 <div class="table-wrap"><table>
@@ -405,6 +457,7 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <p>두 숫자가 우연히 같은 것이 아니라, <strong>"사용자가 값을 고치면 해결되는 문제"라는 같은 부류를 셸에 같은 숫자로 알리려고</strong> 맞춰 놓은 것입니다.</p>
 <hr>
 <h2 id="3-promptspy-대화형-입력">3. <code>prompts.py</code> — 대화형 입력</h2>
+<p>명령줄에 값을 다 적지 않았을 때 프로그램이 하나씩 되묻는 부분입니다. 무엇을 물을지, 틀린 값이 오면 몇 번까지 다시 물을지, 사람이 도중에 그만두면 어떻게 끝낼지를 이 파일이 정합니다.</p>
 <h3 id="31-핸들러에서-떼어낸-이유">3.1 핸들러에서 떼어낸 이유</h3>
 <p>budget_app/cli/prompts.py:1-11</p>
 <div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;대화형 입력 — 표준입력에서 값을 받아 내는 일만 담당한다.</span>
@@ -444,16 +497,18 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <div class="codehilite"><pre><span></span><code><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;2024-01-15\nexpense\n&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>add
 </code></pre></div>
 
-<p>날짜와 타입만 주고 입력이 끝났습니다. 세 번째 프롬프트(카테고리)에서 <code>input()</code> 이 <code>EOFError</code> 를 던집니다. 이것을 잡지 않으면:</p>
+<p>가운데의 <code>|</code> 는 앞 명령의 출력을 뒤 명령의 입력으로 잇는 연결(파이프)입니다. 즉 사람이 앉아서 답하는 대신 날짜와 타입 두 줄만 미리 밀어 넣은 것이고, 그 두 줄을 다 쓰면 더 읽을 것이 없습니다. 세 번째 프롬프트(카테고리)에서 <code>input()</code> 이 <code>EOFError</code> 를 던집니다. 이것을 잡지 않으면:</p>
 <ul>
-<li><strong>처리 안 함</strong> → 스택트레이스가 사용자 화면에 노출</li>
+<li><strong>처리 안 함</strong> → 스택트레이스(오류가 난 자리를 죽 늘어놓은 개발자용 출력)가 사용자 화면에 노출</li>
 <li><strong>빈 문자열 반환</strong> → 검증기가 거부 → 다시 물음 → 또 EOF → <strong>무한 루프</strong></li>
 </ul>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 전화로 설문을 받는 상황입니다. 세 번째 질문을 하려는데 상대가 이미 끊었습니다. 이때 "응답이 비어 있으니 다시 여쭙겠습니다"를 반복하면 끊긴 수화기에 대고 영원히 같은 질문을 하게 됩니다. 그래서 파이썬은 "빈 답"과 "끊겼음"을 <strong>다른 종류의 신호</strong>로 구분해서 알려 주고, 이 프로그램은 끊겼다는 신호를 받으면 되묻기를 그만두고 정리한 뒤 끝냅니다.
+다만 이 비유는 <strong>누가 끊었는가</strong>에서 깨집니다 — 사람이 직접 Ctrl+D 를 누른 경우도 있지만, 위 예처럼 미리 밀어 넣은 줄을 다 쓴 자동 실행 쪽이 실제로는 더 흔합니다.</p>
+</blockquote>
 <p><code>InputAborted</code> 는 <code>AppError</code> 를 상속하므로 <code>handle_errors</code> 의 <code>except AppError</code> 가 <strong>코드 추가 없이</strong> 처리합니다. 종료 코드 4 로 깔끔히 끝납니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>input(prompt)</code> 는 세 가지 일을 한 번에 합니다. ① <code>prompt</code> 를 <strong>stdout 에 쓰고 flush</strong> 합니다(개행 없이). ② stdin 에서 한 줄을 읽습니다. ③ 끝의 개행 문자를 <strong>떼고</strong> 돌려줍니다. 그래서 프롬프트 문자열은 결과 채널인 stdout 으로 나가고, 실제로 <code>printf 'x\n' | python -c "print('|'+input('PROMPT&gt;')+'|')"</code> 를 실행하면 <code>PROMPT&gt;|x|</code> 가 stdout 한 줄로 찍힙니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>input(prompt)</code> 는 세 가지 일을 한 번에 합니다. ① <code>prompt</code> 를 <strong>stdout 에 쓰고 flush</strong> 합니다(개행 없이). ② stdin 에서 한 줄을 읽습니다. ③ 끝의 개행 문자를 <strong>떼고</strong> 돌려줍니다. 그래서 프롬프트 문자열은 결과 채널인 stdout 으로 나가고, 실제로 <code>printf 'x\n' | python -c "print('|'+input('PROMPT&gt;')+'|')"</code> 를 실행하면 <code>PROMPT&gt;|x|</code> 가 stdout 한 줄로 찍힙니다.</p>
 <p><strong>EOF 가 왜 빈 문자열이 아니라 예외인가.</strong> 저수준 <code>sys.stdin.readline()</code> 은 스트림이 끝나면 <code>''</code> 를 돌려주는데, 이것은 "빈 줄을 읽었다"(<code>'\n'</code>)와 명확히 구분되는 신호입니다. 그런데 <code>input()</code> 은 개행을 떼고 주는 함수라, 그대로 <code>''</code> 를 돌려주면 <strong>"사용자가 엔터만 쳤다"와 "스트림이 끝났다"가 똑같은 <code>''</code> 로 뭉개집니다.</strong> 그래서 CPython 은 이 자리에서 <code>EOFError</code> 를 던집니다. 파이프 입력(<code>printf '2024-01-15\nexpense\n' | ... add</code>)에서는 준 줄을 다 소비한 <strong>다음 호출</strong>에서 곧바로 발생하며, 그 뒤 <code>sys.stdin.read()</code> 는 계속 <code>''</code> 를 돌려줍니다(로컬 3.13.1 에서 확인). 재시도 루프가 <code>''</code> 를 "잘못된 값"으로 보고 다시 묻는 한, 예외가 없으면 루프는 영원히 돕니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>raise InputAborted() from exc</code>(<code>prompts.py:57</code>)의 <code>from</code> 절은 <strong>예외 연쇄</strong>로 PEP 3134 가 파이썬 3.0 에 넣었습니다. <code>from exc</code> 는 새 예외의 <code>__cause__</code> 에 원래 예외를 걸어 두고, 트레이스백을 찍을 때 "The above exception was the direct cause of..."로 두 예외를 이어 보여 줍니다. <code>from</code> 을 쓰지 않고 <code>except</code> 안에서 그냥 <code>raise</code> 해도 <code>__context__</code> 에는 자동으로 걸리지만(암묵적 연쇄), <code>from</code> 은 <strong>"이건 우연히 겹친 게 아니라 내가 의도적으로 번역한 것"</strong> 이라는 표시입니다. 같은 관용구가 <code>positive_int</code>(<code>parser.py:52</code>)에도 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>raise InputAborted() from exc</code>(<code>prompts.py:57</code>)의 <code>from</code> 절은 <strong>예외 연쇄</strong>로 PEP 3134 가 파이썬 3.0 에 넣었습니다. <code>from exc</code> 는 새 예외의 <code>__cause__</code> 에 원래 예외를 걸어 두고, 트레이스백을 찍을 때 "The above exception was the direct cause of..."로 두 예외를 이어 보여 줍니다. <code>from</code> 을 쓰지 않고 <code>except</code> 안에서 그냥 <code>raise</code> 해도 <code>__context__</code> 에는 자동으로 걸리지만(암묵적 연쇄), <code>from</code> 은 <strong>"이건 우연히 겹친 게 아니라 내가 의도적으로 번역한 것"</strong> 이라는 표시입니다. 같은 관용구가 <code>positive_int</code>(<code>parser.py:52</code>)에도 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="33-ask_until-재시도-루프의-뼈대">3.3 <code>ask_until</code> — 재시도 루프의 뼈대</h3>
 <p>budget_app/cli/prompts.py:60-74</p>
@@ -500,10 +555,9 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <p><strong><code>while True</code> 가 아니라 <code>for range(...)</code> 인 것</strong>이 핵심입니다. 파이프로 잘못된 값을 무한히 흘려보내는 자동화 스크립트가 있어도 10회에서 멈춥니다.</p>
 <p><strong>재입력 안내가 stderr 로 가는 것</strong>도 채널 정책의 일부입니다 — 재입력 요청은 프로그램의 "결과"가 아니라 "진단"입니다.</p>
 <p><code>Callable[[str], T]</code> 타입 표기가 계약을 적어 둡니다 — "문자열을 받아 T 를 돌려주는 함수를 주면, 나도 T 를 돌려주겠다".</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>T = TypeVar("T")</code>(<code>prompts.py:25</code>)로 만드는 <strong>제네릭 함수</strong>는 PEP 484(파이썬 3.5)가 도입한 타입 힌트 체계의 일부입니다. <code>TypeVar</code> 를 함수 시그니처에 두 번 이상 쓰면 "그 자리들이 <strong>서로 같은 타입</strong>이어야 한다"는 뜻이 되어, <code>ask_until(PROMPT_AMOUNT, parse_amount)</code> 의 반환은 <code>int</code>, <code>ask_until(PROMPT_DATE, parse_date)</code> 의 반환은 <code>str</code> 로 호출마다 다르게 좁혀집니다. 문자열 <code>"T"</code> 를 인자로 다시 적는 것은 변수 이름이 실행 시점에 자기 이름을 모르기 때문입니다.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>T = TypeVar("T")</code>(<code>prompts.py:25</code>)로 만드는 <strong>제네릭 함수</strong>는 PEP 484(파이썬 3.5)가 도입한 타입 힌트 체계의 일부입니다. <code>TypeVar</code> 를 함수 시그니처에 두 번 이상 쓰면 "그 자리들이 <strong>서로 같은 타입</strong>이어야 한다"는 뜻이 되어, <code>ask_until(PROMPT_AMOUNT, parse_amount)</code> 의 반환은 <code>int</code>, <code>ask_until(PROMPT_DATE, parse_date)</code> 의 반환은 <code>str</code> 로 호출마다 다르게 좁혀집니다. 문자열 <code>"T"</code> 를 인자로 다시 적는 것은 변수 이름이 실행 시점에 자기 이름을 모르기 때문입니다.</p>
 <p><code>Callable</code> 을 <code>typing</code> 이 아니라 <code>collections.abc</code> 에서 가져오는 것(<code>prompts.py:15</code>)은 PEP 585(파이썬 3.9)가 표준 컨테이너에 <code>[]</code> 첨자를 허용하면서 <code>typing.Callable</code> 등이 <strong>비권장(deprecated)</strong> 이 된 결과입니다. 실행 시점에 <code>collections.abc.Callable</code> 은 <code>isinstance</code> 검사에 쓰이는 진짜 추상 기반 클래스이고, <code>[]</code> 를 붙이면 <code>types.GenericAlias</code> 객체를 만들 뿐 아무 검사도 하지 않습니다. <strong>타입 힌트는 실행에 영향을 주지 않습니다</strong> — <code>ask_until</code> 에 정수를 넘겨도 파이썬은 막지 않고, 호출하다 <code>TypeError</code> 가 날 뿐입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>for _ in range(...)</code> 의 밑줄은 <strong>문법이 아니라 관례</strong>입니다. <code>_</code> 는 다른 이름과 똑같이 값이 대입되는 평범한 변수이고, "이 값을 쓰지 않겠다"는 사람에게 보내는 신호일 뿐입니다(린터도 이 이름만 미사용 경고에서 빼 줍니다). <code>range(10)</code> 은 리스트를 만들지 않고 필요할 때 정수를 만들어 내는 <code>range</code> 객체이므로, 횟수가 아무리 커도 메모리는 일정합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>for _ in range(...)</code> 의 밑줄은 <strong>문법이 아니라 관례</strong>입니다. <code>_</code> 는 다른 이름과 똑같이 값이 대입되는 평범한 변수이고, "이 값을 쓰지 않겠다"는 사람에게 보내는 신호일 뿐입니다(린터도 이 이름만 미사용 경고에서 빼 줍니다). <code>range(10)</code> 은 리스트를 만들지 않고 필요할 때 정수를 만들어 내는 <code>range</code> 객체이므로, 횟수가 아무리 커도 메모리는 일정합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <h3 id="34-검증기-조립">3.4 검증기 조립</h3>
 <p>budget_app/cli/prompts.py:77-107</p>
@@ -527,10 +581,9 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <li>필수 4개(<code>date</code>/<code>type</code>/<code>category</code>/<code>amount</code>)는 <code>ask_until</code> — 틀리면 다시 묻습니다.</li>
 <li>선택 2개(<code>memo</code>/<code>tags</code>)는 <code>ask</code> 한 번 — 빈 값이 정상이라 재입력할 이유가 없습니다.</li>
 </ul>
-<p><strong>카테고리만 클로저 팩토리인 이유</strong>는 저장소를 봐야 판단되기 때문입니다. 나머지는 값만 보면 되므로 <code>validators</code> 모듈 함수를 그대로 넘깁니다. <code>ValidationError</code> 를 던지면 <code>ask_until</code> 이 잡아 재입력을 요구하므로, "등록 안 된 카테고리"도 <strong>재입력 가능한 오류</strong>가 됩니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>_validate</code> 가 바깥 함수의 인자 <code>cat_service</code> 를 읽는 것을 <strong>클로저</strong>라고 합니다. 컴파일 시점에 파이썬은 <code>cat_service</code> 가 안쪽 함수에서도 쓰인다는 것을 알아채고 그 변수를 <strong>셀(cell)</strong> 객체에 담습니다. <code>return _validate</code> 로 바깥 함수가 끝나도 셀이 살아 있어 <code>registered_category_validator(cat_service).__closure__[0].cell_contents</code> 로 붙잡힌 서비스를 직접 꺼내 볼 수 있습니다. 즉 <code>ask_until</code> 이 받는 것은 <strong>함수 하나</strong>지만 그 안에는 저장소가 함께 실려 있습니다. <code>functools.partial</code> 이나 <code>__call__</code> 을 가진 클래스로도 같은 일을 할 수 있고, 셋 다 "상태를 가진 호출 가능 객체"라는 같은 것의 다른 표기입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>TransactionInput</code>(<code>prompts.py:40-49</code>)의 <code>@dataclass(frozen=True)</code> 는 PEP 557 로 파이썬 3.7 에 들어왔습니다. 클래스 본문의 <strong>어노테이션이 붙은 이름들</strong>(<code>__annotations__</code>)을 읽어 <code>__init__</code>·<code>__repr__</code>·<code>__eq__</code> 소스 코드를 <strong>문자열로 만들어 <code>exec</code></strong> 한 뒤 클래스에 붙입니다. <code>frozen=True</code> 는 추가로 <code>__setattr__</code>/<code>__delattr__</code> 을 정의해 대입을 <code>FrozenInstanceError</code> 로 막습니다 — 언어 차원의 상수가 아니라 <strong>덮어쓴 특수 메서드</strong>이므로 <code>object.__setattr__</code> 로는 여전히 뚫립니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<p><strong>카테고리만 클로저 팩토리</strong>(검사에 필요한 도구를 미리 품은 검사 함수를 그때그때 만들어 내는 방식)<strong>인 이유</strong>는 저장소를 봐야 판단되기 때문입니다. 나머지는 값만 보면 되므로 <code>validators</code> 모듈 함수를 그대로 넘깁니다. <code>ValidationError</code> 를 던지면 <code>ask_until</code> 이 잡아 재입력을 요구하므로, "등록 안 된 카테고리"도 <strong>재입력 가능한 오류</strong>가 됩니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>_validate</code> 가 바깥 함수의 인자 <code>cat_service</code> 를 읽는 것을 <strong>클로저</strong>라고 합니다. 컴파일 시점에 파이썬은 <code>cat_service</code> 가 안쪽 함수에서도 쓰인다는 것을 알아채고 그 변수를 <strong>셀(cell)</strong> 객체에 담습니다. <code>return _validate</code> 로 바깥 함수가 끝나도 셀이 살아 있어 <code>registered_category_validator(cat_service).__closure__[0].cell_contents</code> 로 붙잡힌 서비스를 직접 꺼내 볼 수 있습니다. 즉 <code>ask_until</code> 이 받는 것은 <strong>함수 하나</strong>지만 그 안에는 저장소가 함께 실려 있습니다. <code>functools.partial</code> 이나 <code>__call__</code> 을 가진 클래스로도 같은 일을 할 수 있고, 셋 다 "상태를 가진 호출 가능 객체"라는 같은 것의 다른 표기입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>TransactionInput</code>(<code>prompts.py:40-49</code>)의 <code>@dataclass(frozen=True)</code> 는 PEP 557 로 파이썬 3.7 에 들어왔습니다. 클래스 본문의 <strong>어노테이션이 붙은 이름들</strong>(<code>__annotations__</code>)을 읽어 <code>__init__</code>·<code>__repr__</code>·<code>__eq__</code> 소스 코드를 <strong>문자열로 만들어 <code>exec</code></strong> 한 뒤 클래스에 붙입니다. <code>frozen=True</code> 는 추가로 <code>__setattr__</code>/<code>__delattr__</code> 을 정의해 대입을 <code>FrozenInstanceError</code> 로 막습니다 — 언어 차원의 상수가 아니라 <strong>덮어쓴 특수 메서드</strong>이므로 <code>object.__setattr__</code> 로는 여전히 뚫립니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <p>미등록 시 사용 가능한 목록을 보여 주는 것도 UX 배려입니다.</p>
 <div class="codehilite"><pre><span></span><code>카테고리: 커피
@@ -541,6 +594,10 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 
 <hr>
 <h2 id="4-presenterpy-출력하지-않고-반환한다">4. <code>presenter.py</code> — 출력하지 않고 반환한다</h2>
+<p>계산이 끝난 값을 사람이 읽을 문장으로 바꾸는 부분입니다. 바꾸기만 하고 화면에 내보내지는 않습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 주방의 요리사는 접시에 담기까지만 하고, 손님 자리로 가져가는 일은 홀 직원이 합니다. 이렇게 나눠 두면 모양이 제대로 나왔는지 확인하려고 손님 자리까지 따라갈 필요가 없습니다. 주방 안에서 접시만 보면 됩니다. 프레젠터가 만든 문장을 화면에 찍지 않고 돌려주는 것도 같은 이유입니다 — "이 문장이 제대로 만들어졌나"를 확인할 때 프로그램을 실제로 띄우고 화면에 나온 글자를 긁어모을 필요가 없습니다.
+다만 이 비유는 <strong>접시가 한 번에 하나씩 나온다</strong>는 점에서 깨집니다 — 프레젠터는 완성된 상을 통째로 내주는 것이 아니라 줄을 한 줄씩 내주고, 받는 쪽이 그만 받겠다고 하면 그 자리에서 멈춥니다(§4.2).</p>
+</blockquote>
 <h3 id="41-유일한-규칙">4.1 유일한 규칙</h3>
 <p>budget_app/cli/presenter.py:1-16</p>
 <div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;프레젠터 — 도메인 객체를 사람이 읽을 줄로 바꾼다.</span>
@@ -563,6 +620,9 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 
 <p><code>grep -c "print(" budget_app/cli/presenter.py</code> 의 결과는 <strong>0</strong> 입니다.</p>
 <h3 id="42-제너레이터로-반환하는-이유">4.2 제너레이터로 반환하는 이유</h3>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 도서관에서 두꺼운 책의 내용을 확인하는 방법은 둘입니다. 전권을 복사해 가방에 넣고 나와서 보거나, 열람실에서 필요한 만큼만 한 장씩 넘겨 보거나. 뒤쪽이 제너레이터입니다 — 스무 줄만 필요하면 스물한 장째는 넘기지 않고, 가방(메모리)이 무거워지지도 않습니다.
+다만 이 비유는 <strong>중간에 정렬이 끼는 순간</strong> 깨집니다 — 최신순으로 보려면 어차피 전권을 한 번은 훑어야 하고, 훑은 것을 다 손에 든 채로 첫 줄을 내놓게 됩니다. 즉 조건에 걸러진 항목 전체가 메모리에 쌓이고, <code>--limit 20</code> 을 붙여도 그 양은 줄지 않습니다. 이 프로그램의 <code>list</code> 가 정확히 그 경우라, 두 가지 이득 중 어느 쪽도 여기서는 얻지 못합니다. 그래서 이 절 뒤쪽에 "정직하게" 라는 단서가 붙습니다.</p>
+</blockquote>
 <p>budget_app/cli/presenter.py:42-55</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tx_table</span><span class="p">(</span><span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.</span>
@@ -588,9 +648,8 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
                                          상류 제너레이터도 더 이상 값을 요구받지 않음
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 함수 본문에 <code>yield</code> 가 하나라도 있으면 그 함수는 <strong>호출해도 본문이 실행되지 않고</strong> 제너레이터 객체를 돌려주는 함수가 됩니다(PEP 255, 파이썬 2.2). 컴파일러가 코드 객체에 <code>CO_GENERATOR</code> 플래그를 세우기 때문이고, 그래서 <code>tx_table(...)</code> 을 부르는 것만으로는 저장소를 한 줄도 읽지 않습니다. 본문은 <code>next()</code> 가 불릴 때마다 <strong>다음 <code>yield</code> 까지만</strong> 실행되고 거기서 지역 변수(<code>count</code>, <code>tx</code>)와 실행 위치를 프레임에 남긴 채 멈춥니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ <code>break</code> 가 상류까지 전파되는 실제 경로.</strong> 제너레이터는 값을 <strong>밀어내지(push) 않고 당겨집니다(pull)</strong>. <code>for line in tx_table(...)</code> 이 도는 동안에만 <code>tx_table</code> 이 깨어나고, <code>tx_table</code> 이 깨어난 동안에만 <code>for tx in rows</code> 가 상류에 <code>next()</code> 를 겁니다. <code>break</code> 로 <code>tx_table</code> 이 멈추면 상류에 <code>next()</code> 를 거는 코드가 아무 데도 없으므로 상류는 <strong>그 자리에 멈춘 채 그대로 남습니다</strong> — 취소 신호를 보내는 것이 아니라 <strong>아무도 부르지 않아서</strong> 멈추는 것입니다. 이후 제너레이터 객체의 참조가 사라지면 파이썬이 <code>close()</code> 를 불러 멈춘 지점에 <code>GeneratorExit</code> 를 던지고, 그때 상류의 <code>with open(...)</code>(<code>storage/jsonl.py:174</code>)이 <code>finally</code> 를 타며 파일이 닫힙니다.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 함수 본문에 <code>yield</code> 가 하나라도 있으면 그 함수는 <strong>호출해도 본문이 실행되지 않고</strong> 제너레이터 객체를 돌려주는 함수가 됩니다(PEP 255, 파이썬 2.2). 컴파일러가 코드 객체에 <code>CO_GENERATOR</code> 플래그를 세우기 때문이고, 그래서 <code>tx_table(...)</code> 을 부르는 것만으로는 저장소를 한 줄도 읽지 않습니다. 본문은 <code>next()</code> 가 불릴 때마다 <strong>다음 <code>yield</code> 까지만</strong> 실행되고 거기서 지역 변수(<code>count</code>, <code>tx</code>)와 실행 위치를 프레임에 남긴 채 멈춥니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ <code>break</code> 가 상류까지 전파되는 실제 경로.</strong> 제너레이터는 값을 <strong>밀어내지(push) 않고 당겨집니다(pull)</strong>. <code>for line in tx_table(...)</code> 이 도는 동안에만 <code>tx_table</code> 이 깨어나고, <code>tx_table</code> 이 깨어난 동안에만 <code>for tx in rows</code> 가 상류에 <code>next()</code> 를 겁니다. <code>break</code> 로 <code>tx_table</code> 이 멈추면 상류에 <code>next()</code> 를 거는 코드가 아무 데도 없으므로 상류는 <strong>그 자리에 멈춘 채 그대로 남습니다</strong> — 취소 신호를 보내는 것이 아니라 <strong>아무도 부르지 않아서</strong> 멈추는 것입니다. 이후 제너레이터 객체의 참조가 사라지면 파이썬이 <code>close()</code> 를 불러 멈춘 지점에 <code>GeneratorExit</code> 를 던지고, 그때 상류의 <code>with open(...)</code>(<code>storage/jsonl.py:174</code>)이 <code>finally</code> 를 타며 파일이 닫힙니다.</p>
 </blockquote>
 <p><strong>정직하게 — <code>list</code> 경로에서는 파일 읽기까지 줄어들지는 않습니다.</strong></p>
 <p>budget_app/services/transactions.py:79-87</p>
@@ -640,8 +699,7 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 
 <p><code>summary.is_empty</code>, <code>summary.balance</code>, <code>summary.over_budget</code> — <strong>전부 묻기만</strong> 합니다. <code>income - expense</code> 를 여기서 계산하지 않습니다.</p>
 <p><strong><code>yield from _budget_lines(summary)</code></strong> 는 다른 제너레이터에 반복을 위임합니다. 예산 관련 두 줄을 별도 함수로 뺀 이유는 <code>summary_lines</code> 의 흐름(수입→지출→잔액→예산→TOP)이 한눈에 읽히게 하기 위해서입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>yield from</code> 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. 그 전에는 <code>for x in gen(): yield x</code> 라고 손으로 풀어 써야 했고, 여기서는 그것과 결과가 같습니다. 다만 <code>yield from</code> 이 단순한 축약이 아닌 이유는 <strong><code>send()</code>·<code>throw()</code>·<code>close()</code>·반환값(<code>StopIteration.value</code>)까지 하위 제너레이터에 그대로 통과시키기</strong> 때문입니다. 이 소스는 값만 흘려보내므로 축약으로 봐도 무방하지만, 같은 문법이 <code>stream_sorted</code> 의 <code>yield from items</code> 처럼 <strong>리스트에도</strong> 쓰입니다 — 대상은 제너레이터가 아니라 아무 이터러블이면 됩니다.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>yield from</code> 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. 그 전에는 <code>for x in gen(): yield x</code> 라고 손으로 풀어 써야 했고, 여기서는 그것과 결과가 같습니다. 다만 <code>yield from</code> 이 단순한 축약이 아닌 이유는 <strong><code>send()</code>·<code>throw()</code>·<code>close()</code>·반환값(<code>StopIteration.value</code>)까지 하위 제너레이터에 그대로 통과시키기</strong> 때문입니다. 이 소스는 값만 흘려보내므로 축약으로 봐도 무방하지만, 같은 문법이 <code>stream_sorted</code> 의 <code>yield from items</code> 처럼 <strong>리스트에도</strong> 쓰입니다 — 대상은 제너레이터가 아니라 아무 이터러블이면 됩니다.</p>
 <p><code>summary_lines</code> 안의 <code>return</code>(<code>presenter.py:66</code>)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 <code>return</code> 은 "값을 하나 돌려준다"가 아니라 <strong><code>StopIteration</code> 을 일으켜 반복을 끝낸다</strong>는 뜻이고, 그래서 <code>is_empty</code> 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 <code>return 값</code> 도 문법상 허용되지만 그 값은 <code>yield</code> 되지 않고 <code>StopIteration.value</code> 에 실립니다). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="44-진단-줄도-프레젠터가-만든다">4.4 진단 줄도 프레젠터가 만든다</h3>
@@ -655,13 +713,16 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
     <span class="p">)</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>"...{mode}...".format(mode=..., imported=...)</code> 의 중괄호 서식은 PEP 3101 이 파이썬 2.6/3.0 에 넣은 것으로, 그 전에는 <code>"%s개" % n</code> 같은 <code>%</code> 연산자를 썼습니다. <code>str.format</code> 은 서식 문자열을 파싱해 <code>{이름}</code> 자리마다 인자를 꺼내 각 값의 <code>__format__</code> 을 부릅니다. <strong>이 소스가 f-string 대신 <code>.format</code> 을 쓰는 것은 취향이 아니라 구조 때문입니다</strong> — 문장은 <code>cli/messages.py</code> 에 상수로 먼저 정의되어 있고 값은 나중에 다른 파일에서 채워집니다. f-string 은 리터럴이 놓인 자리에서 즉시 평가되므로 "문장을 한곳에 모아 둔다"는 이 설계와 애초에 양립하지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>"...{mode}...".format(mode=..., imported=...)</code> 의 중괄호 서식은 PEP 3101 이 파이썬 2.6/3.0 에 넣은 것으로, 그 전에는 <code>"%s개" % n</code> 같은 <code>%</code> 연산자를 썼습니다. <code>str.format</code> 은 서식 문자열을 파싱해 <code>{이름}</code> 자리마다 인자를 꺼내 각 값의 <code>__format__</code> 을 부릅니다. <strong>이 소스가 f-string 대신 <code>.format</code> 을 쓰는 것은 취향이 아니라 구조 때문입니다</strong> — 문장은 <code>cli/messages.py</code> 에 상수로 먼저 정의되어 있고 값은 나중에 다른 파일에서 채워집니다. f-string 은 리터럴이 놓인 자리에서 즉시 평가되므로 "문장을 한곳에 모아 둔다"는 이 설계와 애초에 양립하지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong>프레젠터는 문자열만 만들고, 어느 채널로 보낼지는 호출자가 정합니다.</strong> docstring 이 그 계약을 명시합니다("호출자가 stderr 로 보낸다").</p>
 <p><code>import_problem_lines</code> 만 리스트를 반환하는데(다른 함수는 제너레이터), 호출자가 "비었는지" 먼저 확인할 수 있어야 하기 때문입니다. 제너레이터는 소비하기 전에는 비었는지 알 수 없습니다.</p>
 <hr>
 <h2 id="5-outputpy-채널-결정">5. <code>output.py</code> — 채널 결정</h2>
+<p>만들어진 문장을 어느 출구로 내보낼지 이 파일에서만 정합니다. 문장을 조립하는 일은 하지 않습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 관공서에 창구가 둘 있다고 생각해 보세요. 하나는 <strong>서류를 내주는 창구</strong>, 다른 하나는 <strong>문제를 알려 주는 창구</strong>입니다. 나눠 두면 받은 서류만 봉투에 담아 그대로 다음 기관에 낼 수 있습니다. 안내문이 서류 사이에 섞여 있으면 일일이 골라내야 하고, 골라낼 방법도 마땅치 않습니다. 결과를 파일로 받아 두거나(<code>list &gt; out.txt</code>) 다음 프로그램에 넘길 때(<code>list | head</code>) 필요한 것이 정확히 이 구분입니다.
+다만 이 비유는 <strong>두 창구가 같은 화면을 쓴다</strong>는 점에서 깨집니다 — 터미널에서 그냥 실행하면 두 출구의 글자가 한 화면에 섞여 보이고, 나뉘어 있다는 사실은 파일로 받거나 한쪽을 버릴 때에야 드러납니다.</p>
+</blockquote>
 <h3 id="51-세-채널">5.1 세 채널</h3>
 <p>budget_app/cli/output.py:1-2</p>
 <div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;출력 채널 — 어떤 메시지가 어느 스트림으로 나가는지 이 모듈에서만 정한다.</span>
@@ -674,6 +735,9 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 
 <p><strong>"선언과 코드의 불일치"를 고친 사례</strong>입니다. 문서가 규칙을 말하는데 코드가 지키지 않으면, 그 문서를 믿고 코드를 읽는 사람이 오해합니다.</p>
 <h3 id="53-err-의-flush">5.3 <code>err()</code> 의 flush</h3>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 같은 사무실에서 두 사람이 편지를 부칩니다. 결과를 담당하는 사람은 우편물을 상자에 모아 두었다가 상자가 차면 한꺼번에 부치고, 문제를 알리는 사람은 쓰는 즉시 한 통씩 부칩니다. 각자에게는 합리적이지만 받는 쪽에서는 나중에 쓴 항의 편지가 먼저 쓴 결과 편지보다 앞서 도착합니다. <code>flush</code> 는 "지금 상자에 든 것부터 다 부쳐라"라고 이르는 일이고, 그래서 항의 편지를 쓰기 직전에 한 번 이릅니다.
+다만 이 비유는 <strong>상자가 늘 쓰인다</strong>는 점에서 깨집니다 — 결과를 터미널에 바로 찍을 때는 결과 쪽도 한 줄씩 곧바로 부치므로 순서가 뒤집히지 않고, 파일이나 파이프로 보낼 때만 상자가 생깁니다.</p>
+</blockquote>
 <p>budget_app/cli/output.py:53-66</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">err</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;사용자용 진단 한 줄을 stderr 로 출력한다.</span>
@@ -724,9 +788,8 @@ RESULT 2
 </code></pre></div>
 
 <p>순서가 복구됩니다. <strong><code>output.err</code> 가 맨 앞에서 하는 일이 정확히 이 한 줄</strong>입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — 왜 stdout 만 그런가. CPython 은 시작할 때 <code>sys.stdout</code>/<code>sys.stderr</code> 를 <code>io.TextIOWrapper</code> 로 만드는데, 정책이 서로 다릅니다. <strong>stdout</strong> 은 <code>isatty()</code> 가 참이면 라인 버퍼, 거짓(파일·파이프)이면 아래 <code>BufferedWriter</code> 의 블록 버퍼(기본 8192바이트)에 모았다가 씁니다. <strong>stderr</strong> 는 대상이 무엇이든 <code>line_buffering=True</code> 로 만들어져 개행마다 곧바로 흘러나갑니다(둘 다 아래는 같은 <code>BufferedWriter</code> 이고, 차이는 텍스트 층의 이 플래그 하나입니다 — 로컬 3.13.1 에서 <code>sys.stderr.line_buffering</code> → <code>True</code>, 파이프에 붙은 <code>sys.stdout.line_buffering</code> → <code>False</code> 로 확인). 소스 주석이 "stderr 는 버퍼링 없음"이라고 적은 것은 이 <strong>줄 단위 즉시 방출</strong>을 줄여 말한 것입니다. 터미널에서 직접 실행할 때 이 버그가 안 보이는 이유도 여기 있습니다 — 터미널이면 stdout 도 라인 버퍼라 순서가 맞습니다. <strong>리다이렉트/파이프에서만 드러나는 버그</strong>인 것입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>print(message, file=sys.stderr)</code> 의 <code>file=</code> 키워드는 <code>print</code> 가 <strong>문장에서 함수로 바뀌면서</strong> 생겼습니다(PEP 3105, 파이썬 3.0). 파이썬 2 의 <code>print &gt;&gt;sys.stderr, message</code> 라는 특수 문법이 그냥 키워드 인자가 된 것입니다. <code>print</code> 가 하는 일은 단순합니다 — 각 인자를 <code>str()</code> 로 바꿔 <code>sep</code>(기본 <code>' '</code>)으로 잇고 <code>end</code>(기본 <code>'\n'</code>)를 붙여 <code>file.write()</code> 를 부릅니다. <code>file</code> 의 기본값은 <code>sys.stderr</code> 처럼 미리 굳어 있지 않고 <strong>호출할 때마다 <code>sys.stdout</code> 을 다시 조회</strong>하므로, 테스트에서 <code>sys.stdout</code> 을 갈아 끼우면 이미 정의된 <code>out()</code> 도 따라옵니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 왜 stdout 만 그런가. CPython 은 시작할 때 <code>sys.stdout</code>/<code>sys.stderr</code> 를 <code>io.TextIOWrapper</code> 로 만드는데, 정책이 서로 다릅니다. <strong>stdout</strong> 은 <code>isatty()</code> 가 참이면 라인 버퍼, 거짓(파일·파이프)이면 아래 <code>BufferedWriter</code> 의 블록 버퍼(기본 8192바이트)에 모았다가 씁니다. <strong>stderr</strong> 는 대상이 무엇이든 <code>line_buffering=True</code> 로 만들어져 개행마다 곧바로 흘러나갑니다(둘 다 아래는 같은 <code>BufferedWriter</code> 이고, 차이는 텍스트 층의 이 플래그 하나입니다 — 로컬 3.13.1 에서 <code>sys.stderr.line_buffering</code> → <code>True</code>, 파이프에 붙은 <code>sys.stdout.line_buffering</code> → <code>False</code> 로 확인). 소스 주석이 "stderr 는 버퍼링 없음"이라고 적은 것은 이 <strong>줄 단위 즉시 방출</strong>을 줄여 말한 것입니다. 터미널에서 직접 실행할 때 이 버그가 안 보이는 이유도 여기 있습니다 — 터미널이면 stdout 도 라인 버퍼라 순서가 맞습니다. <strong>리다이렉트/파이프에서만 드러나는 버그</strong>인 것입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>print(message, file=sys.stderr)</code> 의 <code>file=</code> 키워드는 <code>print</code> 가 <strong>문장에서 함수로 바뀌면서</strong> 생겼습니다(PEP 3105, 파이썬 3.0). 파이썬 2 의 <code>print &gt;&gt;sys.stderr, message</code> 라는 특수 문법이 그냥 키워드 인자가 된 것입니다. <code>print</code> 가 하는 일은 단순합니다 — 각 인자를 <code>str()</code> 로 바꿔 <code>sep</code>(기본 <code>' '</code>)으로 잇고 <code>end</code>(기본 <code>'\n'</code>)를 붙여 <code>file.write()</code> 를 부릅니다. <code>file</code> 의 기본값은 <code>sys.stderr</code> 처럼 미리 굳어 있지 않고 <strong>호출할 때마다 <code>sys.stdout</code> 을 다시 조회</strong>하므로, 테스트에서 <code>sys.stdout</code> 을 갈아 끼우면 이미 정의된 <code>out()</code> 도 따라옵니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><code>try/except</code> 로 감싼 이유는 <strong>이미 파이프가 끊긴 상태</strong>에서 <code>flush()</code> 가 또 <code>BrokenPipeError</code> 를 낼 수 있기 때문입니다. 그래도 stderr 는 살아 있으므로 진단은 계속 출력합니다 — 주석이 지적하듯 이것이 <strong>채널 분리의 이점</strong>입니다.</p>
 <p><code>except</code> 에 <code>ValueError</code> 가 함께 적힌 것도 이유가 있습니다. 파일 객체가 <strong>닫힌 뒤</strong>에 <code>flush()</code> 를 부르면 파이썬은 <code>OSError</code> 가 아니라 <code>ValueError: I/O operation on closed file</code> 을 던집니다. 두 실패는 원인이 다르지만(끊김 / 닫힘) 여기서의 대응은 같으므로 튜플 하나로 묶었습니다.</p>
@@ -761,8 +824,7 @@ RESULT 2
     <span class="k">return</span> <span class="n">enabled</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>logging.basicConfig</code> 는 <strong>루트 로거 하나</strong>를 설정하는 편의 함수입니다. 원래 규칙은 "루트에 핸들러가 이미 있으면 아무것도 하지 않고 조용히 돌아간다"인데, 그래서 라이브러리 하나가 먼저 <code>basicConfig</code> 를 불러 버리면 뒤에 오는 설정이 <strong>경고도 없이 무시</strong>됩니다. <code>force=True</code>(파이썬 3.8 추가)는 그 앞에 정리 단계를 끼워 넣습니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>logging.basicConfig</code> 는 <strong>루트 로거 하나</strong>를 설정하는 편의 함수입니다. 원래 규칙은 "루트에 핸들러가 이미 있으면 아무것도 하지 않고 조용히 돌아간다"인데, 그래서 라이브러리 하나가 먼저 <code>basicConfig</code> 를 불러 버리면 뒤에 오는 설정이 <strong>경고도 없이 무시</strong>됩니다. <code>force=True</code>(파이썬 3.8 추가)는 그 앞에 정리 단계를 끼워 넣습니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><code>force=True</code> 가 실제로 실행하는 코드는 네 줄입니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># CPython 3.13.1 Lib/logging/__init__.py — basicConfig 안</span>
@@ -782,8 +844,7 @@ RESULT 2
 </code></pre></div>
 
 <p><code>if os.environ.get("BUDGET_APP_DEBUG"):</code> 라고만 쓰면 <code>BUDGET_APP_DEBUG=0</code> 이 <strong>켜집니다</strong>(빈 문자열이 아니므로 truthy). 흔한 실수를 상수로 방어했습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>os.environ</code> 은 호출할 때마다 OS 에 묻는 함수가 아니라, <strong>파이썬이 시작할 때 프로세스 환경을 통째로 복사해 만든 <code>os._Environ</code> 매핑</strong>입니다. 그래서 프로그램이 도는 도중 바깥 셸에서 값을 바꿔도 반영되지 않습니다. 반대로 <code>os.environ["X"] = "1"</code> 로 쓰면 <code>__setitem__</code> 이 파이썬 딕셔너리와 함께 C 층의 <code>putenv</code> 도 부르므로, 이후 <code>subprocess</code> 로 띄우는 자식 프로세스는 그 값을 물려받습니다. <code>os.environ.get(name, "")</code> 의 두 번째 인자는 <strong>키가 없을 때의 기본값</strong>이라 <code>.strip().lower()</code> 가 <code>None</code> 에 대해 터지지 않게 해 줍니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>os.environ</code> 은 호출할 때마다 OS 에 묻는 함수가 아니라, <strong>파이썬이 시작할 때 프로세스 환경을 통째로 복사해 만든 <code>os._Environ</code> 매핑</strong>입니다. 그래서 프로그램이 도는 도중 바깥 셸에서 값을 바꿔도 반영되지 않습니다. 반대로 <code>os.environ["X"] = "1"</code> 로 쓰면 <code>__setitem__</code> 이 파이썬 딕셔너리와 함께 C 층의 <code>putenv</code> 도 부르므로, 이후 <code>subprocess</code> 로 띄우는 자식 프로세스는 그 값을 물려받습니다. <code>os.environ.get(name, "")</code> 의 두 번째 인자는 <strong>키가 없을 때의 기본값</strong>이라 <code>.strip().lower()</code> 가 <code>None</code> 에 대해 터지지 않게 해 줍니다.</p>
 <p><code>value not in config.FALSY_ENV_VALUES</code> 의 <code>FALSY_ENV_VALUES</code> 가 <code>frozenset</code> 인 것도 이유가 있습니다. <code>in</code> 은 자료형마다 다른 연산으로 풀립니다 — 리스트/튜플이면 앞에서부터 하나씩 <code>==</code> 비교(O(n)), 집합이면 <strong>해시 한 번</strong>(O(1))입니다. 항목이 다섯 개뿐이라 속도 차이는 무의미하지만, <code>frozenset</code> 은 <strong>불변</strong>이라 모듈 상수가 실수로 변경되는 일을 막아 줍니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong>로그 포맷이 두 가지인 이유.</strong></p>
@@ -795,7 +856,8 @@ RESULT 2
 <p>평상시(WARNING)에는 짧게, <code>--debug</code> 에서는 "어디서 나온 로그인지"(모듈:줄번호)까지 보여 줍니다.</p>
 <hr>
 <h2 id="6-apppy-오케스트레이션과-진입점">6. <code>app.py</code> — 오케스트레이션과 진입점</h2>
-<p>(리팩터 전 단일 모듈의 이름이 <code>cli.py</code> 였고, 그 역할 중 "레지스트리 + 진입점"만 남은 것이 지금의 <code>cli/app.py</code> 입니다. 명령별 함수는 <code>cli/handlers.py</code> 로 갔습니다.)</p>
+<p>프로그램이 시작해서 끝날 때까지의 <strong>순서</strong>를 정하는 파일입니다. 오케스트레이션이란 직접 일하지 않고 누가 할 차례인지만 정해 주는 일을 말합니다.</p>
+<p>(리팩터 전 단일 모듈의 이름이 <code>cli.py</code> 였습니다. 그 역할 중 "레지스트리(이름과 담당 함수를 짝지어 적어 둔 명부) + 진입점"만 남은 것이 지금의 <code>cli/app.py</code> 이고, 명령별 함수는 <code>cli/handlers.py</code> 로 갔습니다.)</p>
 <h3 id="61-핸들러는-36줄">6.1 핸들러는 3~6줄</h3>
 <p>budget_app/cli/app.py:1-13</p>
 <div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;CLI 진입점 — 명령 레지스트리와 ``main``.</span>
@@ -893,9 +955,8 @@ RESULT 2
 
 <p><strong>순서가 중요합니다.</strong> <code>setup_logging</code> 이 3번보다 앞에 있어야 저장소 초기화 중 발생하는 경고 로그도 보입니다. 3·4·5 번은 <code>main</code> 이 아니라 <code>@handle_errors</code> 가 붙은 <code>_dispatch</code>(<code>app.py:61-81</code>) 안에 있습니다 — 파일을 여는 코드를 방패 밖에 두지 않기 위해서입니다.</p>
 <p><strong><code>argv: list[str] | None = None</code></strong> 은 테스트를 위한 설계입니다. <code>None</code> 이면 argparse 가 <code>sys.argv[1:]</code> 를 쓰고, 리스트를 주면 그것을 파싱합니다. 프로세스를 띄우지 않고 <code>main(["list", "--limit", "5"])</code> 로 호출할 수 있습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 타입 표기가 <code>Optional[List[str]]</code> 이 아니라 <code>list[str] | None</code> 인 것은 두 PEP 이 겹친 결과입니다. 소문자 <code>list[str]</code> 은 PEP 585(3.9)가 표준 컨테이너에 첨자를 허용하면서, <code>X | None</code> 은 PEP 604(3.10)가 <code>|</code> 를 타입 합집합으로 쓰게 하면서 가능해졌습니다. 그 위에 파일 첫머리의 <code>from __future__ import annotations</code>(PEP 563)가 <strong>모든 어노테이션을 문자열로만 보관</strong>하게 만들어, 실행 시점에 평가되지 않으니 3.10 미만에서도 구문 오류가 나지 않습니다. 이 프로젝트의 요구 버전이 <code>&gt;=3.10</code> 이므로 실제로는 future import 없이도 동작하지만, 어노테이션 평가 비용을 없애고 따옴표 표기를 영구히 불필요하게 만드는 효과는 그대로 남습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>parse_args(argv)</code> 에 <code>None</code> 을 주면 argparse 가 내부에서 <code>args = sys.argv[1:]</code> 로 바꿔치기합니다(<code>_parse_known_args2</code> 의 첫 세 줄). <code>sys.argv[0]</code> 은 프로그램 이름이라 잘라 내는 것이고, 그래서 usage 에 찍히는 이름은 <code>sys.argv[0]</code> 이 아니라 <code>ArgumentParser(prog=config.PROG_NAME)</code> 으로 <strong>직접 지정한</strong> <code>"budget_app"</code> 입니다. 지정하지 않으면 argparse 는 <code>os.path.basename(sys.argv[0])</code> 을 쓰는데, <code>python -m budget_app</code> 으로 실행하면 그 값이 <code>__main__.py</code> 라서 사용자에게 낯선 이름이 나옵니다.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 타입 표기가 <code>Optional[List[str]]</code> 이 아니라 <code>list[str] | None</code> 인 것은 두 PEP 이 겹친 결과입니다. 소문자 <code>list[str]</code> 은 PEP 585(3.9)가 표준 컨테이너에 첨자를 허용하면서, <code>X | None</code> 은 PEP 604(3.10)가 <code>|</code> 를 타입 합집합으로 쓰게 하면서 가능해졌습니다. 그 위에 파일 첫머리의 <code>from __future__ import annotations</code>(PEP 563)가 <strong>모든 어노테이션을 문자열로만 보관</strong>하게 만들어, 실행 시점에 평가되지 않으니 3.10 미만에서도 구문 오류가 나지 않습니다. 이 프로젝트의 요구 버전이 <code>&gt;=3.10</code> 이므로 실제로는 future import 없이도 동작하지만, 어노테이션 평가 비용을 없애고 따옴표 표기를 영구히 불필요하게 만드는 효과는 그대로 남습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>parse_args(argv)</code> 에 <code>None</code> 을 주면 argparse 가 내부에서 <code>args = sys.argv[1:]</code> 로 바꿔치기합니다(<code>_parse_known_args2</code> 의 첫 세 줄). <code>sys.argv[0]</code> 은 프로그램 이름이라 잘라 내는 것이고, 그래서 usage 에 찍히는 이름은 <code>sys.argv[0]</code> 이 아니라 <code>ArgumentParser(prog=config.PROG_NAME)</code> 으로 <strong>직접 지정한</strong> <code>"budget_app"</code> 입니다. 지정하지 않으면 argparse 는 <code>os.path.basename(sys.argv[0])</code> 을 쓰는데, <code>python -m budget_app</code> 으로 실행하면 그 값이 <code>__main__.py</code> 라서 사용자에게 낯선 이름이 나옵니다.</p>
 </blockquote>
 <h3 id="63-handlers-문자열-키-레지스트리">6.3 <code>HANDLERS</code> — 문자열 키 레지스트리</h3>
 <p>budget_app/cli/app.py:26-27</p>
@@ -903,8 +964,7 @@ RESULT 2
 </code></pre></div>
 
 <p><strong><code>Handler</code> 타입 별칭이 계약을 한 줄로 적어 둡니다</strong> — "컨텍스트와 파싱 결과를 받아 종료 코드를 돌려주는 함수". 새 핸들러를 추가할 때 이 모양만 맞추면 됩니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>Handler = Callable[[AppContext, argparse.Namespace], int]</code> 는 특별한 선언 문법이 아니라 <strong>평범한 대입문</strong>입니다. 오른쪽은 실행 시점에 <code>types.GenericAlias</code> 객체 하나를 만들고, <code>Handler</code> 는 그 객체를 가리키는 모듈 전역 변수가 됩니다. 그래서 아래 <code>dict[str, Handler]</code> 처럼 다른 타입 표기 안에서 그대로 쓸 수 있습니다. <code>Callable[[A, B], R]</code> 의 대괄호 두 겹은 "인자 목록 / 반환 타입"을 뜻합니다 — 안쪽 리스트가 인자, 뒤가 반환입니다. 파이썬 3.12 는 <code>type Handler = ...</code>(PEP 695)라는 전용 문법도 추가했지만 <strong>이 소스는 쓰지 않습니다</strong>(요구 버전이 <code>&gt;=3.10</code>). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>Handler = Callable[[AppContext, argparse.Namespace], int]</code> 는 특별한 선언 문법이 아니라 <strong>평범한 대입문</strong>입니다. 오른쪽은 실행 시점에 <code>types.GenericAlias</code> 객체 하나를 만들고, <code>Handler</code> 는 그 객체를 가리키는 모듈 전역 변수가 됩니다. 그래서 아래 <code>dict[str, Handler]</code> 처럼 다른 타입 표기 안에서 그대로 쓸 수 있습니다. <code>Callable[[A, B], R]</code> 의 대괄호 두 겹은 "인자 목록 / 반환 타입"을 뜻합니다 — 안쪽 리스트가 인자, 뒤가 반환입니다. 파이썬 3.12 는 <code>type Handler = ...</code>(PEP 695)라는 전용 문법도 추가했지만 <strong>이 소스는 쓰지 않습니다</strong>(요구 버전이 <code>&gt;=3.10</code>). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p><strong>키 이름 규칙</strong>: 1단 명령은 <code>"add"</code>, 2단은 <code>"category.add"</code>. 점 표기가 계층을 드러냅니다.</p>
 <p><strong>명령을 추가하는 절차:</strong></p>
@@ -915,11 +975,10 @@ RESULT 2
 <li><code>app.py</code> 의 <code>HANDLERS</code> 에 한 줄 추가</li>
 </ol>
 <p><code>main()</code> 은 영원히 그대로입니다. <strong>3번에 <code>@handle_errors</code> 를 붙이는 단계가 없다는 점</strong>을 눈여겨보세요. 예전에는 핸들러 13개에 각각 붙였지만 지금은 <code>_dispatch</code> 한 곳에만 붙습니다(<code>app.py:61</code>). 정책이 한 곳에서 적용되면 "새 핸들러에 데코레이터를 빠뜨리는" 실수 자체가 생길 수 없습니다 — <code>handlers.py</code> 전체에 <code>@handle_errors</code> 는 <strong>한 개도 없습니다</strong>.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>@handle_errors</code> 같은 데코레이터 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다. <code>@deco</code> 를 함수 정의 위에 얹은 것은 <code>def f(): ...</code> 뒤에 <code>f = deco(f)</code> 를 쓴 것과 <strong>정확히 같은 코드로 풀립니다</strong>(desugar). 그래서 <code>_dispatch</code> 라는 이름이 실제로 가리키는 것은 원래 함수가 아니라 <code>handle_errors</code> 가 돌려준 <code>wrapper</code> 이고, 안쪽에서 <code>functools.wraps</code> 로 이름·docstring 을 옮겨 심어야 정체가 유지됩니다. 자세한 것은 <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a>, 문법 계보는 <a href="12-syntax-and-stdlib.html">12 §1-C</a>.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@handle_errors</code> 같은 데코레이터 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다. <code>@deco</code> 를 함수 정의 위에 얹은 것은 <code>def f(): ...</code> 뒤에 <code>f = deco(f)</code> 를 쓴 것과 <strong>정확히 같은 코드로 풀립니다</strong>(desugar). 그래서 <code>_dispatch</code> 라는 이름이 실제로 가리키는 것은 원래 함수가 아니라 <code>handle_errors</code> 가 돌려준 <code>wrapper</code> 이고, 안쪽에서 <code>functools.wraps</code> 로 이름·docstring 을 옮겨 심어야 정체가 유지됩니다. 자세한 것은 <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a>, 문법 계보는 <a href="12-syntax-and-stdlib.html">12 §1-C</a>.</p>
 </blockquote>
 <h3 id="64-appcontext-합성-루트">6.4 <code>AppContext</code> — 합성 루트</h3>
-<p><a href="04-architecture.html">04 §6</a>에서 다뤘으므로 여기서는 요점만 짚습니다.</p>
+<p>합성 루트란 프로그램에 필요한 부품들을 한 곳에서 한 번에 조립하는 자리입니다. <a href="04-architecture.html">04 §6</a>에서 다뤘으므로 여기서는 요점만 짚습니다.</p>
 <p>budget_app/context.py:42-57</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
@@ -968,8 +1027,9 @@ RESULT 2
 </code></pre></div>
 
 <p>이것은 <strong>오류가 아닙니다.</strong> 하류 프로세스가 "충분히 받았다"고 알린 것입니다. 유닉스 파이프라인에서 완전히 정상적인 상황입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 왜 시그널이 아니라 예외로 오는가.</strong> POSIX 의 원래 규칙은 예외가 아니라 <strong>시그널</strong>입니다. 읽는 쪽이 닫힌 파이프에 <code>write(2)</code> 를 하면 커널이 쓰는 프로세스에 <code>SIGPIPE</code> 를 보내고, 기본 처분(default disposition)이 "프로세스 종료"라서 프로그램은 <strong>아무 메시지도 없이 즉시 죽습니다</strong>. <code>head</code> 로 잘라도 앞 명령이 조용히 끝나는 셸 도구들이 대개 이 기본 동작을 그대로 씁니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 100줄짜리 명단을 소리 내어 읽어 주는 중인데, 듣던 사람이 앞의 세 줄만 확인하고 자리를 떠났습니다. 읽던 쪽이 놀라 소리를 지를 일은 아닙니다 — 충분히 받았다는 뜻이니 조용히 그만두면 됩니다. 그래서 이 프로그램은 남은 말을 아무 데도 연결되지 않은 곳으로 돌려놓고 "정상 종료" 라는 표시(종료 코드 0)를 남긴 채 끝냅니다.
+다만 이 비유는 <strong>말을 멈추는 방법</strong>에서 깨집니다 — 입을 다무는 것으로는 부족합니다. 파이썬 쪽 변수만 바꿔서는 안 되고, 운영체제가 "1번 출구"로 알고 있는 자리 자체를 갈아 끼워야 합니다. 아래 (2) 의 <code>os.dup2</code> 가 하는 일이 그것입니다.</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 왜 시그널이 아니라 예외로 오는가.</strong> POSIX 의 원래 규칙은 예외가 아니라 <strong>시그널</strong>입니다. 읽는 쪽이 닫힌 파이프에 <code>write(2)</code> 를 하면 커널이 쓰는 프로세스에 <code>SIGPIPE</code> 를 보내고, 기본 처분(default disposition)이 "프로세스 종료"라서 프로그램은 <strong>아무 메시지도 없이 즉시 죽습니다</strong>. <code>head</code> 로 잘라도 앞 명령이 조용히 끝나는 셸 도구들이 대개 이 기본 동작을 그대로 씁니다.</p>
 <p>그런데 파이썬은 인터프리터가 시작할 때 <code>SIGPIPE</code> 의 처분을 <strong><code>SIG_IGN</code>(무시)로 바꿉니다</strong>. 시그널이 무시되면 커널은 <code>write(2)</code> 를 <code>-1</code> 로 실패시키고 <code>errno</code> 에 <strong><code>EPIPE</code>(32)</strong> 를 세우며, 파이썬의 I/O 층이 그 errno 를 보고 <code>OSError</code> 의 자식인 <strong><code>BrokenPipeError</code></strong> 를 던집니다(errno→예외 클래스 대응은 <code>errno</code> 모듈의 값에 따라 인터프리터가 자동으로 고릅니다). 즉 이 소스가 <code>except BrokenPipeError</code> 라고 쓸 수 있는 것은 <strong>파이썬이 시그널을 예외로 번역해 주기 때문</strong>이고, 그 대가로 "조용히 죽기"를 스스로 처리해야 하는 것이 아래 세 단계입니다.</p>
 <p>(Windows 에는 <code>SIGPIPE</code> 자체가 없습니다 — 로컬에서 <code>hasattr(signal, "SIGPIPE")</code> → <code>False</code>. 이 절의 <code>PIPESTATUS</code> 예시를 포함한 서술은 POSIX 셸 기준입니다.) → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
@@ -999,8 +1059,7 @@ RESULT 2
 
 <p><strong>왜 이게 필요한가.</strong> 파이썬 인터프리터는 종료 시 stdout 버퍼를 비웁니다. 파이프가 깨진 상태면 그때 또 예외가 나고, 파이썬은 <code>Exception ignored in: &lt;_io.TextIOWrapper ...&gt;</code> 라는 메시지를 stderr 에 출력합니다. 사용자에게는 정상 종료였는데 마지막에 이상한 메시지가 뜨는 것입니다.</p>
 <p><code>os.dup2(devnull, sys.stdout.fileno())</code> 는 <strong>파일 디스크립터 1번(stdout)이 <code>/dev/null</code> 을 가리키게</strong> 만듭니다. 이후의 모든 stdout 쓰기는 조용히 버려집니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 왜 <code>sys.stdout = open(os.devnull, "w")</code> 로는 안 되는가.</strong> 여기가 이 함수의 핵심이고, 두 층을 구분해야 보입니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 왜 <code>sys.stdout = open(os.devnull, "w")</code> 로는 안 되는가.</strong> 여기가 이 함수의 핵심이고, 두 층을 구분해야 보입니다.</p>
 <ul>
 <li><strong>파이썬 층</strong>: <code>sys.stdout</code> 은 그냥 모듈 전역 변수입니다. 다른 객체를 대입해도 그 시점 이후 <code>print()</code> 가 쓰는 대상만 바뀝니다.</li>
 <li><strong>OS 층</strong>: 실제로 커널이 아는 것은 <strong>파일 디스크립터 정수 1번</strong>뿐이고, 원래 <code>sys.stdout</code> 객체는 여전히 그 1번을 붙들고 있습니다.</li>
@@ -1035,7 +1094,7 @@ $<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><sp
 <hr>
 <h2 id="7-정리-과제-방어용-요약">7. 정리 — 과제 방어용 요약</h2>
 <p><strong>Q. CLI 계층을 왜 여섯 모듈로 나눴나요?</strong></p>
-<p>리팩터 전 <code>cli.py</code> 512줄은 고칠 이유가 넷이었습니다 — 명령줄 문법, 입력 정책, 화면 표시, 처리 순서. 각각을 <code>parser</code>/<code>prompts</code>/<code>presenter</code>/<code>handlers</code> 로 나누고, 레지스트리와 진입점만 <code>app</code> 에 남긴 뒤 채널 결정(<code>output</code>)과 오류 표현(<code>error_handler</code>)까지 분리했습니다. 결과적으로 핸들러가 3~6줄이 됐고, <code>cmd_summary</code> 는 25줄에서 3줄이 됐습니다.</p>
+<p>리팩터 전 <code>cli.py</code> 512줄은 고칠 이유가 넷이었습니다 — 명령줄 문법, 입력 정책, 화면 표시, 처리 순서. 각각을 <code>parser</code>/<code>prompts</code>/<code>presenter</code>/<code>handlers</code> 로 나눴습니다. <code>app</code> 에는 명부와 진입점만 남기고, 채널 결정(<code>output</code>)과 오류 표현(<code>error_handler</code>)도 따로 뺐습니다. 결과적으로 핸들러가 3~6줄이 됐고, <code>cmd_summary</code> 는 25줄에서 3줄이 됐습니다.</p>
 <p><strong>Q. argparse 서브커맨드 디스패치를 어떻게 구현했나요?</strong></p>
 <p>파서는 <code>set_defaults(handler="category.add")</code> 로 <strong>문자열 키</strong>만 남기고, <code>cli/app.py</code> 의 <code>HANDLERS</code> 딕셔너리가 키를 함수로 바꿉니다(함수 본체는 <code>cli/handlers.py</code>). 함수 객체를 직접 심으면 파서와 핸들러가 서로를 import 해야 해서 순환이 생기거나 한 파일에 뭉쳐야 합니다. 부수 효과로 하위 명령별 핸들러가 생기면서 <code>if/elif</code> 분기와 <strong>도달 불가능한 죽은 코드</strong>가 사라졌습니다.</p>
 <p><strong>Q. 하위 파서에 <code>default=argparse.SUPPRESS</code> 를 왜 주나요?</strong></p>
@@ -1051,7 +1110,7 @@ $<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><sp
 <hr>
 <p><strong>다음 문서</strong>: <a href="10-advanced-design.html">10. 고급 설계 주제</a> — crash 시나리오, 성능 한계, 트레이드오프.</p>
 <div class="pager"><span><a href="08-services.html">← 08. 서비스 계층 — `services/` 패키지</a></span><span><a href="10-advanced-design.html">10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프 →</a></span></div>
-<footer>docs/09-cli.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/09-cli.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

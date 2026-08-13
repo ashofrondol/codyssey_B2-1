@@ -3,12 +3,20 @@
   --bg: #ffffff; --fg: #1f2328; --muted: #57606a; --border: #d0d7de;
   --accent: #0969da; --code-bg: #f6f8fa; --sidebar-bg: #f6f8fa;
   --quote: #57606a; --quote-border: #d0d7de; --current: #ddf4ff;
+  --tip-bg: #fff8e6; --tip-bd: #d4a72c;
+  --origin-bg: #eef6ff; --origin-bd: #4493f8;
+  --internals-bg: #f0f3f6; --internals-bd: #8b949e;
+  --plain-bg: #f2fbf5; --plain-bd: #2da44e;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --border: #30363d;
     --accent: #4493f8; --code-bg: #161b22; --sidebar-bg: #10151c;
     --quote: #8b949e; --quote-border: #30363d; --current: #0c2d6b;
+    --tip-bg: #2a2213; --tip-bd: #b98b18;
+    --origin-bg: #12233b; --origin-bd: #316dca;
+    --internals-bg: #1a1f26; --internals-bd: #6e7681;
+    --plain-bg: #122a19; --plain-bd: #2f7f42;
   }
 }
 * { box-sizing: border-box; }
@@ -47,6 +55,23 @@ a { color: var(--accent); }
 blockquote {
   margin: 1rem 0; padding: .2rem 1rem; color: var(--quote);
   border-left: 4px solid var(--quote-border);
+}
+/* 💡 비유 / 🔎 문법의 출처 / ⚙️ 내부 동작 — 종류별로 색을 달리해
+   "비유만 훑기", "내부 동작만 훑기" 같은 읽기가 가능하게 한다. */
+blockquote.callout {
+  color: var(--fg); border-radius: 0 8px 8px 0;
+  padding: .7rem 1rem; margin: 1.3rem 0;
+}
+blockquote.callout > p:first-child { margin-top: 0; }
+blockquote.callout > p:last-child { margin-bottom: 0; }
+blockquote.callout.tip { background: var(--tip-bg); border-left-color: var(--tip-bd); }
+blockquote.callout.origin { background: var(--origin-bg); border-left-color: var(--origin-bd); }
+blockquote.callout.internals { background: var(--internals-bg); border-left-color: var(--internals-bd); }
+/* 「쉬운 말로 먼저」 절 — 비전공자용 진입로라 눈에 띄어야 한다. */
+h2[id^="쉬운-말로-먼저"] {
+  background: var(--plain-bg); border: 1px solid var(--plain-bd);
+  border-radius: 8px; padding: .5rem .8rem; border-bottom: none;
+  font-size: 1.25rem;
 }
 code {
   font-family: Consolas, "D2Coding", "Cascadia Mono", "Courier New", monospace;

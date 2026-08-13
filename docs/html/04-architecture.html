@@ -11,14 +11,69 @@
 <nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html" class="current"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
 <main>
 <h1 id="04-아키텍처-계층-구조와-설계-원칙">04. 아키텍처 — 계층 구조와 설계 원칙</h1>
-<p>이 문서는 budget_app 이 왜 43개 파일(구현 38 + 패키지 선언 <code>__init__.py</code> 5)로 나뉘어 있는지, 명령 하나가 파일 저장까지 어떤 경로를 지나가는지, 그리고 그 구조가 어떤 설계 원칙과 리팩터링 과정을 거쳐 만들어졌는지를 코드로 실증합니다.</p>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#쉬운-말로-먼저">쉬운 말로 먼저</a></li><li><a href="#1-전체-그림-계층-다이어그램">1. 전체 그림 — 계층 다이어그램</a></li><li><a href="#2-각-계층의-책임과-금지사항">2. 각 계층의 책임과 금지사항</a></li><li><a href="#3-실행-흐름-완전-추적-1-쓰기-경로-python-m-budget_app-add">3. 실행 흐름 완전 추적 1 — 쓰기 경로 (python -m budget_app add)</a></li><li><a href="#4-실행-흐름-완전-추적-2-읽기-경로-summary-month-2024-01">4. 실행 흐름 완전 추적 2 — 읽기 경로 (summary --month 2024-01)</a></li><li><a href="#5-실행-흐름-완전-추적-3-가장-복잡한-경로-import">5. 실행 흐름 완전 추적 3 — 가장 복잡한 경로 (import)</a></li><li><a href="#6-appcontext-수동-의존성-주입di과-부작용-분리">6. AppContext — 수동 의존성 주입(DI)과 부작용 분리</a></li><li><a href="#7-오류-처리-아키텍처-예외의-발생지와-변환지">7. 오류 처리 아키텍처 — 예외의 발생지와 변환지</a></li><li><a href="#8-설계-원칙-정리-이-코드가-지키고-있는-것">8. 설계 원칙 정리 — 이 코드가 지키고 있는 것</a></li><li><a href="#9-설계의-진화-리팩터-전후-대조표">9. 설계의 진화 — 리팩터 전후 대조표</a></li><li><a href="#10-요약-과제-방어용-문답-정리">10. 요약 — 과제 방어용 문답 정리</a></li></ul></details><h2 id="쉬운-말로-먼저">쉬운 말로 먼저</h2>
+<p>이 프로그램은 터미널에서 쓰는 가계부입니다. 명령을 한 줄 치면 수입·지출 한 건이 기록되고, 달마다 얼마를 벌고 썼는지 셈해서 보여 줍니다. 이런 일을 하는 코드가 한 덩어리로 뭉쳐 있으면, 화면 글자 하나를 고치려다 돈 계산이 틀어지는 사고가 납니다. 그래서 이 프로그램은 일을 네 구역으로 나눠 두었습니다 — 사용자의 말을 받는 곳, 규칙에 맞는지 따지는 곳, 파일에 적고 꺼내 오는 곳, "거래 한 건이란 무엇인가"를 정해 두는 곳입니다. 식당으로 치면 홀·주방·창고·조리법에 해당합니다. 이 문서는 그 구역 나누기가 그림으로만 있는 것이 아니라 실제 코드에서 지켜지고 있는지를 확인하고, 명령 하나가 네 구역을 어떤 순서로 지나 파일에 닿는지를 처음부터 끝까지 따라갑니다. 까다로운 대목은 여기입니다 — 구역은 선을 그어 놓는다고 저절로 지켜지지 않고, 코드가 그 선을 넘지 않는지 누군가 계속 확인해야만 유지됩니다.</p>
+<p><strong>이 문서에 자주 나오는 말</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>말</th>
+<th>쉬운 뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>계층</td>
+<td>하는 일의 성격에 따라 코드를 위아래로 나눠 놓은 구역. 이 프로그램은 넷(CLI·서비스·저장소·도메인)입니다</td>
+</tr>
+<tr>
+<td>의존 / import</td>
+<td>A 가 B 없이는 돌아가지 않는 관계를 "A 가 B 에 의존한다"고 하고, 코드에서는 <code>import</code> 한 줄이 그 증거입니다. 이 화살표가 위에서 아래로만 향하게 두는 것이 이 문서의 핵심 규칙입니다</td>
+</tr>
+<tr>
+<td>순환 import</td>
+<td>두 파일이 서로를 import 해서, 한쪽이 아직 준비를 끝내지 못한 반쪽짜리 상태로 상대에게 건네지는 것. 파이썬은 여기서 멈추거나 기다리지 않습니다 — 운이 좋으면 그대로 돌아가고, 나쁘면 <code>ImportError</code> 가 납니다</td>
+</tr>
+<tr>
+<td>합성 루트</td>
+<td>프로그램이 시작할 때 그 명령이 쓸 저장소·서비스를 한자리에서 만들어 끼워 주는 곳. 여기서는 <code>AppContext</code> 입니다</td>
+</tr>
+<tr>
+<td>의존성 주입(DI)</td>
+<td>필요한 부품을 스스로 만들지 않고 밖에서 받는 것. 그래야 시험할 때 가짜 부품으로 바꿔 끼울 수 있습니다</td>
+</tr>
+<tr>
+<td>데코레이터</td>
+<td>함수 위에 <code>@이름</code> 을 붙여, 원래 함수는 그대로 둔 채 겉에 일을 한 겹 덧씌우는 파이썬 문법</td>
+</tr>
+<tr>
+<td>원자적</td>
+<td>바꾸다 만 중간 상태가 남지 않고, "바꾸기 전" 아니면 "바꾼 후"만 존재하는 것</td>
+</tr>
+<tr>
+<td>종료 코드</td>
+<td>프로그램이 끝나면서 남기는 숫자. 0 이면 성공이고, 다른 숫자는 실패의 종류를 뜻합니다</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>바쁘면 여기만</strong></p>
+<ul>
+<li><strong>§1 전체 그림 — 계층 다이어그램</strong> — 코드 전체가 어떤 구역으로 나뉘어 있는지가 그림 한 장에 담겨 있습니다. 이것만 봐도 나머지를 읽을 지도가 생깁니다.</li>
+<li><strong>§3·§4·§5 실행 흐름 완전 추적 3종</strong> — 명령을 하나 쳤을 때 그것이 어디를 지나 파일에 닿는지를 손가락으로 짚어 갈 수 있게 적어 둔 부분입니다. 쓰기(§3)·읽기(§4)·가장 복잡한 가져오기(§5) 셋이라, 하나만 골라 읽어도 됩니다.</li>
+<li><strong>§9 설계의 진화 — 리팩터 전후 대조표</strong> — 무엇이 잘못돼 있었고 어떻게 고쳤는지가 표 하나에 모여 있습니다. "왜 하필 이 모양인가"의 답이 여기 있습니다.</li>
+</ul>
+<hr>
+<p>이 문서는 budget_app 의 전체 지도입니다. 왜 코드가 43개 파일(구현 38 + 패키지 선언 <code>__init__.py</code> 5)로 나뉘어 있는지, 명령 하나가 파일 저장까지 어떤 경로를 지나가는지를 코드로 실증합니다. 그 구조가 어떤 설계 원칙과 리팩터링 과정을 거쳐 만들어졌는지도 함께 따라갑니다.</p>
 <blockquote>
 <p><strong>난이도</strong>: 🟡 중급</p>
 <p><strong>먼저 읽으면 좋은 문서</strong>: 없음 — 이 편은 전체 코드의 "지도" 역할을 하므로 시리즈의 다른 편보다 먼저 읽어도 됩니다. 개별 기법(데코레이터, dataclass, 제너레이터 등)의 상세는 <a href="03-python-advanced.html">03. 파이썬 중·고급 기법</a>에서, 각 문법이 <strong>어느 PEP·어느 버전에서 왔고 파이썬이 그것을 무엇으로 바꾸는지</strong>와 표준 라이브러리 호출의 내부 동작은 <a href="12-syntax-and-stdlib.html">12. 문법·표준 라이브러리 레퍼런스</a>에서 다룹니다. 이 문서 곳곳의 🔎/⚙️ 블록이 그 요약이자 링크입니다.</p>
 </blockquote>
 <hr>
-<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#1-전체-그림-계층-다이어그램">1. 전체 그림 — 계층 다이어그램</a></li><li><a href="#2-각-계층의-책임과-금지사항">2. 각 계층의 책임과 금지사항</a></li><li><a href="#3-실행-흐름-완전-추적-1-쓰기-경로-python-m-budget_app-add">3. 실행 흐름 완전 추적 1 — 쓰기 경로 (python -m budget_app add)</a></li><li><a href="#4-실행-흐름-완전-추적-2-읽기-경로-summary-month-2024-01">4. 실행 흐름 완전 추적 2 — 읽기 경로 (summary --month 2024-01)</a></li><li><a href="#5-실행-흐름-완전-추적-3-가장-복잡한-경로-import">5. 실행 흐름 완전 추적 3 — 가장 복잡한 경로 (import)</a></li><li><a href="#6-appcontext-수동-의존성-주입di과-부작용-분리">6. AppContext — 수동 의존성 주입(DI)과 부작용 분리</a></li><li><a href="#7-오류-처리-아키텍처-예외의-발생지와-변환지">7. 오류 처리 아키텍처 — 예외의 발생지와 변환지</a></li><li><a href="#8-설계-원칙-정리-이-코드가-지키고-있는-것">8. 설계 원칙 정리 — 이 코드가 지키고 있는 것</a></li><li><a href="#9-설계의-진화-리팩터-전후-대조표">9. 설계의 진화 — 리팩터 전후 대조표</a></li><li><a href="#10-요약-과제-방어용-문답-정리">10. 요약 — 과제 방어용 문답 정리</a></li></ul></details><h2 id="1-전체-그림-계층-다이어그램">1. 전체 그림 — 계층 다이어그램</h2>
-<p>budget_app 은 "명령을 받는 곳(CLI) → 규칙을 판단하는 곳(서비스) → 파일을 읽고 쓰는 곳(저장소) → 데이터가 무엇인지 정의하는 곳(도메인)" 순서로 <strong>한 방향으로만 의존하는</strong> 구조입니다.</p>
+<h2 id="1-전체-그림-계층-다이어그램">1. 전체 그림 — 계층 다이어그램</h2>
+<p>budget_app 은 일을 네 구역으로 나눠 두었습니다 — 명령을 받는 곳(CLI), 규칙을 판단하는 곳(서비스), 파일을 읽고 쓰는 곳(저장소), 데이터가 무엇인지 정의하는 곳(도메인). 그리고 그 순서대로 <strong>한 방향으로만 의존합니다.</strong></p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 식당을 떠올리면 됩니다. 홀 직원은 손님의 주문을 받아 주방에 넘기고, 주방은 "이 재료로 이 요리가 되는가"를 판단해 창고에서 재료를 꺼내 쓰고, 조리법 책은 "이 요리가 무엇인가"만 적어 둡니다. 홀을 통째로 개조해도 창고는 하던 대로 하면 됩니다 — 화살표가 아래로만 향하니 위를 바꿔도 아래는 그대로인 것이고, 구역을 나누는 값어치가 여기 있습니다. (반대로 창고가 재료를 내주는 방식을 바꾸면 그것을 받아 쓰는 주방은 따라 바뀝니다.)
+다만 이 비유는 사람이 급하면 선을 넘을 수 있다는 데서 깨집니다 — 홀 직원은 바쁘면 창고에 직접 뛰어들 수 있지만, 이 코드에서는 <code>cli/</code> 가 <code>storage/</code> 를 <strong>import 하는 순간</strong> 테스트가 실패합니다(§1.2.2).</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code> 사용자 터미널
       │  python -m budget_app add ...
       ▼
@@ -85,8 +140,9 @@
 
 <p><strong>폴더 이름이 곧 계층입니다.</strong> 평평하게 두면 알파벳순이 계층을 흩뜨립니다 — <code>cli(L6) config(L0) csv_io(L3) decorators(L3) error_handler(L5) errors(L0) …</code> 처럼 계층 번호가 뒤죽박죽 나열됩니다. 횡단 4개만 폴더 없이 루트에 두어 "이들은 계층이 아니다"를 위치로 표현합니다.</p>
 <p>핵심 규칙은 <strong>화살표가 아래로만 향한다</strong>는 것입니다. <code>storage/</code> 는 <code>services/</code> 를 모르고, <code>services/</code> 는 <code>cli/</code> 를 모릅니다. 아래 계층은 위 계층이 누구인지 신경 쓰지 않으므로, 예를 들어 나중에 CLI 대신 웹 UI 를 붙여도 <code>services/</code> 이하는 한 줄도 바꿀 필요가 없습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — 맨 위의 <code>python -m budget_app</code> 은 셸이 <code>budget_app</code> 이라는 파일을 찾는 것이 아닙니다. <code>-m</code> 은 인터프리터가 <code>runpy</code> 모듈로 넘어가라는 지시이고, <code>runpy</code> 는 이름이 패키지면 그 안의 <code>__main__.py</code> 를 찾아 <strong><code>__name__</code> 을 <code>"__main__"</code> 으로 바꿔 실행</strong>합니다. 그래서 이 프로젝트에는 <code>budget_app/__main__.py</code> 가 8줄짜리로 존재합니다. <code>sys.path[0]</code> 이 현재 디렉터리가 되므로 <code>budget_app</code> 패키지가 import 가능해지고, 아래에서 설명할 상대 import 가 전부 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 창고 담당자는 오늘 홀에 손님이 몇 명 앉아 있는지 알 필요가 없습니다. 모르는 편이 낫기도 합니다 — 홀을 카페처럼 개조해도 창고는 하던 대로 하면 되니까요. 코드에서 "모른다"는 그 파일 이름을 한 번도 쓰지 않는다는 뜻이고, 그래서 위쪽을 통째로 갈아 끼워도 아래쪽에는 손댈 곳이 없습니다.
+다만 이 비유는 "몰라도 일이 된다"까지가 한계입니다 — 창고에 물건이 없으면 홀도 결국 멈추듯, 아래 계층이 고장 나면 위 계층도 함께 멈춥니다. 모르는 것은 상대의 <strong>정체</strong>이지 상대의 <strong>사정</strong>이 아닙니다.</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 맨 위의 <code>python -m budget_app</code> 은 셸이 <code>budget_app</code> 이라는 파일을 찾는 것이 아닙니다. <code>-m</code> 은 인터프리터가 <code>runpy</code> 모듈로 넘어가라는 지시이고, <code>runpy</code> 는 이름이 패키지면 그 안의 <code>__main__.py</code> 를 찾아 <strong><code>__name__</code> 을 <code>"__main__"</code> 으로 바꿔 실행</strong>합니다. 그래서 이 프로젝트에는 <code>budget_app/__main__.py</code> 가 8줄짜리로 존재합니다. <code>sys.path[0]</code> 이 현재 디렉터리가 되므로 <code>budget_app</code> 패키지가 import 가능해지고, 아래에서 설명할 상대 import 가 전부 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <h3 id="11-왜-이렇게-잘게-나눴나-파일-하나-책임-하나">1.1 왜 이렇게 잘게 나눴나 — "파일 하나 = 책임 하나"</h3>
 <p>구현 파일이 38개(패키지 선언 <code>__init__.py</code> 5개 제외, 전체 4,203줄)인 것이 많아 보일 수 있습니다. 판단 기준은 <strong>"이 파일을 고칠 이유가 몇 개인가"</strong> 입니다.</p>
@@ -117,7 +173,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>지금은 각각 <code>cli/parser.py</code> / <code>cli/prompts.py</code> / <code>cli/presenter.py</code> / <code>cli/handlers.py</code> 로 나뉘어 파일마다 이유가 하나입니다(<code>cli/app.py</code> 는 그 넷을 엮는 레지스트리와 진입점만 남았습니다). 파일 크기도 함께 줄었습니다.</p>
+<p>지금은 각각 <code>cli/parser.py</code> / <code>cli/prompts.py</code> / <code>cli/presenter.py</code> / <code>cli/handlers.py</code> 로 나뉘어 파일마다 이유가 하나입니다(<code>cli/app.py</code> 는 그 넷을 엮는 레지스트리(이름과 함수를 짝지어 둔 목록)와 진입점만 남았습니다). 파일 크기도 함께 줄었습니다.</p>
 <p>아래는 상위 파일들의 실제 줄 수입니다(주석·docstring 포함).</p>
 <div class="table-wrap"><table>
 <thead>
@@ -311,12 +367,14 @@
 </code></pre></div>
 
 <p><code>n.level</code> 이 1이면 같은 패키지(<code>from . import x</code>), 2면 한 단계 위(<code>from .. import x</code>)입니다. 패키지가 생기면서 이 계산이 필요해졌습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>from . import x</code> 같은 <strong>명시적 상대 import</strong> 는 PEP 328 이 도입했습니다. 같은 PEP 가 "점 없는 import 는 무조건 절대 경로"라는 규칙도 함께 정해서, 파이썬 3 에서는 <code>budget_app/domain/config.py</code> 가 있어도 <code>import calendar</code> 가 표준 라이브러리를 가져옵니다. <code>domain/periods.py</code> 의 모듈 docstring 이 "모듈 이름이 <code>calendar</code> 가 아닌 이유"를 설명하는 배경이 이것입니다 — 동작은 안전하지만 <strong>읽는 사람이 헷갈리는 비용</strong>은 남습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작</strong> — 상대 import 의 점(<code>.</code>)은 <strong>파일 위치가 아니라 <code>__package__</code> 를 기준</strong>으로 풀립니다. import 시스템은 <code>__package__</code> 에서 <code>level - 1</code> 만큼 조각을 떼어내 절대 이름을 만듭니다. <code>budget_app/cli/app.py</code> 는 <code>__package__ == "budget_app.cli"</code> 이므로 <code>from ..context import AppContext</code> 는 <code>budget_app.context</code> 가 됩니다. 그래서 <code>python budget_app/cli/app.py</code> 로 <strong>직접 실행하면 반드시 깨집니다</strong> — 그때 <code>__name__</code> 은 <code>"__main__"</code>, <code>__package__</code> 는 빈 문자열이라 위로 올라갈 패키지가 없고, <code>ImportError: attempted relative import with no known parent package</code> 가 납니다. 이 프로젝트를 <code>python -m budget_app</code> 으로만 실행하는 것은 취향이 아니라 <strong>문법적 요구</strong>입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>from . import x</code> 같은 <strong>명시적 상대 import</strong> 는 PEP 328 이 도입했습니다. 같은 PEP 가 "점 없는 import 는 무조건 절대 경로"라는 규칙도 함께 정해서, 파이썬 3 에서는 <code>budget_app/domain/config.py</code> 가 있어도 <code>import calendar</code> 가 표준 라이브러리를 가져옵니다. <code>domain/periods.py</code> 의 모듈 docstring 이 "모듈 이름이 <code>calendar</code> 가 아닌 이유"를 설명하는 배경이 이것입니다 — 동작은 안전하지만 <strong>읽는 사람이 헷갈리는 비용</strong>은 남습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 상대 import 의 점(<code>.</code>)은 <strong>파일 위치가 아니라 <code>__package__</code> 를 기준</strong>으로 풀립니다. import 시스템은 <code>__package__</code> 에서 <code>level - 1</code> 만큼 조각을 떼어내 절대 이름을 만듭니다. <code>budget_app/cli/app.py</code> 는 <code>__package__ == "budget_app.cli"</code> 이므로 <code>from ..context import AppContext</code> 는 <code>budget_app.context</code> 가 됩니다. 그래서 <code>python budget_app/cli/app.py</code> 로 <strong>직접 실행하면 반드시 깨집니다</strong> — 그때 <code>__name__</code> 은 <code>"__main__"</code>, <code>__package__</code> 는 빈 문자열이라 위로 올라갈 패키지가 없고, <code>ImportError: attempted relative import with no known parent package</code> 가 납니다. 이 프로젝트를 <code>python -m budget_app</code> 으로만 실행하는 것은 취향이 아니라 <strong>문법적 요구</strong>입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <h3 id="121-순환-import-가-없는-것이-우연이-아닌-이유">1.2.1 순환 import 가 없는 것이 우연이 아닌 이유</h3>
 <p>위 목록에서 두 모듈이 서로를 가리키는 쌍은 하나도 없습니다. 이것은 파이썬에서 <strong>선택이 아니라 필수에 가깝습니다.</strong></p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 이사한 A 가 방에서 짐을 풀다가 드라이버가 필요해 옆방의 B 를 부릅니다. <strong>A 가 불렀기 때문에</strong> B 가 그제야 자기 짐을 풀기 시작하는데, B 도 A 의 드라이버가 있어야 해서 A 의 방으로 돌아옵니다 — 그런데 A 의 방은 아직 반쯤만 풀린 채라 그 드라이버가 상자 밖으로 나와 있지 않습니다. 둘이 동시에 엇갈린 것이 아니라 <code>A → B → A</code> 한 줄기로 되돌아온 것입니다. 두 파일이 서로를 import 할 때 파이썬이 겪는 일이 정확히 이것이고, 아래 ⚙️ 상자의 "반쯤 채워진 모듈"이 아직 상자를 다 못 푼 A 의 방입니다.
+다만 이 비유는 사람이라면 잠시 기다렸다 다시 오면 된다는 데서 깨집니다 — 파이썬은 A 를 처음부터 다시 실행해 주지 않고 반쯤 푼 그 방을 그대로 건네주므로, 기다려서 해결되지 않습니다. 그래서 필요한 이름이 이미 나와 있으면 그냥 넘어가고, 아직이면 그 자리에서 <code>ImportError</code> 가 납니다.</p>
+</blockquote>
 <p><code>cli/app.py</code> 의 모듈 docstring 이 그 이유를 직접 말합니다.</p>
 <p>budget_app/cli/app.py:3-7</p>
 <div class="codehilite"><pre><span></span><code><span class="c1">## 명령 → 핸들러 대응</span>
@@ -327,14 +385,18 @@
 </code></pre></div>
 
 <p>리팩터 전에는 <code>parser.py</code> 가 <code>p.set_defaults(func=cmd_add)</code> 로 <strong>핸들러 함수 객체</strong>를 들고 있었습니다. 그러려면 <code>parser</code> 가 <code>handlers</code> 를 import 해야 하는데, <code>handlers</code> 는 프롬프트·프레젠터를 쓰고 <code>app</code> 은 둘 다 쓰므로 모듈 그래프가 금방 얽힙니다. 지금은 파서가 <code>handler="add"</code> 라는 <strong>문자열</strong>만 남기고, 문자열 → 함수 변환은 <code>app.HANDLERS</code> 딕셔너리 한 곳이 담당합니다. 의존 화살표가 <code>app → parser</code>, <code>app → handlers</code> 두 개로 갈라지고 <code>parser ↔ handlers</code> 사이에는 아무것도 없습니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — 순환이 생기면 파이썬은 어떻게 실패하는가. import 는 모듈 객체를 만들어 <code>sys.modules</code> 에 <strong>먼저 등록한 다음</strong> 본문을 위에서 아래로 실행합니다. A 를 실행하던 중 B 를 import 하고 B 가 다시 A 를 import 하면, <code>sys.modules["A"]</code> 는 이미 있으므로 재실행 없이 그 객체가 반환되는데 — 그 객체는 <strong>아직 본문을 끝내지 않은 반쯤 채워진 모듈</strong>입니다. 그래서 <code>from .a import A</code> 는 아직 대입되지 않은 이름을 찾다 실패하고, 다음 오류가 납니다.</p>
-<p><code>ImportError: cannot import name 'A' from partially initialized module 'pkg.a'
-(most likely due to a circular import)</code></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 순환이 생기면 파이썬은 어떻게 실패하는가. import 는 모듈 객체를 만들어 <code>sys.modules</code> 에 <strong>먼저 등록한 다음</strong> 본문을 위에서 아래로 실행합니다. A 를 실행하던 중 B 를 import 하고 B 가 다시 A 를 import 하면, <code>sys.modules["A"]</code> 는 이미 있으므로 재실행 없이 그 객체가 반환되는데 — 그 객체는 <strong>아직 본문을 끝내지 않은 반쯤 채워진 모듈</strong>입니다. 그래서 <code>from .a import A</code> 는 아직 대입되지 않은 이름을 찾다 실패하고, 다음 오류가 납니다.</p>
+<div class="codehilite"><pre><span></span><code>ImportError: cannot import name &#39;A&#39; from partially initialized module &#39;pkg.a&#39;
+(most likely due to a circular import)
+</code></pre></div>
+
 <p>무서운 점은 <strong>실행 순서에 따라 나기도 하고 안 나기도 한다</strong>는 것입니다. <code>import a.b</code> 형태(모듈 객체만 받고 속성 접근은 나중)면 통과하고, <code>from a import X</code> 형태면 터집니다. 그래서 "돌아가니까 괜찮다"가 성립하지 않고, 애초에 순환을 만들지 않는 설계가 필요합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <h3 id="122-계층-규칙을-문서가-아니라-테스트가-강제합니다">1.2.2 계층 규칙을 문서가 아니라 <strong>테스트가</strong> 강제합니다</h3>
 <p>문서에 적힌 규칙은 검증되지 않습니다. 그래서 <code>tests/test_architecture.py</code> (115줄)가 규칙을 실행 가능한 형태로 갖고 있습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 주차 금지를 지키게 하는 방법은 둘입니다. 벽에 "주차 금지" 안내문을 붙이거나, 차가 못 들어오게 말뚝을 박거나. 문서에 적어 둔 계층 규칙은 안내문이고, <code>tests/test_architecture.py</code> 는 말뚝입니다 — 규칙을 어긴 코드가 들어오면 테스트가 빨간불을 냅니다.
+다만 이 비유는 말뚝이 물리적으로 막는다는 데서 깨집니다 — 테스트는 돌려야 알려 주므로, 아무도 실행하지 않으면 위반은 그대로 들어옵니다.</p>
+</blockquote>
 <p>tests/test_architecture.py:25-29</p>
 <div class="codehilite"><pre><span></span><code><span class="c1">#: 숫자가 작을수록 아래 계층. 같은 계층끼리는 허용한다.</span>
 <span class="n">LAYERS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;domain&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;storage&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;services&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;cli&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">}</span>
@@ -374,20 +436,19 @@
 </tr>
 </tbody>
 </table></div>
-<p>핵심은 판정을 <strong>문자열 검색이 아니라 AST 로</strong> 한다는 점입니다. 테스트 docstring 이 그 이유를 적어 뒀습니다.</p>
+<p>핵심은 판정을 <strong>문자열 검색이 아니라 AST 로</strong> 한다는 점입니다(AST — 파이썬이 코드를 읽어 만들어 두는 구문 트리. 글자가 아니라 문법 구조를 보므로 "진짜 import"만 셀 수 있습니다). 테스트 docstring 이 그 이유를 적어 뒀습니다.</p>
 <p>tests/test_architecture.py:12-13</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">를</span> <span class="n">AST</span> <span class="n">로</span> <span class="n">세는</span> <span class="n">이유</span><span class="p">:</span> <span class="n">문자열</span> <span class="n">검색은</span> <span class="n">주석·docstring</span> <span class="n">에</span> <span class="n">적힌</span> <span class="n">모듈</span> <span class="n">이름까지</span>
 <span class="n">세어서</span> <span class="n">거짓</span> <span class="n">양성이</span> <span class="n">나온다</span><span class="o">.</span>
 </code></pre></div>
 
 <p>실제로 이 프로젝트의 docstring 에는 <code>storage.repositories</code> 같은 이름이 설명용으로 여러 번 등장합니다. <code>grep</code> 이었다면 전부 위반으로 잡혔을 것입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>ast.parse(source)</code> 는 사실 <code>compile(source, filename, mode, flags=ast.PyCF_ONLY_AST)</code> 의 얇은 래퍼입니다. CPython 이 실제 컴파일에 쓰는 것과 <strong>같은 파서</strong>를 돌리되 바이트코드 생성 직전에 멈춰서 구문 트리를 돌려주므로, "파이썬이 이 코드를 어떻게 읽는가"와 결과가 어긋날 수 없습니다. 모듈을 import 하지 않고 읽기만 하므로 부작용도 없습니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>ast.parse(source)</code> 는 사실 <code>compile(source, filename, mode, flags=ast.PyCF_ONLY_AST)</code> 의 얇은 래퍼입니다. CPython 이 실제 컴파일에 쓰는 것과 <strong>같은 파서</strong>를 돌리되 바이트코드 생성 직전에 멈춰서 구문 트리를 돌려주므로, "파이썬이 이 코드를 어떻게 읽는가"와 결과가 어긋날 수 없습니다. 모듈을 import 하지 않고 읽기만 하므로 부작용도 없습니다.</p>
 <p><code>ast.walk(tree)</code> 는 <code>collections.deque</code> 를 쓴 <strong>너비 우선 순회</strong>입니다 — 노드를 꺼내 <code>iter_child_nodes()</code> 의 결과를 뒤에 붙이고 자신을 yield 하는 것이 전부라, 트리 전체를 순서 상관없이 훑을 때 쓰는 관용구입니다. 특정 노드만 필요하면 <code>isinstance(node, ast.ImportFrom)</code> 로 거릅니다.</p>
 <p><code>ast.ImportFrom</code> 노드가 들고 있는 것은 셋입니다 — <code>module</code>(점 뒤 모듈 이름, <code>from . import x</code> 면 <code>None</code>), <code>level</code>(점 개수), <code>names</code>(가져오는 이름들). <code>from ..storage.repositories import X</code> 는 <code>module="storage.repositories", level=2</code> 로 파싱되므로 <strong><code>module</code> 의 첫 조각이 곧 계층 이름</strong>이 됩니다. 테스트가 <code>(node.module or "").split(".")[0]</code> 한 줄로 계층을 뽑아내는 근거가 이것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="13-리팩터가-고친-역류-services-decorators-output">1.3 리팩터가 고친 역류 — services → decorators → output</h3>
-<p>이 구조가 처음부터 이랬던 것은 아닙니다. 리팩터 전에는 <strong>아래 계층이 위 계층에 전이 의존</strong>하는 경로가 있었습니다.</p>
+<p>이 구조가 처음부터 이랬던 것은 아닙니다. 리팩터 전에는 <strong>아래 계층이 위 계층에 전이 의존</strong>(직접 부르지는 않지만, 부른 것이 또 부르는 식으로 결국 이어지는 의존)하는 경로가 있었습니다.</p>
 <div class="codehilite"><pre><span></span><code>[리팩터 전]
 services.py ──import AppError──▶ decorators.py ──import──▶ output.py
    (서비스)                         (횡단?)                 (프레젠테이션)
@@ -557,8 +618,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </code></pre></div>
 
 <p>세 줄에 세 계층이 각각 한 번씩 등장합니다 — 서비스가 계산하고, 프레젠터가 문자열로 바꾸고, 출력 모듈이 채널을 고릅니다. 리팩터 전 <code>cmd_summary</code> 는 25줄짜리 렌더링 함수였습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>summary_lines</code> 는 <code>return</code> 대신 <code>yield</code> 를 쓰는 <strong>제너레이터 함수</strong>입니다(§4 에 본문이 있습니다). 함수 본문 어딘가에 <code>yield</code> 가 있으면 컴파일러가 코드 객체에 제너레이터 플래그를 세워서, 호출해도 본문이 실행되지 않고 제너레이터 객체만 돌아옵니다. 그래서 프레젠터는 "출력을 만들지 않고 <strong>만드는 방법</strong>을 넘긴다"가 되고, <code>output.out_lines</code> 가 <code>for</code> 로 돌릴 때 비로소 한 줄씩 계산됩니다. 조기 반환(<code>if summary.is_empty: ... return</code>)이 자연스럽게 쓰이는 것도 제너레이터라서입니다 — 여기서 <code>return</code> 은 값이 아니라 <strong>종료</strong>를 뜻합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>summary_lines</code> 는 <code>return</code> 대신 <code>yield</code> 를 쓰는 <strong>제너레이터 함수</strong>입니다(§4 에 본문이 있습니다). 함수 본문 어딘가에 <code>yield</code> 가 있으면 컴파일러가 코드 객체에 제너레이터 플래그를 세워서, 호출해도 본문이 실행되지 않고 제너레이터 객체만 돌아옵니다. 그래서 프레젠터는 "출력을 만들지 않고 <strong>만드는 방법</strong>을 넘긴다"가 되고, <code>output.out_lines</code> 가 <code>for</code> 로 돌릴 때 비로소 한 줄씩 계산됩니다. 조기 반환(<code>if summary.is_empty: ... return</code>)이 자연스럽게 쓰이는 것도 제너레이터라서입니다 — 여기서 <code>return</code> 은 값이 아니라 <strong>종료</strong>를 뜻합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="23-services-에는-open-이-없습니다">2.3 <code>services/</code> 에는 <code>open(</code> 이 없습니다</h3>
 <p>리팩터 전에는 <code>services.py</code> 안에서 CSV 파일을 직접 열었습니다. <code>repository.py</code> 는 "파일 입출력만 담당"한다고 선언해 놓고 실제로는 <strong>JSONL I/O 는 저장소, CSV I/O 는 서비스</strong>라는 일관성 없는 규칙이었습니다.</p>
@@ -588,7 +648,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
         <span class="bp">self</span><span class="o">.</span><span class="n">_append_lines</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode</span><span class="p">(</span><span class="n">entity</span><span class="p">)])</span>
 </code></pre></div>
 
-<p><code>TransactionRepository</code> 가 이것을 재정의하지만, 더하는 일도 도메인 판단이 아니라 <strong>ID 워터마크 갱신</strong>뿐입니다.</p>
+<p><code>TransactionRepository</code> 가 이것을 재정의하지만, 더하는 일도 도메인 판단이 아니라 <strong>ID 워터마크 갱신</strong>(워터마크 — 지금까지 발급한 번호 중 가장 큰 값을 적어 두는 기준선)뿐입니다.</p>
 <p>budget_app/storage/repositories.py:128-136</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx</span><span class="p">:</span> <span class="n">Transaction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;한 건을 이어 쓰고 워터마크를 갱신한다.</span>
@@ -654,9 +714,8 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </code></pre></div>
 
 <p><strong>"거의 다 됐지만 한 조각이 비어 있는 값"을 타입으로 표현</strong>한 것이 이 설계의 핵심입니다. 어댑터와 정책의 경계가 타입 하나로 그어집니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>tx_id: TransactionId | None</code> 의 <code>|</code> 유니온 표기는 PEP 604 로 파이썬 3.10 에 들어왔습니다. 그 전에는 <code>typing.Optional[TransactionId]</code> 또는 <code>typing.Union[...]</code> 을 썼습니다. 이 프로젝트의 <code>requires-python = "&gt;=3.10"</code> 은 이 표기를 쓰기 위한 조건 중 하나입니다. 다만 타입 어노테이션을 쓰는 파일 28개(43개 중)는 모두 <code>from __future__ import annotations</code> 를 켜 두어서 어노테이션이 문자열로만 보관되므로, 실행 시점에는 3.10 미만에서도 평가되지 않습니다 — 그래도 <code>list[str]</code>·<code>dict[str, int]</code> 같은 내장 제네릭(PEP 585, 3.9)과 함께 쓰이므로 하한선은 유지됩니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>@dataclass(frozen=True)</code> 는 PEP 557 로 파이썬 3.7 에 들어온 <code>dataclasses</code> 입니다. 데코레이터가 클래스 어노테이션을 읽어 <code>__init__</code>·<code>__repr__</code>·<code>__eq__</code> <strong>소스 코드를 문자열로 조립한 뒤 <code>exec</code> 로 컴파일</strong>해 클래스에 붙입니다. <code>frozen=True</code> 면 추가로 <code>__setattr__</code>/<code>__delattr__</code> 을 심어 대입을 <code>FrozenInstanceError</code> 로 막고, <code>__hash__</code> 도 생성해 줍니다. <code>ParsedRow</code> 를 얼려 두면 "검증을 마친 값"이 어댑터를 떠난 뒤 몰래 바뀌는 일이 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>tx_id: TransactionId | None</code> 의 <code>|</code> 유니온 표기는 PEP 604 로 파이썬 3.10 에 들어왔습니다. 그 전에는 <code>typing.Optional[TransactionId]</code> 또는 <code>typing.Union[...]</code> 을 썼습니다. 이 프로젝트의 <code>requires-python = "&gt;=3.10"</code> 은 이 표기를 쓰기 위한 조건 중 하나입니다. 다만 타입 어노테이션을 쓰는 파일 28개(43개 중)는 모두 <code>from __future__ import annotations</code> 를 켜 두어서 어노테이션이 문자열로만 보관되므로, 실행 시점에는 3.10 미만에서도 평가되지 않습니다 — 그래도 <code>list[str]</code>·<code>dict[str, int]</code> 같은 내장 제네릭(PEP 585, 3.9)과 함께 쓰이므로 하한선은 유지됩니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@dataclass(frozen=True)</code> 는 PEP 557 로 파이썬 3.7 에 들어온 <code>dataclasses</code> 입니다. 데코레이터가 클래스 어노테이션을 읽어 <code>__init__</code>·<code>__repr__</code>·<code>__eq__</code> <strong>소스 코드를 문자열로 조립한 뒤 <code>exec</code> 로 컴파일</strong>해 클래스에 붙입니다. <code>frozen=True</code> 면 추가로 <code>__setattr__</code>/<code>__delattr__</code> 을 심어 대입을 <code>FrozenInstanceError</code> 로 막고, <code>__hash__</code> 도 생성해 줍니다. <code>ParsedRow</code> 를 얼려 두면 "검증을 마친 값"이 어댑터를 떠난 뒤 몰래 바뀌는 일이 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <h3 id="26-domain-패키지는-io-를-전혀-모릅니다">2.6 <code>domain/</code> 패키지는 I/O 를 전혀 모릅니다</h3>
 <p><code>domain/</code> 의 9개 파일 어디에도 <code>open</code>, <code>print</code>, <code>input</code> 이 없고, dataclass 정의와 계산만 있습니다(§1.2 의 목록에서 <code>domain.*</code> 가 import 하는 것은 자기 계층과 루트 <code>errors</code> 뿐입니다). 그래서 도메인은 파일 없이 단독으로 테스트할 수 있고, <code>tests/test_architecture.py::test_domain_imports_nothing_above_itself</code> 가 이 규칙을 매 실행마다 확인합니다.</p>
@@ -689,8 +748,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 <div class="codehilite"><pre><span></span><code><span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">app_config</span><span class="o">.</span><span class="n">LOGGER_NAME</span><span class="si">}</span><span class="s2">.storage&quot;</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>logging</code> 의 로거 이름은 <strong>점으로 계층을 만드는 문자열</strong>입니다. <code>logging.getLogger("budget_app.storage")</code> 는 이름이 같으면 항상 같은 객체를 돌려주고(모듈 수준 딕셔너리 캐시), 레코드를 처리할 때는 자기 핸들러를 부른 뒤 <code>propagate</code> 를 따라 부모 <code>"budget_app"</code> → 루트 로거로 <strong>거슬러 올라갑니다.</strong> 그래서 <code>output.setup_logging()</code> 이 <code>logging.basicConfig</code> 로 루트에 핸들러 하나만 붙여 두면 모든 계층의 로그가 그리로 모이고, 나중에 "저장소 로그만 끄고 싶다"가 생기면 <code>budget_app.storage</code> 한 줄만 조정하면 됩니다. 즉 <strong>모듈 트리와 로거 트리가 같은 모양</strong>이 되도록 이름을 파생시킨 것입니다. 현재 자식 로거는 <code>budget_app.storage</code> 하나뿐이고, <code>cli</code>·<code>decorators</code> 는 루트 이름 <code>"budget_app"</code> 을 그대로 씁니다(<code>cli/config.py:10</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>logging</code> 의 로거 이름은 <strong>점으로 계층을 만드는 문자열</strong>입니다. <code>logging.getLogger("budget_app.storage")</code> 는 이름이 같으면 항상 같은 객체를 돌려주고(모듈 수준 딕셔너리 캐시), 레코드를 처리할 때는 자기 핸들러를 부른 뒤 <code>propagate</code> 를 따라 부모 <code>"budget_app"</code> → 루트 로거로 <strong>거슬러 올라갑니다.</strong> 그래서 <code>output.setup_logging()</code> 이 <code>logging.basicConfig</code> 로 루트에 핸들러 하나만 붙여 두면 모든 계층의 로그가 그리로 모이고, 나중에 "저장소 로그만 끄고 싶다"가 생기면 <code>budget_app.storage</code> 한 줄만 조정하면 됩니다. 즉 <strong>모듈 트리와 로거 트리가 같은 모양</strong>이 되도록 이름을 파생시킨 것입니다. 현재 자식 로거는 <code>budget_app.storage</code> 하나뿐이고, <code>cli</code>·<code>decorators</code> 는 루트 이름 <code>"budget_app"</code> 을 그대로 씁니다(<code>cli/config.py:10</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <hr>
 <h2 id="3-실행-흐름-완전-추적-1-쓰기-경로-python-m-budget_app-add">3. 실행 흐름 완전 추적 1 — 쓰기 경로 (<code>python -m budget_app add</code>)</h2>
@@ -715,10 +773,9 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </code></pre></div>
 
 <p><strong>1단계 — 진입.</strong> <code>python -m budget_app</code> 은 패키지의 <code>__main__.py</code> 를 실행합니다. <code>sys.exit(main())</code> 이 <code>cli.main</code> 의 반환값(정수)을 프로세스 종료 코드로 만듭니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>sys.exit(n)</code> 은 프로세스를 즉시 죽이는 것이 아니라 <code>SystemExit(n)</code> <strong>예외를 던지는</strong> 것입니다. 그래서 <code>try</code>/<code>finally</code> 와 컨텍스트 매니저의 정리 코드가 정상적으로 돌고, 인터프리터 최상단이 그 예외를 받아 종료 코드로 씁니다. 인자가 정수면 그대로 종료 코드, 문자열이면 stderr 에 찍고 코드 1, <code>None</code>/생략이면 0 입니다. <code>main()</code> 이 <code>int</code> 를 돌려주도록 설계한 이유가 여기 있습니다 — 모든 핸들러가 <code>config.EXIT_*</code> 상수를 <code>return</code> 하면 그 값이 그대로 셸의 <code>$?</code> 가 됩니다. 예외로 종료 코드를 정하지 않으므로 <code>handle_errors</code> 가 예외를 잡아 <code>return EXIT_IO</code> 하는 방식이 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>sys.exit(n)</code> 은 프로세스를 즉시 죽이는 것이 아니라 <code>SystemExit(n)</code> <strong>예외를 던지는</strong> 것입니다. 그래서 <code>try</code>/<code>finally</code> 와 컨텍스트 매니저의 정리 코드가 정상적으로 돌고, 인터프리터 최상단이 그 예외를 받아 종료 코드로 씁니다. 인자가 정수면 그대로 종료 코드, 문자열이면 stderr 에 찍고 코드 1, <code>None</code>/생략이면 0 입니다. <code>main()</code> 이 <code>int</code> 를 돌려주도록 설계한 이유가 여기 있습니다 — 모든 핸들러가 <code>config.EXIT_*</code> 상수를 <code>return</code> 하면 그 값이 그대로 셸의 <code>$?</code> 가 됩니다. 예외로 종료 코드를 정하지 않으므로 <code>handle_errors</code> 가 예외를 잡아 <code>return EXIT_IO</code> 하는 방식이 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
-<p><strong>2단계 — 파싱·준비·디스패치.</strong></p>
+<p><strong>2단계 — 파싱·준비·디스패치.</strong> 디스패치는 명령 이름에 맞는 함수를 골라 일을 넘기는 것을 말합니다.</p>
 <p>budget_app/cli/app.py:84-94</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
@@ -741,8 +798,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
     <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">)</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>set_defaults(handler="add")</code> 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 <code>Namespace</code> 에 <strong>그냥 꽂아 넣을 값</strong>을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 <code>_defaults</code> 를 상위 <code>Namespace</code> 에 합칩니다. 그래서 <code>args.handler</code> 는 사용자가 입력한 적 없는데도 값이 들어 있고, <code>--data-dir</code> 처럼 실제 옵션이 아니라서 <code>--help</code> 에도 나오지 않습니다. <code>needs_storage</code> 도 같은 통로로 들어옵니다 — 최상위에서 <code>set_defaults(needs_storage=True)</code>, <code>backup</code> 하위 파서만 <code>False</code> 로 덮습니다(<code>cli/parser.py:91</code>, <code>cli/parser.py:243</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>set_defaults(handler="add")</code> 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 <code>Namespace</code> 에 <strong>그냥 꽂아 넣을 값</strong>을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 <code>_defaults</code> 를 상위 <code>Namespace</code> 에 합칩니다. 그래서 <code>args.handler</code> 는 사용자가 입력한 적 없는데도 값이 들어 있고, <code>--data-dir</code> 처럼 실제 옵션이 아니라서 <code>--help</code> 에도 나오지 않습니다. <code>needs_storage</code> 도 같은 통로로 들어옵니다 — 최상위에서 <code>set_defaults(needs_storage=True)</code>, <code>backup</code> 하위 파서만 <code>False</code> 로 덮습니다(<code>cli/parser.py:91</code>, <code>cli/parser.py:243</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong>3단계 — 컨텍스트 조립과 핸들러 실행.</strong> <code>@handle_errors</code> 는 개별 핸들러가 아니라 <strong><code>_dispatch</code> 한 곳에만</strong> 붙습니다.</p>
 <p>budget_app/cli/app.py:61-81</p>
@@ -763,8 +819,9 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </code></pre></div>
 
 <p><code>AppContext</code> 생성과 <code>prepare()</code> 까지 방패 안에 들어와 있다는 점이 중요합니다. <strong>파일을 여는 코드가 방패 밖에 있으면 방패가 아닙니다.</strong> 이 아래 모든 단계에서 발생하는 예외는 스택트레이스 대신 <code>[오류]</code>/<code>[힌트]</code> 메시지와 종료 코드로 변환됩니다(§7).</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>@handle_errors</code> 라는 데코레이터 문법은 PEP 318 로 파이썬 2.4 에 들어왔고, 하는 일은 순수한 문법 설탕입니다. <code>@deco</code> 다음에 오는 <code>def f(...)</code> 는 파이썬이 <code>f = deco(f)</code> 로 바꿔 씁니다(정확히는 함수를 만든 직후 <code>deco</code> 를 적용하고 그 결과를 <code>f</code> 라는 이름에 대입합니다). 그래서 위 코드에서 <code>_dispatch</code> 라는 이름이 실제로 가리키는 것은 원본 함수가 아니라 <code>handle_errors</code> 가 돌려준 <code>wrapper</code> 입니다. "정책을 한 줄로 붙인다"가 가능한 이유가 이 재대입 하나입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — <code>@handle_errors</code> 같은 데코레이터는 편지를 봉투에 넣는 일에 가깝습니다. 편지(원래 함수)는 한 글자도 바뀌지 않는데, 겉에 주소와 우표가 붙어야 비로소 우체국이 다룰 수 있는 물건이 됩니다. 여기서는 <code>_dispatch</code> 라는 이름이 가리키는 것이 이제 편지가 아니라 봉투이고, 안에서 무슨 사고가 나든 봉투가 그것을 받아 <code>[오류]</code> 한 줄과 종료 코드로 바꿔 내놓습니다.
+다만 이 비유는 봉투가 속을 건드리지 않는다는 데서 깨집니다 — 데코레이터는 안의 함수가 던진 예외를 가로채 아예 다른 값을 대신 돌려줄 수 있습니다. 겉만 한 겹 두르고 마는 것이 아닙니다.</p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@handle_errors</code> 라는 데코레이터 문법은 PEP 318 로 파이썬 2.4 에 들어왔고, 하는 일은 순수한 문법 설탕입니다. <code>@deco</code> 다음에 오는 <code>def f(...)</code> 는 파이썬이 <code>f = deco(f)</code> 로 바꿔 씁니다(정확히는 함수를 만든 직후 <code>deco</code> 를 적용하고 그 결과를 <code>f</code> 라는 이름에 대입합니다). 그래서 위 코드에서 <code>_dispatch</code> 라는 이름이 실제로 가리키는 것은 원본 함수가 아니라 <code>handle_errors</code> 가 돌려준 <code>wrapper</code> 입니다. "정책을 한 줄로 붙인다"가 가능한 이유가 이 재대입 하나입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p><code>HANDLERS["add"]</code> 가 가리키는 함수가 이것입니다.</p>
 <p>budget_app/cli/handlers.py:33-50</p>
@@ -803,10 +860,9 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
     <span class="p">)</span>
 </code></pre></div>
 
-<p>여기서 <strong>CLI 가 자체 검증 규칙을 갖지 않는다</strong>는 점이 중요합니다. <code>validators.parse_date</code> 를 그대로 넘길 뿐입니다. 카테고리만 서비스에 물어봐야 하므로 클로저 팩토리로 감쌉니다 — <code>registered_category_validator(cat_service)</code> 는 <code>cat_service</code> 를 기억하는 <strong>한 인자짜리 함수</strong>를 만들어 돌려주므로, <code>ask_until</code> 이 요구하는 <code>Callable[[str], T]</code> 모양에 맞아떨어집니다(<code>cli/prompts.py:77-109</code>, 자세한 것은 <a href="03-python-advanced.html">03 §4.5</a>).</p>
+<p>여기서 <strong>CLI 가 자체 검증 규칙을 갖지 않는다</strong>는 점이 중요합니다. <code>validators.parse_date</code> 를 그대로 넘길 뿐입니다. 카테고리만 서비스에 물어봐야 하므로 클로저 팩토리(어떤 값을 기억한 채로 새 함수를 만들어 내는 함수)로 감쌉니다 — <code>registered_category_validator(cat_service)</code> 는 <code>cat_service</code> 를 기억하는 <strong>한 인자짜리 함수</strong>를 만들어 돌려주므로, <code>ask_until</code> 이 요구하는 <code>Callable[[str], T]</code> 모양에 맞아떨어집니다(<code>cli/prompts.py:77-109</code>, 자세한 것은 <a href="03-python-advanced.html">03 §4.5</a>).</p>
 <p><code>ask_until</code> 은 재입력 루프의 뼈대이고, EOF 와 무한 반복이라는 두 함정을 막아 둡니다(<code>cli/prompts.py:60-74</code>) — EOF 면 <code>InputAborted</code> 를 던지고, 재입력은 <code>config.MAX_INPUT_RETRIES</code> 회로 끊습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>ask_until</code> 이 검증 <strong>함수 자체</strong>를 인자로 받을 수 있는 것은 파이썬에서 함수가 일급 객체(first-class object)이기 때문입니다. <code>def</code> 는 선언이 아니라 <strong>실행되는 문</strong>이고, 함수 객체를 만들어 이름에 대입합니다. 그래서 <code>validators.parse_date</code> 는 호출하지 않으면 그냥 값이고, 딕셔너리에 담거나(<code>app.HANDLERS</code>) 인자로 넘기거나(<code>ask_until</code>) 감싸서 새 함수를 만들 수 있습니다(<code>registered_category_validator</code>). 별도의 "함수 포인터" 개념이 필요 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>ask_until</code> 이 검증 <strong>함수 자체</strong>를 인자로 받을 수 있는 것은 파이썬에서 함수가 일급 객체(first-class object)이기 때문입니다. <code>def</code> 는 선언이 아니라 <strong>실행되는 문</strong>이고, 함수 객체를 만들어 이름에 대입합니다. 그래서 <code>validators.parse_date</code> 는 호출하지 않으면 그냥 값이고, 딕셔너리에 담거나(<code>app.HANDLERS</code>) 인자로 넘기거나(<code>ask_until</code>) 감싸서 새 함수를 만들 수 있습니다(<code>registered_category_validator</code>). 별도의 "함수 포인터" 개념이 필요 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong>5단계 — 서비스의 도메인 규칙.</strong></p>
 <p>budget_app/services/transactions.py:27-35</p>
@@ -844,13 +900,13 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </code></pre></div>
 
 <p><strong><code>iter_raw()</code> 를 쓴다는 점이 핵심입니다.</strong> 검증에 실패하는 줄에도 id 는 들어 있고, 그 번호는 이미 쓰인 번호입니다. <code>stream()</code>(유효한 것만)으로 훑으면 그 번호가 보이지 않아 <strong>재발급으로 중복 id 가 생깁니다</strong>. 저장소는 읽기 경로를 둘로 나눠 두었습니다 — <code>iter_raw()</code> 는 해석 실패 줄까지 원문 그대로 주고, <code>stream()</code> 은 해석에 성공한 엔티티만 줍니다(<a href="07-repository.html">07 §4</a>).</p>
-<p><strong>7단계 — 생성자 불변식.</strong> <code>Transaction(...)</code> 호출이 <code>__post_init__</code> 을 태우고, 여기서 모든 필드가 검증·정규화됩니다. 여기까지 예외 없이 왔다면 <strong>객체는 반드시 유효</strong>합니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>__post_init__</code> 은 파이썬 언어의 특수 메서드가 아니라 <strong><code>dataclasses</code> 모듈의 약속</strong>입니다. <code>@dataclass</code> 가 생성해 주는 <code>__init__</code> 의 마지막 줄에 "클래스에 <code>__post_init__</code> 이 있으면 부른다"는 호출이 삽입되는 것뿐입니다. 그런데 <code>Transaction</code> 은 <code>frozen=True</code> 라 <code>self.date = ...</code> 같은 정규화 대입이 막히므로, 정규화가 필요한 자리는 <code>object.__setattr__(self, "date", ...)</code> 로 얼음을 우회합니다(<code>domain/entities.py:68-80</code>). "검증은 생성자에서 단 한 번" 규칙이 성립하는 지점이 여기입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<p><strong>7단계 — 생성자 불변식.</strong> 불변식이란 그 객체가 존재하는 한 언제나 참이어야 하는 조건입니다. <code>Transaction(...)</code> 호출이 <code>__post_init__</code> 을 태우고, 여기서 모든 필드가 검증·정규화됩니다. 여기까지 예외 없이 왔다면 <strong>객체는 반드시 유효</strong>합니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>__post_init__</code> 은 파이썬 언어의 특수 메서드가 아니라 <strong><code>dataclasses</code> 모듈의 약속</strong>입니다. <code>@dataclass</code> 가 생성해 주는 <code>__init__</code> 의 마지막 줄에 "클래스에 <code>__post_init__</code> 이 있으면 부른다"는 호출이 삽입되는 것뿐입니다. 그런데 <code>Transaction</code> 은 <code>frozen=True</code> 라 <code>self.date = ...</code> 같은 정규화 대입이 막히므로, 정규화가 필요한 자리는 <code>object.__setattr__(self, "date", ...)</code> 로 얼음을 우회합니다(<code>domain/entities.py:68-80</code>). "검증은 생성자에서 단 한 번" 규칙이 성립하는 지점이 여기입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <p><strong>8단계 — 파일 쓰기.</strong> <code>append</code> 가 한 줄을 파일 끝에 붙입니다(§2.4). 새 거래 추가는 파일 전체를 다시 쓰지 않으므로 O(1) 입니다.</p>
 <hr>
 <h2 id="4-실행-흐름-완전-추적-2-읽기-경로-summary-month-2024-01">4. 실행 흐름 완전 추적 2 — 읽기 경로 (<code>summary --month 2024-01</code>)</h2>
+<p>이번에는 파일을 바꾸지 않고 읽기만 하는 경로입니다. "2024년 1월에 얼마를 벌고 얼마를 썼나"라는 물음이, 저장된 거래를 훑어 답을 만들고 화면까지 오는 길을 따라갑니다.</p>
 <div class="codehilite"><pre><span></span><code>python -m budget_app summary --month 2024-01
   → cmd_summary(ctx, args)
       → BudgetService.monthly_summary(&quot;2024-01&quot;, top_n=5)     @measure_time
@@ -910,8 +966,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 <p>세 가지를 눈여겨보세요.</p>
 <p><strong>(1) 단일 패스 집계.</strong> 파일을 <strong>한 번만</strong> 순회하며 수입 합계·지출 합계·카테고리별 합계를 동시에 누적합니다. 세 값을 각각 구하려고 세 번 읽는 방식보다 파일 I/O 가 1/3 입니다.</p>
 <p><strong>(2) 파생값을 계산하지 않습니다.</strong> <code>balance</code>, <code>usage_pct</code>, <code>over_budget</code> 이 여기 없습니다. 전부 <code>MonthlySummary</code> 의 <code>@property</code> 입니다(<code>domain/results.py:38-50</code>). 서비스는 <strong>원자료만</strong> 담아 넘깁니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>@property</code> 는 문법이 아니라 <strong>내장 클래스</strong>입니다. <code>property(fget)</code> 가 <code>__get__</code> 을 가진 객체(디스크립터)를 만들어 클래스 속성 자리에 앉으면, <code>summary.balance</code> 라는 <strong>속성 접근</strong>이 파이썬 내부에서 <code>type(summary).balance.__get__(summary)</code> 로 바뀌어 함수가 호출됩니다. 그래서 호출 괄호 없이도 계산이 일어나고, 프레젠터 쪽 코드는 "필드를 읽는 것"과 "계산을 요청하는 것"을 구분할 필요가 없어집니다. 파생값의 정의처가 데이터 옆에 붙어 있게 되는 것이 이 설계의 이득입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>@property</code> 는 문법이 아니라 <strong>내장 클래스</strong>입니다. <code>property(fget)</code> 가 <code>__get__</code> 을 가진 객체(디스크립터)를 만들어 클래스 속성 자리에 앉으면, <code>summary.balance</code> 라는 <strong>속성 접근</strong>이 파이썬 내부에서 <code>type(summary).balance.__get__(summary)</code> 로 바뀌어 함수가 호출됩니다. 그래서 호출 괄호 없이도 계산이 일어나고, 프레젠터 쪽 코드는 "필드를 읽는 것"과 "계산을 요청하는 것"을 구분할 필요가 없어집니다. 파생값의 정의처가 데이터 옆에 붙어 있게 되는 것이 이 설계의 이득입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <p><strong>(3) 리팩터 전에는 dict 를 돌려줬습니다.</strong> <code>{"month": ..., "income": ..., "usage_pct": ...}</code> 형태의 9키 딕셔너리였고, CLI 가 <code>result["has_data"]</code> 처럼 꺼내 썼습니다. 키 오타는 런타임 <code>KeyError</code> 였고, "예산이 없으면 N/A" 같은 <strong>도메인 상태 해석이 화면 코드에 섞여</strong> 있었습니다.</p>
 <p>프레젠터는 그 결과를 읽기만 합니다.</p>
@@ -948,6 +1003,9 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 <hr>
 <h2 id="5-실행-흐름-완전-추적-3-가장-복잡한-경로-import">5. 실행 흐름 완전 추적 3 — 가장 복잡한 경로 (<code>import</code>)</h2>
 <p><code>import</code> 는 이 프로그램에서 계층이 가장 많이 관여하는 명령입니다. 정책이 셋(실패/중복/카테고리 자동 등록) 얽혀 있고, 준비와 커밋이 나뉘어 있습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 장을 볼 때 물건을 하나 집을 때마다 계산하지는 않습니다. 카트에 다 담은 뒤 계산대에서 한 번에 셈하지요. 담는 동안에는 아직 아무것도 내 것이 아니라, 도중에 마음이 바뀌면 카트째 두고 나오면 그만입니다. 여기서도 준비 단계는 CSV 를 전부 읽어 검증하고 판정만 할 뿐 파일은 한 글자도 건드리지 않고, 파일이 실제로 바뀌는 것은 커밋 단계에 가서입니다.
+다만 이 비유는 계산대가 하나라는 데서 깨집니다 — 여기서는 거래 파일과 카테고리 파일 <strong>두 개</strong>를 바꿔야 하는데, 계산대가 하나로 합쳐지는 것은 <code>--atomic</code> 일 때뿐입니다. 그때는 <code>UnitOfWork</code> 가 둘을 한 단위로 묶어 하나만 바뀐 중간 상태를 막습니다. 기본 모드는 두 파일을 따로 이어쓰므로 그 사이에 죽으면 카테고리만 남을 수 있고, "가능한 만큼 최대한 넣는다"는 이 모드의 정책이 그 위험을 감수하는 쪽을 택한 것입니다.</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code>python -m budget_app import --from data.csv --atomic --on-duplicate skip
   → cmd_import(ctx, args)
       → ImportExportService.import_csv(path, atomic=True, on_duplicate=&quot;skip&quot;)
@@ -1042,8 +1100,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </tbody>
 </table></div>
 <p><code>csv_io</code> 가 "중복"을 모른다는 점이 특히 중요합니다. 그래서 CSV 스키마가 바뀌어도 정책 코드는 그대로고, 정책이 바뀌어도 CSV 파싱 코드는 그대로입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>with UnitOfWork() as uow:</code> 는 PEP 343 으로 파이썬 2.5 에 들어온 <code>with</code> 문입니다. 파이썬은 이것을 "<code>__enter__()</code> 를 불러 그 반환값을 <code>uow</code> 에 대입하고, 블록이 어떻게 끝나든 — 정상 종료든 예외든 — <code>__exit__(예외타입, 예외값, 트레이스백)</code> 을 반드시 부른다"로 풀어냅니다. <code>UnitOfWork.__exit__</code> 은 예외 인자가 <code>None</code> 인지 보고 <code>commit()</code> 할지 <code>rollback()</code> 할지 정합니다(<code>storage/unit_of_work.py:172-181</code>). "준비 중 죽으면 아무것도 남지 않는다"는 약속이 <code>try/finally</code> 를 손으로 쓰지 않고도 지켜지는 이유입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>with UnitOfWork() as uow:</code> 는 PEP 343 으로 파이썬 2.5 에 들어온 <code>with</code> 문입니다. 파이썬은 이것을 "<code>__enter__()</code> 를 불러 그 반환값을 <code>uow</code> 에 대입하고, 블록이 어떻게 끝나든 — 정상 종료든 예외든 — <code>__exit__(예외타입, 예외값, 트레이스백)</code> 을 반드시 부른다"로 풀어냅니다. <code>UnitOfWork.__exit__</code> 은 예외 인자가 <code>None</code> 인지 보고 <code>commit()</code> 할지 <code>rollback()</code> 할지 정합니다(<code>storage/unit_of_work.py:172-181</code>). "준비 중 죽으면 아무것도 남지 않는다"는 약속이 <code>try/finally</code> 를 손으로 쓰지 않고도 지켜지는 이유입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p>정책 3축(실패 축 × 중복 축 × 카테고리 자동 등록)의 조합이 어떻게 결정되는지는 <a href="08-services.html">08. 서비스 계층</a>에서 다룹니다 — 요지는 <code>--atomic</code> 이 "준비 중 한 줄이라도 실패하면 즉시 <code>AppError</code> 로 중단(파일 무접촉)", 기본 모드는 "실패한 줄만 기록하고 나머지는 넣는다"이고, <code>--on-duplicate</code> 는 그와 <strong>독립적으로</strong> id 충돌만 다룬다는 것입니다.</p>
 <hr>
@@ -1056,6 +1113,9 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </code></pre></div>
 
 <p><code>TransactionService</code> 는 저장소를 <strong>인자로 받습니다</strong>. 만약 생성자 안에서 <code>self.txs = TransactionRepository(Path("./data"))</code> 라고 직접 만들었다면, 이 서비스는 영원히 <code>./data</code> 폴더에 묶이고 테스트에서 가짜 저장소로 바꿀 수도 없습니다. 네 서비스가 모두 같은 모양입니다(<code>services/budgets.py:23-25</code>, <code>services/categories.py:18-20</code>, <code>services/importexport.py:71-73</code>).</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 요리사가 자기 칼을 직접 벼려서만 쓴다면 평생 그 칼 하나에 묶입니다. 칼을 밖에서 받아 쓰기로 하면, 연습 때는 무딘 칼을 실전에는 잘 드는 칼을 쥐여 줄 수 있습니다 — 이것이 의존성 주입입니다. 그럼 칼은 누가 챙기느냐, 개업 준비 시간에 한 사람이 주방과 창고 몫을 한자리에서 꺼내 배치합니다. 그 자리가 합성 루트이고, 여기서는 <code>AppContext</code> 입니다. 홀 몫(파서·프롬프트·프레젠터 같은 CLI 부품)은 여기서 손대지 않고 <code>cli/app.py</code> 가 따로 엮습니다 — <code>context.py</code> 는 <code>cli.*</code> 를 import 하지 않는다는 것이 이 프로젝트의 규칙이라(§2 표), 나중에 홀 대신 웹 화면을 붙여도 조립하는 자리는 그대로입니다.
+다만 이 비유는 가게가 하루 종일 열려 있다는 데서 깨집니다 — 이 프로그램은 명령 하나가 끝나면 프로세스째 사라지므로, 조립은 명령을 칠 때마다 처음부터 다시 합니다.</p>
+</blockquote>
 <p>그럼 그 저장소는 누가 만드나 — <strong>합성 루트(composition root)</strong> 인 <code>AppContext</code> 입니다.</p>
 <p>budget_app/context.py:33-65</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AppContext</span><span class="p">:</span>
@@ -1103,8 +1163,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
     <span class="k">assert</span> <span class="s2">&quot;tx_service&quot;</span> <span class="ow">in</span> <span class="n">public</span> <span class="ow">and</span> <span class="s2">&quot;backup_service&quot;</span> <span class="ow">in</span> <span class="n">public</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>vars(ctx)</code> 는 <code>ctx.__dict__</code> 를 그대로 돌려줍니다. 파이썬 객체의 인스턴스 속성은 클래스에 선언되는 것이 아니라 <strong>생성자가 대입할 때 이 딕셔너리에 들어가는</strong> 것이므로, <code>vars()</code> 한 번이면 "이 객체가 실제로 무엇을 들고 있는가"의 전체 목록이 나옵니다. 그래서 이 테스트는 소스를 읽지 않고 객체를 실제로 만들어 확인합니다. <code>AppContext(Path("."))</code> 를 만들어도 디스크가 안전한 것은 생성자가 경로 계산만 하기 때문입니다(§6.2) — 만약 이전처럼 생성자가 mkdir 을 했다면 <strong>이 테스트 자체가 부작용</strong>이 됐을 것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>vars(ctx)</code> 는 <code>ctx.__dict__</code> 를 그대로 돌려줍니다. 파이썬 객체의 인스턴스 속성은 클래스에 선언되는 것이 아니라 <strong>생성자가 대입할 때 이 딕셔너리에 들어가는</strong> 것이므로, <code>vars()</code> 한 번이면 "이 객체가 실제로 무엇을 들고 있는가"의 전체 목록이 나옵니다. 그래서 이 테스트는 소스를 읽지 않고 객체를 실제로 만들어 확인합니다. <code>AppContext(Path("."))</code> 를 만들어도 디스크가 안전한 것은 생성자가 경로 계산만 하기 때문입니다(§6.2) — 만약 이전처럼 생성자가 mkdir 을 했다면 <strong>이 테스트 자체가 부작용</strong>이 됐을 것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <h3 id="62-생성자와-prepare-를-나눈-이유-리팩터">6.2 생성자와 <code>prepare()</code> 를 나눈 이유 (리팩터)</h3>
 <p><strong>리팩터 전에는 저장소 생성자가 디스크를 건드렸습니다.</strong></p>
@@ -1165,8 +1224,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 <h3 id="63-왜-di-프레임워크를-쓰지-않았나">6.3 왜 DI 프레임워크를 쓰지 않았나</h3>
 <p>이 프로젝트는 표준 라이브러리만 쓴다는 제약이 있고, 의존 관계가 8개 객체(저장소 3 + 서비스 5)로 단순합니다. <code>AppContext.__init__</code> 열여섯 줄이 프레임워크가 할 일을 전부 하며, <strong>"무엇이 무엇에 의존하는지"가 한 화면에 보인다</strong>는 장점까지 있습니다. 규모가 커지면 그때 도구를 고려하면 됩니다.</p>
 <p>그런데 "규모가 작아서"만이 이유는 아닙니다. <strong>파이썬에는 DI 컨테이너가 해결하려는 문제 자체가 거의 없습니다.</strong></p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 자바·C# 계열의 DI 컨테이너는 두 가지를 대신해 줍니다. (1) "이 인터페이스의 구현체를 찾아 꽂아라" — 리플렉션으로 타입을 뒤져 생성자를 호출하는 일, (2) "테스트에서는 다른 구현으로 바꿔라" — 컴파일 시점에 타입이 고정돼 있어 언어만으로는 못 하는 일. 파이썬에서는 둘 다 언어 기능으로 끝납니다.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 자바·C# 계열의 DI 컨테이너는 두 가지를 대신해 줍니다. (1) "이 인터페이스의 구현체를 찾아 꽂아라" — 리플렉션으로 타입을 뒤져 생성자를 호출하는 일, (2) "테스트에서는 다른 구현으로 바꿔라" — 컴파일 시점에 타입이 고정돼 있어 언어만으로는 못 하는 일. 파이썬에서는 둘 다 언어 기능으로 끝납니다.</p>
 <ul>
 <li><strong>함수와 클래스가 일급 객체</strong>입니다. 클래스 자체가 값이므로 <code>TransactionService(repo, cats)</code> 처럼 그냥 부르면 되고, "팩토리"가 필요하면 함수 하나면 됩니다. 별도의 등록 DSL 이 필요 없습니다.</li>
 <li><strong>덕 타이핑(duck typing)</strong> 이라 타입 선언이 실행에 관여하지 않습니다. <code>def __init__(self, txs: TransactionRepository, ...)</code> 의 어노테이션은 문서이자 정적 검사용일 뿐, 인터프리터는 검사하지 않습니다. 그래서 테스트가 <code>.stream()</code> 과 <code>.append()</code> 만 있는 가짜 객체를 넘겨도 그대로 동작합니다 — 인터페이스를 추상 클래스로 뽑아 두지 않아도 교체가 됩니다(§8.5 에서 다시 다룹니다).</li>
@@ -1175,6 +1233,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </blockquote>
 <hr>
 <h2 id="7-오류-처리-아키텍처-예외의-발생지와-변환지">7. 오류 처리 아키텍처 — 예외의 발생지와 변환지</h2>
+<p>무엇인가 잘못됐을 때 <strong>어디서 알아채고 어디서 사용자에게 말하는가</strong>도 계층 설계의 일부입니다. 이 프로그램은 알아채는 자리는 여럿이되, <strong>예외를</strong> 사용자용 문구와 종료 코드로 바꾸는 자리는 <code>@handle_errors</code> 한 곳으로 모아 두었습니다. (예외를 쓰지 않는 실패 경로 — 이를테면 §3 의 <code>cmd_add</code> 가 카테고리가 하나도 없을 때 곧장 안내 문구를 내보내는 자리 — 는 핸들러·프롬프트가 직접 말합니다.)</p>
 <h3 id="71-예외의-3가지-종류와-발생-계층">7.1 예외의 3가지 종류와 발생 계층</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -1246,6 +1305,9 @@ context._require_usable_...  ── NotADirectoryError┤
 <p>전체 except 체인과 순서 정책은 <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a>에서 상세히 다룹니다 — 순서의 핵심은 <strong>좁은 것부터</strong>입니다. <code>try</code> 문은 위에서부터 <code>isinstance</code> 검사를 하고 <strong>처음 맞는 절 하나만</strong> 실행하므로, <code>FileNotFoundError</code>·<code>IsADirectoryError</code>·<code>NotADirectoryError</code>·<code>PermissionError</code> 를 부모인 <code>except OSError</code> 보다 위에 두지 않으면 그 네 절이 영원히 도달 불가능해집니다. <code>cli/error_handler.py</code> 는 네 부류(종료 신호 → 입력 오류 → 환경 상태 → 최후 방어선)로 묶고 각 부류 안에서 이 순서를 지킵니다.</p>
 <h3 id="73-출력-채널도-아키텍처입니다">7.3 출력 채널도 아키텍처입니다</h3>
 <p>"어디로 나가는가"가 계층 설계의 일부입니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 주방에서 밖으로 나가는 것이 둘입니다. 손님 앞에 놓는 접시(stdout)와 주방 게시판에 적어 두는 메모(stderr)입니다. 접시 위에 "오늘 양파가 떨어졌음" 쪽지를 얹어 내보내면 손님은 그 접시를 쓸 수 없습니다 — <code>list &gt; out.txt</code> 로 데이터만 받으려는데 오류 문구가 섞여 들어가는 상황이 그것입니다.
+다만 이 비유는 둘이 끝까지 따로 간다는 데서 깨집니다 — 셸에서 <code>2&gt;&amp;1</code> 로 두 채널을 다시 합칠 수 있고, 그때 순서가 뒤집히는 문제가 아래 ⚙️ 상자의 내용입니다.</p>
+</blockquote>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -1294,8 +1356,7 @@ context._require_usable_...  ── NotADirectoryError┤
 python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>import<span class="w"> </span>--from<span class="w"> </span>nope.csv<span class="w"> </span><span class="m">1</span>&gt;/dev/null<span class="w">     </span><span class="c1"># 결과만 버림 → 오류만 보임</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>output.err()</code> 이 <code>print(..., file=sys.stderr)</code> <strong>앞에</strong> <code>sys.stdout.flush()</code> 를 부르는 이유는 두 스트림의 버퍼링 정책이 다르기 때문입니다. CPython 은 stdout 이 터미널(tty)이면 줄 단위 버퍼링, 파이프나 파일이면 <strong>블록 버퍼링</strong>(보통 8KB 단위)으로 잡고, stderr 는 대상이 무엇이든 라인 버퍼(<code>line_buffering=True</code>)라 개행마다 곧바로 흘러나갑니다. 그래서 <code>cmd 2&gt;&amp;1 | less</code> 처럼 두 채널을 다시 합치면, 아직 버퍼에 남은 결과보다 진단이 먼저 튀어나와 순서가 뒤집힙니다. 비우고 쓰면 그 역전이 사라집니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>output.err()</code> 이 <code>print(..., file=sys.stderr)</code> <strong>앞에</strong> <code>sys.stdout.flush()</code> 를 부르는 이유는 두 스트림의 버퍼링 정책이 다르기 때문입니다. CPython 은 stdout 이 터미널(tty)이면 줄 단위 버퍼링, 파이프나 파일이면 <strong>블록 버퍼링</strong>(보통 8KB 단위)으로 잡고, stderr 는 대상이 무엇이든 라인 버퍼(<code>line_buffering=True</code>)라 개행마다 곧바로 흘러나갑니다. 그래서 <code>cmd 2&gt;&amp;1 | less</code> 처럼 두 채널을 다시 합치면, 아직 버퍼에 남은 결과보다 진단이 먼저 튀어나와 순서가 뒤집힙니다. 비우고 쓰면 그 역전이 사라집니다.</p>
 <p>같은 이유로 <code>_silence_broken_pipe()</code> 가 필요합니다. 하류가 먼저 닫힌 뒤 인터프리터가 종료하면서 stdout 버퍼를 마지막으로 비우려다 또 <code>BrokenPipeError</code> 가 나고, 그것은 이미 예외 처리 밖이라 <code>Exception ignored in: ...</code> 가 찍힙니다. <code>os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())</code> 는 <strong>파일 서술자 1번 자체를 <code>/dev/null</code> 로 갈아 끼워서</strong>, 남은 바이트가 아무 데도 가지 않고 조용히 사라지게 합니다(파이썬 공식 문서가 권장하는 레시피입니다). → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><code>import</code> 는 한 명령이 두 채널을 모두 쓰는 예입니다.</p>
@@ -1362,8 +1423,7 @@ domain/queries.py :: SearchFilter.for_month()
         └──▶ cli/handlers.py :: _export_filter()
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>calendar.monthrange(year, month)</code> 는 <code>(그 달 1일의 요일, 그 달의 일수)</code> 튜플을 돌려줍니다. <code>month_range</code> 가 쓰는 것은 두 번째 값뿐입니다(<code>[1]</code>). 윤년 판정까지 포함해 실제 말일을 주므로 "모든 달을 31일로 가정"하는 실수가 원천 봉쇄됩니다. 이 모듈의 이름이 <code>calendar.py</code> 가 아니라 <code>periods.py</code> 인 것은 표준 라이브러리와 이름이 겹치면 읽는 사람이 헷갈리기 때문입니다 — 파이썬 3 의 절대 import 규칙(PEP 328) 덕분에 동작은 안전하지만, 혼동 자체가 비용이라는 판단입니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>calendar.monthrange(year, month)</code> 는 <code>(그 달 1일의 요일, 그 달의 일수)</code> 튜플을 돌려줍니다. <code>month_range</code> 가 쓰는 것은 두 번째 값뿐입니다(<code>[1]</code>). 윤년 판정까지 포함해 실제 말일을 주므로 "모든 달을 31일로 가정"하는 실수가 원천 봉쇄됩니다. 이 모듈의 이름이 <code>calendar.py</code> 가 아니라 <code>periods.py</code> 인 것은 표준 라이브러리와 이름이 겹치면 읽는 사람이 헷갈리기 때문입니다 — 파이썬 3 의 절대 import 규칙(PEP 328) 덕분에 동작은 안전하지만, 혼동 자체가 비용이라는 판단입니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <p><strong>DRY 의 본질은 "코드 줄이기"가 아니라 "지식의 중복 제거"</strong> 입니다. 위 네 가지는 전부 "같은 지식이 두 곳에 있으면 어긋날 수 있다"는 문제를 해결한 것입니다.</p>
 <h3 id="84-명시적-계약-explicit-contract">8.4 명시적 계약 (Explicit Contract)</h3>
@@ -1405,14 +1465,13 @@ domain/queries.py :: SearchFilter.for_month()
 </tbody>
 </table></div>
 <p>리팩터의 상당 부분이 <strong>"암묵적 dict 계약 → 명시적 타입 계약"</strong> 이었습니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>Callable[[str], T]</code> 의 <code>T</code> 는 <code>TypeVar</code> 로 선언한 타입 변수입니다(<code>cli/prompts.py:25</code> 의 <code>T = TypeVar("T")</code>). "무엇이든 좋지만 <strong>입력과 출력에서 같은 것</strong>"을 뜻하므로, <code>ask_until(prompt, parse_amount)</code> 의 결과가 <code>int</code> 로, <code>ask_until(prompt, parse_date)</code> 의 결과가 <code>str</code> 로 각각 추론됩니다. 여기서 중요한 것은 <strong>이 어노테이션이 실행에 아무 영향을 주지 않는다</strong>는 점입니다 — 어노테이션을 쓰는 파일 28개가 모두 <code>from __future__ import annotations</code> 를 켜 두어 어노테이션은 문자열로만 보관되고, 검사는 mypy/pyright 같은 별도 도구가 합니다. 계약은 <strong>사람과 정적 검사기를 향한 선언</strong>이고, 실행 시점의 강제는 여전히 <code>__post_init__</code> 같은 코드가 합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>Callable[[str], T]</code> 의 <code>T</code> 는 <code>TypeVar</code> 로 선언한 타입 변수입니다(<code>cli/prompts.py:25</code> 의 <code>T = TypeVar("T")</code>). "무엇이든 좋지만 <strong>입력과 출력에서 같은 것</strong>"을 뜻하므로, <code>ask_until(prompt, parse_amount)</code> 의 결과가 <code>int</code> 로, <code>ask_until(prompt, parse_date)</code> 의 결과가 <code>str</code> 로 각각 추론됩니다. 여기서 중요한 것은 <strong>이 어노테이션이 실행에 아무 영향을 주지 않는다</strong>는 점입니다 — 어노테이션을 쓰는 파일 28개가 모두 <code>from __future__ import annotations</code> 를 켜 두어 어노테이션은 문자열로만 보관되고, 검사는 mypy/pyright 같은 별도 도구가 합니다. 계약은 <strong>사람과 정적 검사기를 향한 선언</strong>이고, 실행 시점의 강제는 여전히 <code>__post_init__</code> 같은 코드가 합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="85-의존성-역전은-아닐까-구분해-두기">8.5 의존성 역전은 아닐까? (구분해 두기)</h3>
 <p>이 프로젝트는 의존성 <strong>주입</strong>(DI)은 쓰지만 의존성 <strong>역전</strong>(DIP, 추상 인터페이스에 의존)은 쓰지 않습니다. <code>TransactionService</code> 는 <code>TransactionRepository</code> <strong>구체 클래스</strong>를 타입 힌트로 받습니다(<code>services/transactions.py:23</code>).</p>
 <p>규모상 추상화 계층(<code>ABC</code>/<code>Protocol</code>)을 도입할 실익이 없기 때문이며, 필요해지면(예: SQLite 저장소 추가) 그때 인터페이스를 뽑으면 됩니다. <strong>지금 없는 것과 못 하는 것을 구분해서 말할 수 있어야</strong> 합니다.</p>
 <p>여기서 §6.3 의 논점이 다시 걸립니다 — 파이썬에서는 어노테이션이 실행에 관여하지 않으므로, DIP 가 없어도 <strong>교체 자체는 이미 가능합니다.</strong> 필요한 메서드만 가진 객체를 넘기면 그대로 돕니다. <code>Protocol</code> 을 도입해서 얻는 것은 실행 시점의 능력이 아니라 <strong>"저장소란 무엇인가"를 한 곳에 적어 두고 정적 검사기가 확인하게 하는 것</strong>입니다. 그 구분을 정확히 말할 수 있으면 "왜 안 했나"에 대한 답이 변명이 아니라 판단이 됩니다.</p>
-<p>한편 도메인 계층은 다른 방식으로 추상화를 씁니다. <code>domain/specs.py</code> 의 <code>Spec</code> 은 <code>is_satisfied_by</code> 하나를 요구하는 기반 클래스이고, <code>And</code>/<code>Or</code>/<code>Not</code>/<code>DateFrom</code>/… 이 이를 구현해 조건을 조합 가능한 값으로 만듭니다. 즉 <strong>이 코드에 다형성이 없는 것이 아니라, 저장소 축에만 없습니다.</strong></p>
+<p>한편 도메인 계층은 다른 방식으로 추상화를 씁니다. <code>domain/specs.py</code> 의 <code>Spec</code> 은 <code>is_satisfied_by</code> 하나를 요구하는 기반 클래스이고, <code>And</code>/<code>Or</code>/<code>Not</code>/<code>DateFrom</code>/… 이 이를 구현해 조건을 조합 가능한 값으로 만듭니다. 같은 이름의 호출이 대상에 따라 다르게 동작하는 성질을 다형성이라고 하는데, 즉 <strong>이 코드에 다형성이 없는 것이 아니라, 저장소 축에만 없습니다.</strong></p>
 <hr>
 <h2 id="9-설계의-진화-리팩터-전후-대조표">9. 설계의 진화 — 리팩터 전후 대조표</h2>
 <p>이 코드는 처음부터 지금 모습이 아니었습니다. 리팩터에서 바뀐 것을 한눈에 정리합니다.</p>
@@ -1570,7 +1629,7 @@ domain/queries.py :: SearchFilter.for_month()
 <hr>
 <h2 id="10-요약-과제-방어용-문답-정리">10. 요약 — 과제 방어용 문답 정리</h2>
 <p><strong>Q. 코드를 몇 개 모듈로 나눴고, 각 모듈의 책임을 어떻게 정했나요?</strong></p>
-<p>구현 파일 38개(패키지 선언 5개 별도), 4계층입니다. 기준은 "이 파일을 고칠 이유가 몇 개인가"입니다. CLI 계층만 해도 문법(<code>parser</code>)·입력(<code>prompts</code>)·표시(<code>presenter</code>)·채널(<code>output</code>)·오류표현(<code>error_handler</code>)·오케스트레이션(<code>handlers</code>)·조립과 진입(<code>app</code>)으로 나뉘는데, 각각 바뀌는 이유가 다르기 때문입니다. 의존 방향은 import 문으로 검증 가능하며(§1.2) 위로 향하는 의존이 하나도 없고, 그것을 <code>tests/test_architecture.py</code> 가 AST 로 매 실행마다 확인합니다.</p>
+<p>구현 파일 38개(패키지 선언 5개 별도), 4계층입니다. 기준은 "이 파일을 고칠 이유가 몇 개인가"입니다. CLI 계층만 해도 문법(<code>parser</code>)·입력(<code>prompts</code>)·표시(<code>presenter</code>)·채널(<code>output</code>)·오류표현(<code>error_handler</code>)·오케스트레이션(부품들을 순서대로 불러 엮는 일, <code>handlers</code>)·조립과 진입(<code>app</code>)으로 나뉘는데, 각각 바뀌는 이유가 다르기 때문입니다. 의존 방향은 import 문으로 검증 가능하며(§1.2) 위로 향하는 의존이 하나도 없고, 그것을 <code>tests/test_architecture.py</code> 가 AST 로 매 실행마다 확인합니다.</p>
 <p><strong>Q. 클래스에 부여한 책임 경계를 어떻게 정했나요?</strong></p>
 <p>두 예를 듭니다. (1) <code>JsonlStore</code> 와 세 하위 저장소 — "JSONL 파일을 다루는 법"은 공통이므로 부모에, "무엇이 유일 키인가" 같은 엔티티 고유 규칙은 자식에 두었습니다. (2) <code>csv_io.ParsedRow</code> 와 <code>services.ImportExportService</code> — 어댑터는 "CSV 행을 검증"까지, 정책은 "중복이면 어떻게 할지"부터 담당하고, 그 경계를 <code>ParsedRow</code>(id 가 아직 비어 있는 값)라는 타입으로 그었습니다.</p>
 <p><strong>Q. 파일 기반 update/delete 를 어떻게 안전하게 처리했나요?</strong></p>
@@ -1582,7 +1641,7 @@ domain/queries.py :: SearchFilter.for_month()
 <hr>
 <p><strong>다음 문서</strong>: 계층별 상세는 <a href="05-config-and-models.html">05. 설정·검증·모델</a> → <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a> → <a href="07-repository.html">07. 저장소 계층</a> → <a href="08-services.html">08. 서비스 계층</a> → <a href="09-cli.html">09. CLI 계층</a> 순으로 이어집니다.</p>
 <div class="pager"><span><a href="03-python-advanced.html">← 03. 이 코드에 쓰인 파이썬 중·고급 기법</a></span><span><a href="05-config-and-models.html">05. 설정·검증·모델 — config / messages / validators / errors / entities →</a></span></div>
-<footer>docs/04-architecture.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/04-architecture.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

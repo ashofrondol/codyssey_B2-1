@@ -11,14 +11,75 @@
 <nav class="sidebar"><div class="brand"><a href="index.html">📖 budget_app 학습 문서</a></div><details class="nav" open><summary>목차</summary><ul class="navlist"><li><a href="index.html"><span class="badge">📚</span>budget_app 학습 문서 — 목차와 읽기 가이드</a></li><li><a href="01-overview.html"><span class="badge">🟢</span>01. 프로젝트 개요와 사용법</a></li><li><a href="02-python-basics.html"><span class="badge">🟢</span>02. 이 코드에 쓰인 파이썬 기초 문법</a></li><li><a href="03-python-advanced.html"><span class="badge">🟡</span>03. 이 코드에 쓰인 파이썬 중·고급 기법</a></li><li><a href="04-architecture.html"><span class="badge">🟡</span>04. 아키텍처 — 계층 구조와 설계 원칙</a></li><li><a href="05-config-and-models.html"><span class="badge">🟢🟡</span>05. 설정·검증·모델 — config / messages / validators / errors / entities</a></li><li><a href="06-decorators.html"><span class="badge">🟡</span>06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></li><li><a href="07-repository.html" class="current"><span class="badge">🟡🔴</span>07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="08-services.html"><span class="badge">🟡🔴</span>08. 서비스 계층 — `services/` 패키지</a></li><li><a href="09-cli.html"><span class="badge">🟡</span>09. CLI 계층 — cli/ 패키지 여섯 모듈</a></li><li><a href="10-advanced-design.html"><span class="badge">🔴</span>10. 고급 설계 주제 — 원자성, 불변식, 성능, 트레이드오프</a></li><li><a href="11-faq-and-glossary.html"><span class="badge">🟢</span>11. 설계 FAQ &amp; 용어집</a></li><li><a href="12-syntax-and-stdlib.html"><span class="badge">📘</span>12. 문법의 출처와 표준 라이브러리 내부 동작</a></li></ul></details></nav>
 <main>
 <h1 id="07-저장소-계층-storage-패키지-jsonl-ids-repositories-csv_io-backup-unit_of_work">07. 저장소 계층 — <code>storage/</code> 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</h1>
-<p>파일을 읽고 쓰는 모든 코드가 모여 있는 계층입니다. 스트리밍 읽기, 원자적 교체, <strong>손상된 줄 보존</strong>, <strong>ID 발급 충돌 방지</strong>, CSV 경계 어댑터를 다룹니다.</p>
+<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#쉬운-말로-먼저">쉬운 말로 먼저</a></li><li><a href="#1-이-계층의-계약">1. 이 계층의 계약</a></li><li><a href="#2-이-문서의-핵심-읽기-경로가-왜-둘인가">2. 이 문서의 핵심 — 읽기 경로가 왜 둘인가</a></li><li><a href="#3-jsonlstore-파일-포맷을-다루는-법-제네릭-기반-클래스">3. JsonlStore — 파일 포맷을 다루는 법 (제네릭 기반 클래스)</a></li><li><a href="#4-idallocator-id-발급-규칙의-단일-정의처">4. IdAllocator — ID 발급 규칙의 단일 정의처</a></li><li><a href="#5-transactionrepository-거래-저장소">5. TransactionRepository — 거래 저장소</a></li><li><a href="#6-categorystore-이름-집합-관리">6. CategoryStore — 이름 집합 관리</a></li><li><a href="#7-budgetstore-같은-달은-덮어쓰기">7. BudgetStore — &quot;같은 달은 덮어쓰기&quot;</a></li><li><a href="#8-csv_iopy-csv-경계-어댑터">8. csv_io.py — CSV 경계 어댑터</a></li><li><a href="#9-backup_data_dir-서비스에서-저장소로">9. backup_data_dir — 서비스에서 저장소로</a></li><li><a href="#9-unitofwork-여러-파일을-한-단위로-커밋">9. UnitOfWork — 여러 파일을 한 단위로 커밋</a></li><li><a href="#10-정리-과제-방어용-요약">10. 정리 — 과제 방어용 요약</a></li></ul></details><h2 id="쉬운-말로-먼저">쉬운 말로 먼저</h2>
+<p>가계부 프로그램이 저장한 내용은 결국 컴퓨터 안의 파일 몇 개입니다. 이 문서는 그 파일을 읽고 쓰는 부분만 따로 모아 둔 자리를 설명합니다. 파일에 무언가를 적는 일은 생각보다 까다롭습니다. 적는 도중에 정전이 되거나 프로그램이 강제로 종료되면 파일이 반쯤 적힌 채로 남을 수 있습니다. 그러면 적다 만 그 줄 하나를 잃고, 나중에 그 뒤에 이어 쓴 줄까지 함께 못 읽게 될 수 있습니다 — 방금 저장했다고 알린 기록이 그렇게 사라집니다. 다행히 앞에 적어 둔 줄들은 그대로 읽힙니다. 사람이 파일을 직접 열어 잘못 고쳐 놓는 일도 있습니다. 그래서 이 부분의 코드는 대부분 잘될 때가 아니라 <strong>잘못될 때</strong>를 위한 장치입니다. 무엇을 막을 수 있고 무엇은 끝내 막지 못하는지까지 적어 두는 것이 이 문서의 목표입니다.</p>
+<p><strong>이 문서에 자주 나오는 말</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>말</th>
+<th>쉬운 뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JSONL</td>
+<td>한 줄에 한 건씩 적어 내려가는 장부 파일. 줄 하나가 기록 한 건입니다 — 거래·카테고리·예산이 각각 이 형식으로 자기 파일에 쌓입니다</td>
+</tr>
+<tr>
+<td>원자적 교체</td>
+<td>파일 <strong>하나</strong>를 바꿀 때, 바꾸다 만 중간 상태가 남지 않게 통째로 갈아 끼우는 것. 파일 둘 이상을 한꺼번에 바꾸는 일까지는 이것으로도 막지 못합니다(§9.3)</td>
+</tr>
+<tr>
+<td>스트리밍(제너레이터)</td>
+<td>파일을 통째로 들고 오지 않고 필요할 때 한 줄씩 꺼내 오는 방식</td>
+</tr>
+<tr>
+<td>손상된 줄</td>
+<td>프로그램이 해석하지 못하는 줄. 사람이 잘못 고쳤거나 저장이 중간에 끊겼을 때 생깁니다</td>
+</tr>
+<tr>
+<td>fsync</td>
+<td>적은 내용이 실제 저장 장치까지 내려갔는지 확인받는 것. 하지 않으면 정전 때 사라질 수 있습니다</td>
+</tr>
+<tr>
+<td>워터마크</td>
+<td>지금까지 발급한 번호 중 가장 큰 것을 따로 적어 둔 기록. 줄어들지 않습니다</td>
+</tr>
+<tr>
+<td>저장소(리포지토리)</td>
+<td>파일 하나를 맡아 읽고 쓰는 담당자. 무엇이 옳은 값인지는 판단하지 않습니다</td>
+</tr>
+<tr>
+<td>커밋</td>
+<td>준비해 둔 변경을 실제로 반영하는 마지막 한 걸음</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>바쁘면 여기만</strong></p>
+<ul>
+<li><strong>§2</strong> — 실제로 났던 사고 두 건이 터미널 화면 그대로 나옵니다. 이 문서의 나머지가 전부 이 두 건의 뒷이야기입니다.</li>
+<li><strong>§3.6</strong> — "쓰다가 컴퓨터가 꺼져도 안전하다"가 정확히 어떤 순서로 만들어지는지가 여기 있습니다.</li>
+<li><strong>§9.3</strong> — 이 방식이 무엇을 <strong>못</strong> 막는지 적어 둔 표입니다. 한계를 알아야 보장의 크기도 알 수 있습니다.</li>
+</ul>
+<hr>
+<p>파일을 읽고 쓰는 모든 코드가 모여 있는 계층입니다. 프로그램이 파일을 쓰다가 컴퓨터가 꺼지면 어떻게 되는가 — 이 계층은 그 질문에 답하려고 있습니다.</p>
+<p>다루는 것은 다섯 가지입니다.</p>
+<ul>
+<li><strong>스트리밍 읽기</strong> — 파일을 통째로 메모리에 올리지 않고 한 줄씩 꺼내 보는 것</li>
+<li><strong>원자적 교체</strong> — 바꾸다 만 중간 상태가 남지 않게 통째로 한 번에 갈아 끼우는 것</li>
+<li><strong>손상된 줄 보존</strong> — 해석하지 못한 줄도 원문 그대로 파일에 남겨 두는 것</li>
+<li><strong>ID 발급 충돌 방지</strong> — 같은 번호가 서로 다른 두 거래에 붙는 일을 막는 것</li>
+<li><strong>CSV 경계 어댑터</strong> — 바깥과 주고받는 표 형식 파일을 우리 데이터로 옮겨 주는 얇은 번역층</li>
+</ul>
 <blockquote>
 <p><strong>난이도</strong>: 🟡 중급 ~ 🔴 고급</p>
 <p><strong>먼저 읽으면 좋은 문서</strong>: <a href="03-python-advanced.html">03. 파이썬 중·고급 기법</a> §3(제너레이터)·§6(제네릭), <a href="05-config-and-models.html">05. 설정·검증·모델</a></p>
 <p><strong>문법·표준 라이브러리 상세</strong>: <a href="12-syntax-and-stdlib.html">12. 문법과 표준 라이브러리</a> — 이 문서에 나오는 🔎/⚙️ 노트의 원본 설명이 있습니다. 특히 §3(운영체제 계층: 버퍼링·fsync·<code>os.replace</code>·인코딩)이 이 문서와 직접 짝을 이룹니다.</p>
 </blockquote>
 <hr>
-<details class="page-toc" open><summary>이 문서의 목차</summary><ul><li><a href="#07-저장소-계층-storage-패키지-jsonl-ids-repositories-csv_io-backup-unit_of_work">07. 저장소 계층 — storage/ 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work)</a></li><li><a href="#엑셀이-저장한-csv-bom-있음">엑셀이 저장한 CSV (BOM 있음)</a></li></ul></details><h2 id="1-이-계층의-계약">1. 이 계층의 계약</h2>
+<h2 id="1-이-계층의-계약">1. 이 계층의 계약</h2>
+<p>이 절이 보는 것은 "이 폴더가 무엇을 하기로 약속했는가"입니다. 약속은 두 줄로 줄어듭니다. 파일을 여는 코드는 이 폴더 밖에 두지 않는다, 그리고 이 폴더 안에서는 무엇이 옳은 값인지 판단하지 않는다. 판단은 도메인과 서비스가 하고, 이 계층은 완성된 것을 받아 적고 다시 꺼내 줄 뿐입니다.</p>
 <p>budget_app/storage/<strong>init</strong>.py:1-17</p>
 <div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;저장소 계층 — 파일을 읽고 쓰는 코드가 전부 여기 있다.</span>
 
@@ -39,6 +100,9 @@
 <span class="sd">&quot;&quot;&quot;</span>
 </code></pre></div>
 
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 이 프로그램이 쓰는 저장 형식(JSONL)은 공책 장부와 같습니다. 한 줄에 기록 한 건을 적고, 새 기록이 생기면 그다음 줄에 이어 적습니다. 파일 전체를 읽지 않아도 줄 하나만 보면 그 한 건을 알 수 있고, 사람이 열어 봐도 그냥 읽힙니다. 거래도 카테고리도 예산도 각각 이 형식으로 자기 파일에 쌓입니다.
+다만 이 비유는 "고쳐 쓰기"에서 깨집니다 — 공책은 한 줄만 지우고 그 자리에 다시 쓸 수 있지만, 파일은 가운데를 고치는 순간 원본이 반쯤 고쳐진 상태로 남습니다. 그래서 이 코드는 일부러 옆에 통째로 새로 쓴 뒤 마지막에 갈아 끼웁니다(§3.5·§3.6) — 물리적으로 못 해서가 아니라 원본을 끝까지 건드리지 않으려는 선택입니다. 물리적으로 정말 안 되는 것은 따로 있습니다. 가운데 줄 하나를 빼내 파일을 짧게 만드는 일은 애초에 되지 않습니다.</p>
+</blockquote>
 <p>리팩터로 예전의 <code>storage/repository.py</code> 한 파일이 <code>jsonl</code> · <code>ids</code> · <code>repositories</code> · <code>backup</code> 넷으로 쪼개졌습니다. 지금의 구성 요소와 위치는 이렇습니다.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -131,12 +195,11 @@
 </tbody>
 </table></div>
 <p>여기에 CSV 경계 어댑터 <code>storage/csv_io.py</code> 가 같은 폴더에 있습니다(§8). <strong>내장 <code>open()</code> 을 부르는 곳은 <code>storage/jsonl.py</code>(4곳: 61·174·234·258)와 <code>storage/csv_io.py</code>(2곳: 82·142) 뿐입니다.</strong></p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — "<code>open()</code> 이 두 파일에만 있다"는 말에는 작은 예외가 있습니다. <code>storage/ids.py:60</code> 의 <code>Path.read_text</code> 와 <code>storage/backup.py:32</code> 의 <code>Path.read_bytes</code>/<code>Path.write_bytes</code> 는 내부에서 <code>io.open</code> 을 부르는 <strong>얇은 래퍼</strong>입니다(CPython <code>Lib/pathlib</code> 구현이 <code>with self.open(...) as f: return f.read()</code> 형태). 계층 규칙("파일을 여는 코드는 저장소 계층 안에만")은 그대로 지켜지는 셈입니다. 또 <code>cli/app.py:55</code> 의 <code>os.open(os.devnull, ...)</code> 은 내장 <code>open()</code> 이 아니라 <strong>파일 디스크립터를 직접 여는 저수준 시스템 호출</strong>이라 성격이 다릅니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — "<code>open()</code> 이 두 파일에만 있다"는 말에는 작은 예외가 있습니다. <code>storage/ids.py:60</code> 의 <code>Path.read_text</code> 와 <code>storage/backup.py:32</code> 의 <code>Path.read_bytes</code>/<code>Path.write_bytes</code> 는 내부에서 <code>io.open</code> 을 부르는 <strong>얇은 래퍼</strong>입니다(CPython <code>Lib/pathlib</code> 구현이 <code>with self.open(...) as f: return f.read()</code> 형태). 계층 규칙("파일을 여는 코드는 저장소 계층 안에만")은 그대로 지켜지는 셈입니다. 또 <code>cli/app.py:55</code> 의 <code>os.open(os.devnull, ...)</code> 은 내장 <code>open()</code> 이 아니라 <strong>파일 디스크립터를 직접 여는 저수준 시스템 호출</strong>이라 성격이 다릅니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <hr>
 <h2 id="2-이-문서의-핵심-읽기-경로가-왜-둘인가">2. 이 문서의 핵심 — 읽기 경로가 왜 둘인가</h2>
-<p>리팩터 이전과 이후를 먼저 대조합니다. 이 하나가 이 문서 내용의 절반입니다.</p>
+<p>프로그램이 이 파일을 읽는 방법은 두 가지입니다. 하나면 될 것 같은데 왜 둘인가 — 이 절의 주제가 그것입니다. 답은 간단합니다. 하나로 두었더니 사고가 두 건 났기 때문입니다. 리팩터 이전과 이후를 먼저 대조합니다. 이 하나가 이 문서 내용의 절반입니다.</p>
 <p>budget_app/storage/jsonl.py:9-18 (모듈 docstring 이어서)</p>
 <div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;...</span>
 <span class="sd">## 읽기 경로가 둘인 이유</span>
@@ -184,6 +247,9 @@ $ tail -1 data/transactions.jsonl
 <p><code>stream()</code> 이 두 줄을 건너뛰므로 <code>max_id_num()</code> 이 0 을 반환하고, 다음 번호가 1이 됩니다. 파일에 이미 있는 번호와 언제든 충돌할 수 있는 상태가 됩니다.</p>
 <h3 id="23-해결-rawline-이라는-중간-표현">2.3 해결 — <code>RawLine</code> 이라는 중간 표현</h3>
 <p>두 문제의 뿌리가 같습니다. <strong>"읽기"라는 하나의 진입점이 두 가지 용도(조회 / 재작성·스캔)를 겸하고 있었던 것</strong>입니다. 용도마다 필요한 것이 다릅니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 글씨가 번져 못 읽는 줄이 섞인 장부를 새 장부로 옮겨 적는 상황입니다. 못 읽겠다고 그 줄을 빼 버리면, 나중에는 그런 줄이 있었다는 사실조차 아무도 모릅니다. 못 읽는 모양 그대로 베껴 두면 원래 무엇이 적혀 있었는지 나중에 사람이 확인할 수 있습니다. <code>RawLine</code> 은 "원문"과 "해석 결과"를 한 상자에 같이 담아 그 베껴 적기를 가능하게 합니다.
+다만 이 비유는 "짐작"에서 깨집니다 — 사람은 번진 글씨에서 뜻을 어림잡지만 프로그램은 어림잡지 않습니다. 해석에 실패한 줄은 원문만 보존될 뿐 조회 결과에는 끼지 못하고, 경고 로그로만 알려집니다(§3.4).</p>
+</blockquote>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -227,9 +293,8 @@ $ tail -1 data/transactions.jsonl
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>@dataclass</code> 는 PEP 557 로 파이썬 3.7 에 들어온 표준 라이브러리 데코레이터입니다. <code>data: dict | None = None</code> 의 <code>|</code> 표기는 PEP 604(3.10)이고, 파일 첫머리의 <code>from __future__ import annotations</code>(PEP 563) 덕분에 <strong>어노테이션이 평가되지 않고 문자열로만 저장</strong>되므로 더 낮은 버전에서도 문법 오류가 나지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>dataclasses</code> 는 클래스 본문의 <code>__annotations__</code> 를 훑어 필드 목록을 만든 뒤, <code>__init__</code>/<code>__repr__</code>/<code>__eq__</code> 의 <strong>소스 문자열을 만들어 <code>exec</code> 로 컴파일</strong>해 클래스에 붙입니다(마법이 아니라 코드 생성입니다). <code>frozen=True</code> 는 여기에 더해 <code>__setattr__</code>/<code>__delattr__</code> 를 "<strong>그 클래스 자신의 인스턴스이거나 이름이 필드이면</strong> <code>FrozenInstanceError</code>, 그 외에는 <code>super().__setattr__</code> 으로 위임" 하는 함수로 덮고, <code>eq=True</code>(기본) + <code>frozen=True</code> 조합일 때만 <code>__hash__</code> 를 필드 튜플의 해시로 생성합니다. <code>frozen</code> 없이 <code>eq=True</code> 면 <code>__hash__</code> 가 <code>None</code> 이 되어 <strong>해시 불가</strong>가 됩니다 — 그래서 <code>TransactionId</code> 가 <code>set</code> 에 들어갈 수 있는 것이 <code>frozen=True</code> 덕분입니다(§4.2). → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@dataclass</code> 는 PEP 557 로 파이썬 3.7 에 들어온 표준 라이브러리 데코레이터입니다. <code>data: dict | None = None</code> 의 <code>|</code> 표기는 PEP 604(3.10)이고, 파일 첫머리의 <code>from __future__ import annotations</code>(PEP 563) 덕분에 <strong>어노테이션이 평가되지 않고 문자열로만 저장</strong>되므로 더 낮은 버전에서도 문법 오류가 나지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>dataclasses</code> 는 클래스 본문의 <code>__annotations__</code> 를 훑어 필드 목록을 만든 뒤, <code>__init__</code>/<code>__repr__</code>/<code>__eq__</code> 의 <strong>소스 문자열을 만들어 <code>exec</code> 로 컴파일</strong>해 클래스에 붙입니다(마법이 아니라 코드 생성입니다). <code>frozen=True</code> 는 여기에 더해 <code>__setattr__</code>/<code>__delattr__</code> 를 "<strong>그 클래스 자신의 인스턴스이거나 이름이 필드이면</strong> <code>FrozenInstanceError</code>, 그 외에는 <code>super().__setattr__</code> 으로 위임" 하는 함수로 덮고, <code>eq=True</code>(기본) + <code>frozen=True</code> 조합일 때만 <code>__hash__</code> 를 필드 튜플의 해시로 생성합니다. <code>frozen</code> 없이 <code>eq=True</code> 면 <code>__hash__</code> 가 <code>None</code> 이 되어 <strong>해시 불가</strong>가 됩니다 — 그래서 <code>TransactionId</code> 가 <code>set</code> 에 들어갈 수 있는 것이 <code>frozen=True</code> 덕분입니다(§4.2). → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <p>세 상태를 표로 정리하면:</p>
 <div class="table-wrap"><table>
@@ -266,12 +331,13 @@ $ tail -1 data/transactions.jsonl
 <td>None</td>
 <td>None</td>
 <td><strong>원문 보존</strong></td>
-<td>정규식으로 발굴</td>
+<td>정규식(글자 모양 패턴)으로 발굴</td>
 </tr>
 </tbody>
 </table></div>
 <hr>
 <h2 id="3-jsonlstore-파일-포맷을-다루는-법-제네릭-기반-클래스">3. <code>JsonlStore</code> — 파일 포맷을 다루는 법 (제네릭 기반 클래스)</h2>
+<p>저장되는 데이터는 세 종류입니다. 거래, 카테고리, 예산이고 각각 파일 하나씩을 씁니다. 그런데 파일을 열고, 한 줄씩 읽고, 안전하게 다시 쓰는 방법은 셋 다 똑같습니다. 그 똑같은 부분만 부모 클래스 하나로 올린 것이 <code>JsonlStore</code> 이고, 여기에 제네릭(어떤 종류의 데이터를 담을지 나중에 정하게 열어 둔 틀)이 쓰입니다.</p>
 <h3 id="31-왜-공통-클래스로-올렸나">3.1 왜 공통 클래스로 올렸나</h3>
 <p>budget_app/storage/jsonl.py:131-140</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JsonlStore</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
@@ -288,9 +354,8 @@ $ tail -1 data/transactions.jsonl
 
 <p>리팩터 전에는 <code>TransactionRepository.stream</code>, <code>CategoryStore.stream</code>, <code>BudgetStore.stream</code> 이 <strong>거의 같은 코드 11줄씩</strong> 있었습니다. 생성자와 <code>_append</code> 도 마찬가지였습니다.</p>
 <p><code>Generic[T]</code> / <code>entity_cls</code> 의 역할 차이는 <a href="03-python-advanced.html">03 §6</a>에서 다룹니다. 요약하면 <strong><code>T</code> 는 타입 검사용, <code>entity_cls</code> 는 런타임용</strong>입니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>TypeVar</code> 와 <code>Generic</code> 은 PEP 484(파이썬 3.5)의 <code>typing</code> 모듈에서 왔습니다. <code>T = TypeVar("T")</code> 에서 이름을 두 번 쓰는 이유는, 대입문의 왼쪽 이름을 객체가 알 방법이 없어 <strong>문자열로 다시 알려 줘야</strong> 하기 때문입니다. 3.12 부터는 <code>class JsonlStore[T]:</code> 라는 새 문법(PEP 695)이 있지만 이 소스는 <code>&gt;=3.10</code> 을 요구하므로 옛 표기를 씁니다 — <strong>일반론 예시이며 이 소스에는 없습니다.</strong> → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>JsonlStore[Transaction]</code> 은 <code>type.__getitem__</code> 이 아니라 클래스의 <code>__class_getitem__</code> 을 부르고, 그 결과는 <strong>새 클래스가 아니라 <code>typing._GenericAlias</code> 객체</strong>입니다(로컬 3.13.1 확인: <code>type(S[int])</code> → <code>&lt;class 'typing._GenericAlias'&gt;</code>, <code>.__origin__</code> 은 원래 클래스, <code>.__args__</code> 는 <code>(int,)</code>). 런타임 검사는 <strong>전혀 하지 않습니다</strong> — <code>JsonlStore[Budget]()</code> 에 <code>Transaction</code> 을 넣어도 아무 일도 일어나지 않습니다. 그래서 "한 줄을 무슨 dataclass 로 세울지"는 타입이 아니라 <code>entity_cls</code> 라는 <strong>평범한 클래스 속성</strong>이 들고 있어야 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>TypeVar</code> 와 <code>Generic</code> 은 PEP 484(파이썬 3.5)의 <code>typing</code> 모듈에서 왔습니다. <code>T = TypeVar("T")</code> 에서 이름을 두 번 쓰는 이유는, 대입문의 왼쪽 이름을 객체가 알 방법이 없어 <strong>문자열로 다시 알려 줘야</strong> 하기 때문입니다. 3.12 부터는 <code>class JsonlStore[T]:</code> 라는 새 문법(PEP 695)이 있지만 이 소스는 <code>&gt;=3.10</code> 을 요구하므로 옛 표기를 씁니다 — <strong>일반론 예시이며 이 소스에는 없습니다.</strong> → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>JsonlStore[Transaction]</code> 은 <code>type.__getitem__</code> 이 아니라 클래스의 <code>__class_getitem__</code> 을 부르고, 그 결과는 <strong>새 클래스가 아니라 <code>typing._GenericAlias</code> 객체</strong>입니다(로컬 3.13.1 확인: <code>type(S[int])</code> → <code>&lt;class 'typing._GenericAlias'&gt;</code>, <code>.__origin__</code> 은 원래 클래스, <code>.__args__</code> 는 <code>(int,)</code>). 런타임 검사는 <strong>전혀 하지 않습니다</strong> — <code>JsonlStore[Budget]()</code> 에 <code>Transaction</code> 을 넣어도 아무 일도 일어나지 않습니다. 그래서 "한 줄을 무슨 dataclass 로 세울지"는 타입이 아니라 <code>entity_cls</code> 라는 <strong>평범한 클래스 속성</strong>이 들고 있어야 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="32-생성자는-경로만-계산합니다">3.2 생성자는 경로만 계산합니다</h3>
 <p>budget_app/storage/jsonl.py:142-158</p>
@@ -314,12 +379,15 @@ $ tail -1 data/transactions.jsonl
 </code></pre></div>
 
 <p><strong>"객체를 만드는 것"과 "환경을 준비하는 것"의 분리</strong>입니다. 이 결정의 효과는 <a href="04-architecture.html">04 §6.2</a>에서 다뤘습니다 — <code>backup</code> 명령이 존재하지 않는 폴더를 만들어 버리는 문제가 여기서 해결됩니다.</p>
-<p><code>is_empty</code> 의 <code>not self.path.exists() or ...</code> 순서에 주의하세요. 파일이 없으면 <code>stat()</code> 이 예외를 내므로 <strong>단락 평가로 앞에서 막습니다.</strong></p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>or</code> 의 단락 평가는 파이썬 초기부터 있는 규칙입니다. 바이트코드 수준에서 <code>A or B</code> 는 "A 를 계산 → 참이면 <strong>B 를 아예 실행하지 않고</strong> 점프" 로 컴파일됩니다(<code>JUMP_IF_TRUE_OR_POP</code> 류). 또 <code>or</code> 는 불리언이 아니라 <strong>먼저 참이 된 피연산자 자체</strong>를 돌려줍니다 — <code>set(taken or ())</code>(§4.2)가 그 성질을 쓰는 자리입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>pathlib</code> 은 PEP 428 로 3.4 에 들어왔고, <code>Path</code> 는 문자열을 감싼 <strong>불변 객체</strong>라 <code>Path(path)</code> 를 이미 <code>Path</code> 에 다시 씌워도 안전합니다(방어적 정규화). 각 메서드는 결국 <code>os</code> 호출로 내려갑니다 — <code>exists()</code>/<code>stat()</code> 은 <code>os.stat</code>(POSIX <code>stat(2)</code>, Windows <code>GetFileInformationByHandle</code>), <code>mkdir(parents=True, exist_ok=True)</code> 는 <code>os.mkdir</code> 을 상위 경로부터 반복하며 <code>FileExistsError</code> 를 삼키는 것, <code>touch()</code> 는 <code>os.open(..., O_CREAT | O_WRONLY ...)</code> 후 즉시 닫기입니다. <code>st_size</code> 는 파일을 열지 않고 <strong>메타데이터만</strong> 보므로 "빈 파일인가"를 O(1) 로 답합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<p><code>is_empty</code> 의 <code>not self.path.exists() or ...</code> 순서에 주의하세요. 파일이 없으면 <code>stat()</code> 이 예외를 내므로 <strong>단락 평가(앞의 조건만으로 답이 정해지면 뒤는 아예 실행하지 않는 규칙)로 앞에서 막습니다.</strong></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>or</code> 의 단락 평가는 파이썬 초기부터 있는 규칙입니다. 바이트코드 수준에서 <code>A or B</code> 는 "A 를 계산 → 참이면 <strong>B 를 아예 실행하지 않고</strong> 점프" 로 컴파일됩니다(<code>JUMP_IF_TRUE_OR_POP</code> 류). 또 <code>or</code> 는 불리언이 아니라 <strong>먼저 참이 된 피연산자 자체</strong>를 돌려줍니다 — <code>set(taken or ())</code>(§4.2)가 그 성질을 쓰는 자리입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>pathlib</code> 은 PEP 428 로 3.4 에 들어왔고, <code>Path</code> 는 문자열을 감싼 <strong>불변 객체</strong>라 <code>Path(path)</code> 를 이미 <code>Path</code> 에 다시 씌워도 안전합니다(방어적 정규화). 각 메서드는 결국 <code>os</code> 호출로 내려갑니다 — <code>exists()</code>/<code>stat()</code> 은 <code>os.stat</code>(POSIX <code>stat(2)</code>, Windows <code>GetFileInformationByHandle</code>), <code>mkdir(parents=True, exist_ok=True)</code> 는 <code>os.mkdir</code> 을 상위 경로부터 반복하며 <code>FileExistsError</code> 를 삼키는 것, <code>touch()</code> 는 <code>os.open(..., O_CREAT | O_WRONLY ...)</code> 후 즉시 닫기입니다. <code>st_size</code> 는 파일을 열지 않고 <strong>메타데이터만</strong> 보므로 "빈 파일인가"를 O(1) 로 답합니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="33-iter_raw-어떤-줄도-버리지-않는-읽기">3.3 <code>iter_raw()</code> — 어떤 줄도 버리지 않는 읽기</h3>
+<p>이 메서드는 파일의 모든 줄을 하나씩 내보냅니다. 해석에 실패한 줄도 버리지 않고, 원문을 그대로 실어 함께 내보냅니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 두꺼운 책을 통째로 복사해 가방에 넣어 오는 대신 열람실에서 한 장씩 넘겨 보는 방식입니다. 가방(메모리)에는 늘 한 장만 있고, 찾던 것이 앞쪽에서 나오면 나머지는 넘겨 보지도 않고 일어설 수 있습니다. 파이썬에서 이렇게 값을 하나씩 내주는 함수를 제너레이터라고 부릅니다.
+다만 이 비유는 "언제 자리를 뜨는가"에서 깨집니다 — 열람실 문(파일)은 읽는 쪽이 마지막 장을 넘기거나 도중에 그만둘 때까지 닫히지 않습니다. 닫히는 시점이 읽는 쪽에 달려 있다는 뜻이고, 아래 ⚙️ 노트가 그 이야기입니다.</p>
+</blockquote>
 <p>budget_app/storage/jsonl.py:162-179</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">iter_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">RawLine</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.</span>
@@ -335,13 +403,15 @@ $ tail -1 data/transactions.jsonl
                 <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_line</span><span class="p">(</span><span class="n">lineno</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 함수 본문에 <code>yield</code> 가 하나라도 있으면 그 함수는 <strong>제너레이터 함수</strong>가 됩니다(PEP 255, 파이썬 2.2). 컴파일러가 코드 객체에 <code>CO_GENERATOR</code> 플래그를 세우고, <code>iter_raw()</code> 호출은 <strong>본문을 한 줄도 실행하지 않은 채</strong> 제너레이터 객체만 돌려줍니다. 본문은 첫 <code>next()</code>(= <code>for</code> 문의 첫 회전) 때 비로소 시작됩니다. 로컬 3.13.1 에서 확인한 결과가 그대로입니다 — 호출 시점에는 아무 출력이 없고 첫 <code>next()</code> 에서 본문이 실행됐습니다. 그래서 <code>if not self.path.exists(): return</code> 의 <strong>파일 없음 검사도 소비 시점까지 미뤄집니다.</strong> 제너레이터 안의 인자 없는 <code>return</code> 은 값 반환이 아니라 <code>StopIteration</code> 을 일으켜 반복을 끝내라는 뜻입니다(PEP 380 이후 <code>return v</code> 도 가능하지만 이 소스에는 없습니다). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작 — <code>with</code> 블록이 제너레이터 수명 동안 열려 있습니다.</strong> <code>with open(...)</code> 이 <code>yield</code> 를 감싸고 있으므로 파일은 <strong>호출자가 마지막 줄을 꺼낼 때까지 닫히지 않습니다.</strong> 소비자가 도중에 그만두면(예: <code>any()</code> 의 조기 종료) 제너레이터 객체가 가비지 컬렉션될 때 <code>close()</code> 가 호출되고, <code>yield</code> 지점에서 <code>GeneratorExit</code> 가 던져지면서 <code>with</code> 의 <code>__exit__</code> 이 파일을 닫습니다. CPython 은 참조 카운트가 0 이 되는 즉시 그 일을 하지만, <strong>"언제 닫히는가"가 호출자에게 달려 있다</strong>는 사실 자체는 알고 있어야 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 함수 본문에 <code>yield</code> 가 하나라도 있으면 그 함수는 <strong>제너레이터 함수</strong>가 됩니다(PEP 255, 파이썬 2.2). 컴파일러가 코드 객체에 <code>CO_GENERATOR</code> 플래그를 세우고, <code>iter_raw()</code> 호출은 <strong>본문을 한 줄도 실행하지 않은 채</strong> 제너레이터 객체만 돌려줍니다. 본문은 첫 <code>next()</code>(= <code>for</code> 문의 첫 회전) 때 비로소 시작됩니다. 로컬 3.13.1 에서 확인한 결과가 그대로입니다 — 호출 시점에는 아무 출력이 없고 첫 <code>next()</code> 에서 본문이 실행됐습니다. 그래서 <code>if not self.path.exists(): return</code> 의 <strong>파일 없음 검사도 소비 시점까지 미뤄집니다.</strong> 제너레이터 안의 인자 없는 <code>return</code> 은 값 반환이 아니라 <code>StopIteration</code> 을 일으켜 반복을 끝내라는 뜻입니다(PEP 380 이후 <code>return v</code> 도 가능하지만 이 소스에는 없습니다). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>with</code> 블록이 제너레이터 수명 동안 열려 있습니다.</strong> <code>with open(...)</code> 이 <code>yield</code> 를 감싸고 있으므로 파일은 <strong>호출자가 마지막 줄을 꺼낼 때까지 닫히지 않습니다.</strong> 소비자가 도중에 그만두면(예: <code>any()</code> 의 조기 종료) 제너레이터 객체가 가비지 컬렉션될 때 <code>close()</code> 가 호출되고, <code>yield</code> 지점에서 <code>GeneratorExit</code> 가 던져지면서 <code>with</code> 의 <code>__exit__</code> 이 파일을 닫습니다. CPython 은 참조 카운트가 0 이 되는 즉시 그 일을 하지만, <strong>"언제 닫히는가"가 호출자에게 달려 있다</strong>는 사실 자체는 알고 있어야 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p><strong><code>_parse_line</code> 이 예외를 던지지 않는다</strong>는 점이 설계의 핵심입니다. 파일을 읽는 도중 예외가 올라오면 반복이 중단되는데, "손상된 줄 하나"는 나머지 줄을 못 읽을 이유가 되지 않습니다.</p>
 <h3 id="331-errorssurrogateescape-손상-줄-원문-보존의-진짜-근거">3.3.1 <code>errors="surrogateescape"</code> — 손상 줄 원문 보존의 진짜 근거</h3>
 <p>인용에서 <code>...</code> 로 접힌 docstring 이 사실 이 계층에서 가장 중요한 한 문단입니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 파일에 담긴 것은 사실 글자가 아니라 바이트이고, 그것을 약속된 규칙(여기서는 UTF-8)에 따라 글자로 옮겨 읽습니다. 규칙에 맞지 않는 자국을 만났을 때 택할 수 있는 길은 셋입니다. 옮기기를 포기하고 문서를 통째로 덮거나, 물음표로 뭉개 버리거나, "여기 있던 자국은 몇 번"이라고 아무도 쓰지 않는 임시 번호를 적어 두거나. 세 번째만이 나중에 원래 자국을 한 치도 다르지 않게 되돌려 놓을 수 있고, <code>surrogateescape</code> 가 그 세 번째입니다.
+다만 이 비유는 "임시 번호를 누가 알아보는가"에서 깨집니다 — 되돌려 적는 쪽이 같은 규칙을 쓸 때만 성립합니다. 읽기와 쓰기 중 한쪽만 이 정책이면 보존한 줄이 뭉개지거나 쓰기가 아예 실패합니다(아래 표).</p>
+</blockquote>
 <p>budget_app/storage/jsonl.py:167-170</p>
 <div class="codehilite"><pre><span></span><code>        <span class="err">``</span><span class="n">errors</span><span class="o">=</span><span class="n">surrogateescape</span><span class="err">``</span> <span class="n">가</span> <span class="s2">&quot;손상 줄 격리&quot;</span> <span class="n">약속을</span> <span class="o">**</span><span class="n">인코딩</span> <span class="n">층까지</span><span class="o">**</span> <span class="n">넓힌다</span><span class="o">.</span>
         <span class="n">이전에는</span> <span class="n">엄격</span> <span class="n">디코딩이라</span> <span class="n">UTF</span><span class="o">-</span><span class="mi">8</span> <span class="n">이</span> <span class="n">아닌</span> <span class="n">바이트</span> <span class="n">한</span> <span class="n">줄이</span> <span class="err">``</span><span class="ne">UnicodeDecodeError</span><span class="err">``</span>
@@ -358,8 +428,7 @@ $ tail -1 data/transactions.jsonl
 <span class="n">LINE_TERMINATOR</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>surrogateescape</code> 오류 핸들러는 PEP 383 으로 파이썬 3.1 에 들어왔습니다. 원래 목적은 "OS 가 주는 파일 이름 바이트가 선언된 인코딩을 어길 때 프로그램이 죽지 않게" 하는 것이었습니다. 규칙은 단순합니다 — <strong>디코딩할 수 없는 바이트 <code>0xNN</code>(0x80~0xFF) 하나를 코드포인트 <code>U+DCNN</code> 하나에 실어 둔다.</strong> U+DC80..U+DCFF 는 유니코드의 "하위 서로게이트" 구역이라 정상 텍스트에는 절대 나타나지 않으므로 충돌하지 않습니다. 인코딩할 때 같은 핸들러를 쓰면 그 구간의 문자를 <strong>원래 바이트로 되돌려</strong> 씁니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>surrogateescape</code> 오류 핸들러는 PEP 383 으로 파이썬 3.1 에 들어왔습니다. 원래 목적은 "OS 가 주는 파일 이름 바이트가 선언된 인코딩을 어길 때 프로그램이 죽지 않게" 하는 것이었습니다. 규칙은 단순합니다 — <strong>디코딩할 수 없는 바이트 <code>0xNN</code>(0x80~0xFF) 하나를 코드포인트 <code>U+DCNN</code> 하나에 실어 둔다.</strong> U+DC80..U+DCFF 는 유니코드의 "하위 서로게이트" 구역이라 정상 텍스트에는 절대 나타나지 않으므로 충돌하지 않습니다. 인코딩할 때 같은 핸들러를 쓰면 그 구간의 문자를 <strong>원래 바이트로 되돌려</strong> 씁니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong>실행으로 확인한 왕복(로컬 CPython 3.13.1).</strong> UTF-8 이 아닌 바이트가 섞인 파일을 이 정책으로 읽고 같은 정책으로 다시 쓰면 바이트가 <strong>완전히 동일</strong>하게 복원됩니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;se.jsonl&quot;</span><span class="p">,</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;{&quot;id&quot;:&quot;TX-000001&quot;}</span><span class="se">\n\xff\xfe</span><span class="s1"> not utf-8</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
@@ -418,9 +487,8 @@ $ tail -1 data/transactions.jsonl
 </code></pre></div>
 
 <p><code>TypeError</code> 가 포함된 이유가 재미있습니다. <code>[1, 2, 3]</code> 같은 JSON 배열이 한 줄에 있으면 <code>json.loads</code> 는 성공하고 리스트를 돌려주는데, <code>from_dict</code> 에서 <code>data["id"]</code> 가 <code>TypeError: list indices must be integers</code> 를 냅니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 잡을 예외 목록을 모듈 상수 <code>_LINE_ERRORS</code> 로 빼 둘 수 있는 이유는, <code>except</code> 절이 <strong>런타임에 평가되는 식</strong>을 받기 때문입니다(<code>except (A, B) as e:</code> 의 튜플 형태는 파이썬 1.x 부터, <code>as</code> 표기는 PEP 3110/3.0). 예외 클래스를 문법이 아니라 <strong>값</strong>으로 다룰 수 있다는 뜻입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>json.JSONDecodeError</code> 는 <code>ValueError</code> 의 하위 클래스입니다(로컬 확인: MRO 가 <code>JSONDecodeError → ValueError → Exception → BaseException</code>). <code>json.loads</code> 는 C 로 짜인 스캐너(<code>_json</code> 확장 모듈)로 파싱하고, 실패하면 <strong>그 스캐너가</strong> 위치·줄·열 정보를 붙인 <code>JSONDecodeError</code> 를 직접 던집니다(값 자체가 없는 경우만 <code>json/decoder.py</code> 의 <code>raw_decode</code> 가 스캐너의 <code>StopIteration</code> 을 받아 같은 예외로 바꿉니다). <code>str(exc)</code> 는 <code>"Expecting value: line 1 column 3 (char 2)"</code> 같은 사람이 읽을 문자열이 됩니다. 그 문자열이 그대로 <code>RawLine.error</code> 에 담겨 나중에 경고 로그로 나갑니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 잡을 예외 목록을 모듈 상수 <code>_LINE_ERRORS</code> 로 빼 둘 수 있는 이유는, <code>except</code> 절이 <strong>런타임에 평가되는 식</strong>을 받기 때문입니다(<code>except (A, B) as e:</code> 의 튜플 형태는 파이썬 1.x 부터, <code>as</code> 표기는 PEP 3110/3.0). 예외 클래스를 문법이 아니라 <strong>값</strong>으로 다룰 수 있다는 뜻입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>json.JSONDecodeError</code> 는 <code>ValueError</code> 의 하위 클래스입니다(로컬 확인: MRO 가 <code>JSONDecodeError → ValueError → Exception → BaseException</code>). <code>json.loads</code> 는 C 로 짜인 스캐너(<code>_json</code> 확장 모듈)로 파싱하고, 실패하면 <strong>그 스캐너가</strong> 위치·줄·열 정보를 붙인 <code>JSONDecodeError</code> 를 직접 던집니다(값 자체가 없는 경우만 <code>json/decoder.py</code> 의 <code>raw_decode</code> 가 스캐너의 <code>StopIteration</code> 을 받아 같은 예외로 바꿉니다). <code>str(exc)</code> 는 <code>"Expecting value: line 1 column 3 (char 2)"</code> 같은 사람이 읽을 문자열이 됩니다. 그 문자열이 그대로 <code>RawLine.error</code> 에 담겨 나중에 경고 로그로 나갑니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <h3 id="34-stream-조회-전용-유효한-것만">3.4 <code>stream()</code> — 조회 전용, 유효한 것만</h3>
 <p>budget_app/storage/jsonl.py:193-203</p>
@@ -439,8 +507,7 @@ $ tail -1 data/transactions.jsonl
 
 <p><strong>docstring 의 마지막 문장이 중요합니다</strong> — "파일 자체는 손대지 않는다". 리팩터 전에는 이 말이 성립하지 않았습니다.</p>
 <p><code>stream()</code> 이 자기 파일을 열지 않고 <code>iter_raw()</code> 를 소비한다는 점도 눈여겨보세요. <strong>제너레이터를 층층이 쌓은</strong> 구조라 둘 다 한 번에 한 줄만 메모리에 둡니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>logger.warning(messages.LOG_CORRUPT_LINE, self.path.name, raw.lineno, raw.error)</code> 에서 f-string 이 아니라 <strong><code>%s</code> 서식과 인자를 따로</strong> 넘기는 것은 취향이 아닙니다. <code>logging</code> 은 인자를 <code>LogRecord.args</code> 에 그대로 보관해 두었다가, 그 레벨이 실제로 출력될 때 핸들러가 <code>record.getMessage()</code> 안에서 <code>msg % args</code> 를 수행합니다. 즉 <strong>필터링으로 버려질 로그는 문자열 조립 비용이 0</strong> 입니다. f-string 은 호출 전에 이미 만들어지므로 이 최적화가 사라집니다. 이 프로젝트의 로거는 <code>budget_app.storage</code>(<code>storage/config.py:11</code> 의 <code>LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"</code>)이고, 점(<code>.</code>)으로 이어진 이름이 곧 <strong>부모-자식 트리</strong>라 레코드는 <code>budget_app</code> 루트까지 전파(propagate)됩니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>logger.warning(messages.LOG_CORRUPT_LINE, self.path.name, raw.lineno, raw.error)</code> 에서 f-string 이 아니라 <strong><code>%s</code> 서식과 인자를 따로</strong> 넘기는 것은 취향이 아닙니다. <code>logging</code> 은 인자를 <code>LogRecord.args</code> 에 그대로 보관해 두었다가, 그 레벨이 실제로 출력될 때 핸들러가 <code>record.getMessage()</code> 안에서 <code>msg % args</code> 를 수행합니다. 즉 <strong>필터링으로 버려질 로그는 문자열 조립 비용이 0</strong> 입니다. f-string 은 호출 전에 이미 만들어지므로 이 최적화가 사라집니다. 이 프로젝트의 로거는 <code>budget_app.storage</code>(<code>storage/config.py:11</code> 의 <code>LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"</code>)이고, 점(<code>.</code>)으로 이어진 이름이 곧 <strong>부모-자식 트리</strong>라 레코드는 <code>budget_app</code> 루트까지 전파(propagate)됩니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="35-rewrite-손상-줄을-보존하는-재작성">3.5 <code>rewrite()</code> — 손상 줄을 보존하는 재작성</h3>
 <p>budget_app/storage/jsonl.py:264-268</p>
@@ -489,9 +556,8 @@ $ tail -1 data/transactions.jsonl
 </tbody>
 </table></div>
 <p><code>Callable[[T], T | None]</code> 이라는 타입 하나가 "바꾼 것 / 그대로 / 삭제" 세 의도를 전부 표현합니다.</p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 시그니처 가운데의 홀로 선 <code>*</code> 는 <strong>키워드 전용 인자</strong> 표시로, PEP 3102(파이썬 3.0)에서 왔습니다. <code>*</code> 뒤의 <code>extra</code> 는 <code>plan_rewrite(f, [b])</code> 처럼 위치로 넘길 수 없고 반드시 <code>extra=[b]</code> 라고 써야 합니다 — 호출부에서 두 번째 인자가 무슨 뜻인지 읽히게 강제하는 장치입니다. (<code>/</code> 로 표시하는 위치 전용 인자는 PEP 570, 3.8 이며 <strong>이 소스에는 없습니다.</strong>) → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>Callable[[T], T | None]</code> 은 <code>collections.abc.Callable</code> 의 <code>__class_getitem__</code> 이 만드는 별칭일 뿐이라 <strong>런타임 검사가 없습니다.</strong> 실제로 <code>transform(raw.entity)</code> 이 동작하는 근거는 타입이 아니라 "그 객체에 <code>__call__</code> 이 있다"는 사실입니다 — 그래서 <code>def _drop(...)</code>(중첩 함수), <code>lambda tx: tx</code>, 모듈 수준 <code>_keep</code> 이 전부 같은 자리에 들어갈 수 있습니다. <code>collections.abc.Callable</code> 에 <strong>대괄호 첨자</strong>를 붙여 <code>Callable[[T], T | None]</code> 로 쓸 수 있게 된 것이 PEP 585(3.9)이고(<code>from collections.abc import Callable</code> 이라는 import 자체는 그 전부터 됩니다 — <code>collections.abc</code> 모듈은 파이썬 3.3 부터 있습니다), 같은 PEP 이후 <code>typing.Callable</code> 은 비권장 별칭이 되었습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 시그니처 가운데의 홀로 선 <code>*</code> 는 <strong>키워드 전용 인자</strong> 표시로, PEP 3102(파이썬 3.0)에서 왔습니다. <code>*</code> 뒤의 <code>extra</code> 는 <code>plan_rewrite(f, [b])</code> 처럼 위치로 넘길 수 없고 반드시 <code>extra=[b]</code> 라고 써야 합니다 — 호출부에서 두 번째 인자가 무슨 뜻인지 읽히게 강제하는 장치입니다. (<code>/</code> 로 표시하는 위치 전용 인자는 PEP 570, 3.8 이며 <strong>이 소스에는 없습니다.</strong>) → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>Callable[[T], T | None]</code> 은 <code>collections.abc.Callable</code> 의 <code>__class_getitem__</code> 이 만드는 별칭일 뿐이라 <strong>런타임 검사가 없습니다.</strong> 실제로 <code>transform(raw.entity)</code> 이 동작하는 근거는 타입이 아니라 "그 객체에 <code>__call__</code> 이 있다"는 사실입니다 — 그래서 <code>def _drop(...)</code>(중첩 함수), <code>lambda tx: tx</code>, 모듈 수준 <code>_keep</code> 이 전부 같은 자리에 들어갈 수 있습니다. <code>collections.abc.Callable</code> 에 <strong>대괄호 첨자</strong>를 붙여 <code>Callable[[T], T | None]</code> 로 쓸 수 있게 된 것이 PEP 585(3.9)이고(<code>from collections.abc import Callable</code> 이라는 import 자체는 그 전부터 됩니다 — <code>collections.abc</code> 모듈은 파이썬 3.3 부터 있습니다), 같은 PEP 이후 <code>typing.Callable</code> 은 비권장 별칭이 되었습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p><strong>보존 로그가 별도인 것도 의도적입니다.</strong></p>
 <p>budget_app/storage/messages.py:8-9</p>
@@ -501,6 +567,10 @@ $ tail -1 data/transactions.jsonl
 
 <p>읽을 때(<code>stream</code>)는 "건너뜁니다", 쓸 때(<code>rewrite</code>)는 "보존했습니다" — 두 상황에서 사용자가 알아야 할 것이 다릅니다.</p>
 <h3 id="36-원자적-교체-stage_lines-commit_staged-atomic_write_lines">3.6 원자적 교체 — <code>stage_lines</code> / <code>commit_staged</code> / <code>atomic_write_lines</code></h3>
+<p>파일을 고칠 때 원본에 바로 덮어쓰지 않습니다. 옆에 임시 파일을 하나 만들어 새 내용을 전부 적고, 그것이 디스크에 확실히 내려간 뒤에, 마지막에 이름만 갈아 끼웁니다. 이 절이 그 세 단계를 나눠 보는 자리입니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 벽에 붙은 안내문을 고치는 일과 같습니다. 붙어 있는 종이 위에 지우고 덧쓰면, 고치는 동안 지나가는 사람은 지우다 만 문장을 봅니다. 새 종이에 다 쓴 다음 압정을 뽑아 한 번에 갈아 끼우면, 누가 언제 보든 옛 안내문 아니면 새 안내문 하나만 봅니다. 코드가 하는 일이 정확히 뒤쪽입니다.
+다만 이 비유는 "같은 벽"이라는 조건에서 깨집니다 — 이름을 갈아 끼우는 <code>os.replace</code> 가 쪼개지지 않는 것은 같은 파일시스템(같은 디스크 구획) 안에서일 뿐이고, 임시 파일을 다른 곳에 만들면 성립하지 않습니다. 아래 <code>with_suffix</code> 노트가 임시 파일을 굳이 같은 폴더에 만드는 이유입니다.</p>
+</blockquote>
 <p>budget_app/storage/jsonl.py:48-72</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stage_lines</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">lines</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;임시 파일에 전부 쓰고 디스크에 내린 뒤, 그 임시 경로를 돌려준다.</span>
@@ -575,6 +645,9 @@ $ tail -1 data/transactions.jsonl
 </tbody>
 </table></div>
 <p>셋을 이 순서로 조합해야 "새 이름이 가리키는 파일에 완전한 내용이 들어 있다"가 성립합니다. <code>fsync</code> 는 리팩터에서 추가됐습니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 편지에 빗대면 세 단계가 이렇습니다. 편지를 다 썼다(<code>f.write</code>), 봉투에 넣어 현관에 내놨다(<code>f.flush</code>), 우체통에 실제로 넣었다(<code>os.fsync</code>). 현관까지만 가 있는 편지는 그 집에 불이 나면 함께 탑니다 — 전원이 갑자기 끊기면 아직 OS 버퍼에 있던 내용이 그렇게 됩니다.
+다만 이 비유는 "몇 통인가"에서 깨집니다 — <code>fsync</code> 는 편지 한 통이 아니라 그 파일에 대해 아직 내려가지 않은 것을 한꺼번에 내립니다. 그리고 이 셋은 전부 <strong>내용</strong>에 대한 이야기라, "이름이 바뀌었는가"는 여전히 별개입니다. 그 몫이 위 표 세 번째 줄의 <code>os.replace</code> 입니다.</p>
+</blockquote>
 <h4 id="open-의-3층-구조-위-표를-이해하는-열쇠"><code>open()</code> 의 3층 구조 — 위 표를 이해하는 열쇠</h4>
 <p>위 표의 "파이썬 버퍼"와 "OS 버퍼"가 무엇인지 알아야 세 줄이 왜 셋인지 설명할 수 있습니다. 텍스트 모드 <code>open()</code> 이 돌려주는 것은 <strong>세 겹으로 포개진 객체</strong>입니다(로컬 3.13.1 확인).</p>
 <div class="codehilite"><pre><span></span><code>f            = &lt;_io.TextIOWrapper&gt;   ← str 을 받아 인코딩(utf-8) + 개행 변환
@@ -604,13 +677,11 @@ f.buffer.raw = &lt;_io.FileIO&gt;          ← 실제 파일 디스크립터. wr
 </tr>
 </tbody>
 </table></div>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>f.fileno()</code> 는 세 층을 뚫고 내려가 <code>FileIO</code> 가 들고 있는 <strong>정수 파일 디스크립터</strong>를 돌려줍니다. <code>os.fsync</code> 는 이 정수만 받는 저수준 함수라 파이썬 버퍼의 존재를 모릅니다. 그래서 <code>flush()</code> 를 먼저 부르지 않고 <code>fsync</code> 만 하면 <strong>아직 파이썬 버퍼에 있는 바이트는 그대로 유실</strong>됩니다 — 이 순서가 관례가 아니라 필연인 이유입니다. 참고로 <code>with</code> 블록이 끝날 때의 <code>close()</code> 는 <code>flush()</code> 까지만 하고 <code>fsync</code> 는 하지 않으므로, 내구성이 필요하면 <strong>명시적으로 불러야 합니다.</strong> (<code>with</code> 문이 어떤 코드로 풀리는지는 §9.2 노트에서 다룹니다.) → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>f.fileno()</code> 는 세 층을 뚫고 내려가 <code>FileIO</code> 가 들고 있는 <strong>정수 파일 디스크립터</strong>를 돌려줍니다. <code>os.fsync</code> 는 이 정수만 받는 저수준 함수라 파이썬 버퍼의 존재를 모릅니다. 그래서 <code>flush()</code> 를 먼저 부르지 않고 <code>fsync</code> 만 하면 <strong>아직 파이썬 버퍼에 있는 바이트는 그대로 유실</strong>됩니다 — 이 순서가 관례가 아니라 필연인 이유입니다. 참고로 <code>with</code> 블록이 끝날 때의 <code>close()</code> 는 <code>flush()</code> 까지만 하고 <code>fsync</code> 는 하지 않으므로, 내구성이 필요하면 <strong>명시적으로 불러야 합니다.</strong> (<code>with</code> 문이 어떤 코드로 풀리는지는 §9.2 노트에서 다룹니다.) → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <h4 id="newlinen-windows-에서-이것이-없으면-파일이-달라집니다"><code>newline="\n"</code> — Windows 에서 이것이 없으면 파일이 달라집니다</h4>
 <p><code>stage_lines</code>/<code>_append_lines</code> 는 <code>newline=config.LINE_TERMINATOR</code>(= <code>"\n"</code>)로 열고, CSV 쪽은 <code>newline=""</code> 로 엽니다. <strong>다른 값인 데는 이유가 있습니다.</strong></p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>newline=</code> 은 파이썬 3 의 새 I/O 스택(PEP 3116)이 <code>TextIOWrapper</code> 에 도입한 인자입니다. 쓰기 모드에서 <code>None</code>(기본)이면 문자열 안의 <code>"\n"</code> 을 <strong><code>os.linesep</code> 으로 치환</strong>하고, <code>""</code> 또는 <code>"\n"</code> 이면 아무 변환도 하지 않습니다. 읽기 모드에서 <code>None</code> 이면 <code>\n</code>/<code>\r\n</code>/<code>\r</code> 을 모두 <code>"\n"</code> 으로 바꿔 주는 <strong>범용 개행(universal newlines)</strong> 이 켜집니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>newline=</code> 은 파이썬 3 의 새 I/O 스택(PEP 3116)이 <code>TextIOWrapper</code> 에 도입한 인자입니다. 쓰기 모드에서 <code>None</code>(기본)이면 문자열 안의 <code>"\n"</code> 을 <strong><code>os.linesep</code> 으로 치환</strong>하고, <code>""</code> 또는 <code>"\n"</code> 이면 아무 변환도 하지 않습니다. 읽기 모드에서 <code>None</code> 이면 <code>\n</code>/<code>\r\n</code>/<code>\r</code> 을 모두 <code>"\n"</code> 으로 바꿔 주는 <strong>범용 개행(universal newlines)</strong> 이 켜집니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p>로컬 Windows(<code>os.linesep == "\r\n"</code>)에서 실행한 결과입니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.txt&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;a</span><span class="se">\n</span><span class="s2">b</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>                 <span class="c1"># 기본값</span>
@@ -623,13 +694,11 @@ f.buffer.raw = &lt;_io.FileIO&gt;          ← 실제 파일 디스크립터. wr
 
 <p>이 차이가 왜 치명적인가 하면, <code>_has_torn_tail</code>(§3.7)이 마지막 <strong>바이트</strong>를 <code>"\n".encode("utf-8")</code> = <code>b"\n"</code> 과 비교하기 때문입니다. 기본값으로 열어 <code>\r\n</code> 이 쓰였다면 마지막 바이트는 <code>b"\n"</code> 이 맞아 통과하지만, 파일 안에는 JSONL 표준이 아닌 <code>\r</code> 이 섞이고 플랫폼마다 파일 내용이 달라집니다. <strong>데이터 파일 포맷을 OS 에 맡기지 않겠다</strong>는 선언이 <code>newline="\n"</code> 한 줄입니다.</p>
 <h4 id="pathwith_suffixpathsuffix-tmp-왜-이렇게-겹쳐-쓰나"><code>path.with_suffix(path.suffix + ".tmp")</code> — 왜 이렇게 겹쳐 쓰나</h4>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>Path.with_suffix(s)</code> 는 확장자를 <strong>덧붙이는 게 아니라 대체</strong>합니다. 그래서 <code>Path("data/transactions.jsonl").with_suffix(".tmp")</code> 는 <code>data/transactions.tmp</code> 가 되어 <strong>원래 확장자가 사라집니다.</strong> 현재 확장자를 앞에 이어 붙이면(<code>p.suffix + ".tmp"</code>) 의도한 <code>data/transactions.jsonl.tmp</code> 가 나옵니다(로컬 확인). 확장자가 없는 파일에서도 안전합니다 — <code>Path("data/id_counter").suffix</code> 는 빈 문자열이라 결과가 <code>data/id_counter.tmp</code> 입니다. <code>IdWatermark</code> 가 쓰는 파일이 정확히 그 경우입니다. 임시 파일을 <code>tempfile</code> 이 아니라 <strong>같은 폴더에 만드는 것도 필수</strong>입니다 — <code>os.replace</code> 의 원자성이 같은 파일시스템 안에서만 성립하기 때문입니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>Path.with_suffix(s)</code> 는 확장자를 <strong>덧붙이는 게 아니라 대체</strong>합니다. 그래서 <code>Path("data/transactions.jsonl").with_suffix(".tmp")</code> 는 <code>data/transactions.tmp</code> 가 되어 <strong>원래 확장자가 사라집니다.</strong> 현재 확장자를 앞에 이어 붙이면(<code>p.suffix + ".tmp"</code>) 의도한 <code>data/transactions.jsonl.tmp</code> 가 나옵니다(로컬 확인). 확장자가 없는 파일에서도 안전합니다 — <code>Path("data/id_counter").suffix</code> 는 빈 문자열이라 결과가 <code>data/id_counter.tmp</code> 입니다. <code>IdWatermark</code> 가 쓰는 파일이 정확히 그 경우입니다. 임시 파일을 <code>tempfile</code> 이 아니라 <strong>같은 폴더에 만드는 것도 필수</strong>입니다 — <code>os.replace</code> 의 원자성이 같은 파일시스템 안에서만 성립하기 때문입니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h4 id="osreplace-가-보장하는-것과-보장하지-않는-것"><code>os.replace</code> 가 보장하는 것과 보장하지 않는 것</h4>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>os.replace</code> 는 파이썬 3.3 에 추가됐습니다. 그 전에는 <code>os.rename</code> 을 썼는데, <code>os.rename</code> 은 <strong>POSIX 에서는 대상을 덮어쓰고 Windows 에서는 <code>FileExistsError</code></strong> 를 내는 식으로 플랫폼마다 동작이 달랐습니다. <code>os.replace</code> 는 "있으면 덮어쓴다"로 <strong>양쪽 동작을 통일</strong>한 것입니다. 그래서 이 코드는 Windows 에서도 그대로 돕니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
-<p><strong>⚙️ 내부 동작</strong> — POSIX 에서는 <code>rename(2)</code>, Windows 에서는 <code>MoveFileExW(..., MOVEFILE_REPLACE_EXISTING)</code> 로 내려갑니다. 원자성의 범위를 정확히 말하면 <strong>"같은 파일시스템 안에서, 디렉터리 엔트리가 가리키는 대상이 바뀌는 순간이 쪼개지지 않는다"</strong> 뿐입니다. 세 가지는 보장하지 않습니다. (1) <strong>다른 파일시스템</strong>으로 옮기면 원자적이지 않고 <code>OSError(EXDEV)</code> 가 납니다. (2) <strong>디렉터리 엔트리 자체의 내구성</strong>은 별개라, 완벽을 기하려면 부모 디렉터리를 열어 <code>os.fsync</code> 해야 합니다(이 소스는 거기까지는 하지 않습니다 — CLI 도구의 합리적 절충입니다). (3) <strong>Windows 에서는 대상 파일을 다른 프로세스(또는 자기 자신)가 열고 있으면 <code>PermissionError</code> 로 그냥 실패합니다</strong> — POSIX 에는 없는 실패 모드이고, <code>UnitOfWork.commit</code> 이 그것을 명시적으로 다루는 이유입니다(§9.2 참조). → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>os.replace</code> 는 파이썬 3.3 에 추가됐습니다. 그 전에는 <code>os.rename</code> 을 썼는데, <code>os.rename</code> 은 <strong>POSIX 에서는 대상을 덮어쓰고 Windows 에서는 <code>FileExistsError</code></strong> 를 내는 식으로 플랫폼마다 동작이 달랐습니다. <code>os.replace</code> 는 "있으면 덮어쓴다"로 <strong>양쪽 동작을 통일</strong>한 것입니다. 그래서 이 코드는 Windows 에서도 그대로 돕니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — POSIX 에서는 <code>rename(2)</code>, Windows 에서는 <code>MoveFileExW(..., MOVEFILE_REPLACE_EXISTING)</code> 로 내려갑니다. 원자성의 범위를 정확히 말하면 <strong>"같은 파일시스템 안에서, 디렉터리 엔트리가 가리키는 대상이 바뀌는 순간이 쪼개지지 않는다"</strong> 뿐입니다. 세 가지는 보장하지 않습니다. (1) <strong>다른 파일시스템</strong>으로 옮기면 원자적이지 않고 <code>OSError(EXDEV)</code> 가 납니다. (2) <strong>디렉터리 엔트리 자체의 내구성</strong>은 별개라, 완벽을 기하려면 부모 디렉터리를 열어 <code>os.fsync</code> 해야 합니다(이 소스는 거기까지는 하지 않습니다 — CLI 도구의 합리적 절충입니다). (3) <strong>Windows 에서는 대상 파일을 다른 프로세스(또는 자기 자신)가 열고 있으면 <code>PermissionError</code> 로 그냥 실패합니다</strong> — POSIX 에는 없는 실패 모드이고, <code>UnitOfWork.commit</code> 이 그것을 명시적으로 다루는 이유입니다(§9.2 참조). → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong>시나리오별 결과:</strong></p>
 <div class="codehilite"><pre><span></span><code>정상:      임시 파일 작성 → fsync → replace → 완료
@@ -647,7 +716,7 @@ fsync 가 없었다면 + 전원 차단:
 
 <p>자세한 crash 시나리오 분석은 <a href="10-advanced-design.html">10. 고급 설계 주제</a>에 있습니다 — 요약하면 <strong>"원본은 <code>os.replace</code> 가 성공하는 그 순간까지 한 번도 수정되지 않는다"</strong> 가 위 네 시나리오를 모두 설명하는 한 문장입니다.</p>
 <h3 id="37-이어-쓰기-_append_lines-와-_has_torn_tail">3.7 이어 쓰기 — <code>_append_lines</code> 와 <code>_has_torn_tail</code></h3>
-<p><code>rewrite</code> 가 파일 전체를 갈아 끼우는 경로라면, <code>append</code> 계열은 <strong>파일 끝에 붙이는 O(1) 경로</strong>입니다. 여기에도 두 가지 방어가 들어 있습니다.</p>
+<p><code>rewrite</code> 가 파일 전체를 갈아 끼우는 경로라면, <code>append</code> 계열은 <strong>파일 끝에 붙이는 O(1) 경로</strong>입니다. O(1)은 파일이 아무리 커져도 걸리는 시간이 늘지 않는다는 뜻입니다. 여기에도 두 가지 방어가 들어 있습니다.</p>
 <p>budget_app/storage/jsonl.py:232-247</p>
 <div class="codehilite"><pre><span></span><code>        <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">needs_newline</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_torn_tail</span><span class="p">()</span>
@@ -685,24 +754,18 @@ fsync 가 없었다면 + 전원 차단:
             <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># 파일이 없다 — 이어 쓰기가 새로 만든다</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작 — 왜 <code>'rb'</code> 여야만 하는가.</strong> 텍스트 모드(<code>TextIOWrapper</code>)에서는 <strong>음수 오프셋 seek 이 아예 금지</strong>돼 있습니다. 디코딩과 개행 변환 때문에 "문자 위치"와 "바이트 위치"가 일치하지 않아, 파일 끝에서 1을 뺀 지점이 어느 문자인지 계산할 수 없기 때문입니다. 로컬 3.13.1 에서 실제로 확인했습니다.</p>
-<p>```python</p>
-<blockquote>
-<blockquote>
-<blockquote>
-<p>open("x.txt","r",encoding="utf-8").seek(-1, os.SEEK_END)
-io.UnsupportedOperation: can't do nonzero end-relative seeks
-```</p>
-</blockquote>
-</blockquote>
-</blockquote>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 왜 <code>'rb'</code> 여야만 하는가.</strong> 텍스트 모드(<code>TextIOWrapper</code>)에서는 <strong>음수 오프셋 seek 이 아예 금지</strong>돼 있습니다. 디코딩과 개행 변환 때문에 "문자 위치"와 "바이트 위치"가 일치하지 않아, 파일 끝에서 1을 뺀 지점이 어느 문자인지 계산할 수 없기 때문입니다. 로컬 3.13.1 에서 실제로 확인했습니다.</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;x.txt&quot;</span><span class="p">,</span><span class="s2">&quot;r&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_END</span><span class="p">)</span>
+<span class="n">io</span><span class="o">.</span><span class="n">UnsupportedOperation</span><span class="p">:</span> <span class="n">can</span><span class="s1">&#39;t do nonzero end-relative seeks</span>
+</code></pre></div>
+
 <p>바이너리 모드는 <code>BufferedReader</code> → <code>FileIO</code> 두 겹뿐이고 <code>seek</code> 이 그대로 <code>lseek(2)</code> 로 내려가므로 <strong>파일 크기와 무관하게 1바이트만</strong> 읽습니다. 텍스트 모드로 같은 일을 하려면 파일 전체를 디코딩해야 하고, 애초에 인코딩이 깨진 파일에서는 그 디코딩이 실패합니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
-<p><strong>⚙️ <code>st_size == 0</code> 선검사가 장식이 아닌 이유.</strong> 빈 파일에서 <code>seek(-1, os.SEEK_END)</code> 를 하면 오프셋이 음수가 되어 바이너리 모드에서도 실패합니다(로컬 확인: <code>OSError: [Errno 22] Invalid argument</code>). 물론 아래 <code>except OSError</code> 가 잡아 주지만, <strong>예외를 흐름 제어로 쓰지 않겠다</strong>는 뜻으로 크기를 먼저 봅니다. <code>stat()</code> 은 파일을 열지도 않으므로 더 싸기도 합니다.</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ <code>st_size == 0</code> 선검사가 장식이 아닌 이유.</strong> 빈 파일에서 <code>seek(-1, os.SEEK_END)</code> 를 하면 오프셋이 음수가 되어 바이너리 모드에서도 실패합니다(로컬 확인: <code>OSError: [Errno 22] Invalid argument</code>). 물론 아래 <code>except OSError</code> 가 잡아 주지만, <strong>예외를 흐름 제어로 쓰지 않겠다</strong>는 뜻으로 크기를 먼저 봅니다. <code>stat()</code> 은 파일을 열지도 않으므로 더 싸기도 합니다.</p>
 </blockquote>
 <p><code>f.write(...)</code> 뒤에 <code>flush()</code> + <code>fsync()</code> 가 또 나오는 것을 눈여겨보세요. docstring 이 "<strong>내구성 비대칭</strong>"이라고 부른 문제입니다 — 재작성 경로만 <code>fsync</code> 를 하고 이어 쓰기 경로는 하지 않으면, <strong>같은 프로그램의 두 쓰기가 서로 다른 내구성을 약속</strong>하게 됩니다. CLI 는 명령 하나에 한 번 쓰고 끝나므로 <code>fsync</code> 비용도 문제가 되지 않습니다.</p>
 <hr>
 <h2 id="4-idallocator-id-발급-규칙의-단일-정의처">4. <code>IdAllocator</code> — ID 발급 규칙의 단일 정의처</h2>
+<p>거래 하나하나에는 <code>TX-000001</code> 같은 번호가 붙습니다. 그 번호를 누가 어떤 규칙으로 정하는지가 이 절의 주제입니다. 규칙이 한 곳에만 있어야 하는 이유, 그리고 한 번 지운 번호를 다시 쓰면 왜 위험한지를 다룹니다.</p>
 <h3 id="41-리팩터-전의-문제">4.1 리팩터 전의 문제</h3>
 <p>ID 발급 규칙이 <strong>두 곳</strong>에 있었습니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 리팩터 전 — repository.py</span>
@@ -755,9 +818,8 @@ CSV 행 3: id 없음     → next() → counter=8 → TX-000008 ✅  (7 과 충�
 </code></pre></div>
 
 <p><code>reserve</code> 가 <code>counter</code> 도 갱신하기 때문에 대부분의 경우 루프는 한 번만 돕니다. <code>while</code> 은 CSV 가 id 를 뒤죽박죽 순서로 실어 왔을 때를 위한 안전장치입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>_taken</code> 이 <code>set</code> 인 것이 성능의 전부입니다.</strong> <code>candidate not in self._taken</code> 은 <code>set.__contains__</code> 이고, CPython 의 <code>set</code> 은 <strong>열린 주소법 해시 테이블</strong>이라 <code>hash(x)</code> 로 슬롯을 찾은 뒤 그 자리의 원소와 <code>==</code> 를 한 번 비교하는 것으로 끝납니다 — 평균 O(1) 입니다. 같은 코드를 <code>list</code> 로 바꾸면 <code>in</code> 이 앞에서부터 전부 비교하는 O(n) 이 되어, 10만 건 가져오기가 O(n²) 로 무너집니다. <code>x in s</code> 가 성립하려면 <code>x</code> 가 <strong>해시 가능</strong>해야 하는데, <code>TransactionId</code> 가 <code>@dataclass(frozen=True)</code> 라 <code>dataclasses</code> 가 <code>__hash__</code> 를 자동 생성해 준 덕분입니다(<code>frozen</code> 없이 <code>eq=True</code> 면 <code>__hash__</code> 가 <code>None</code> 이라 <code>TypeError: unhashable type</code> 이 납니다 — §2.3 노트 참조). 게다가 <code>TransactionId.__post_init__</code> 이 값을 <strong>정규형으로 다시 찍기</strong> 때문에 <code>TX-1</code> 과 <code>TX-000001</code> 이 같은 해시·같은 원소가 되고, 그래서 집합이 중복을 실제로 거릅니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>set(taken or ())</code> 는 §3.2 노트의 단락 평가를 <strong>기본값 관용구</strong>로 쓴 것입니다. <code>taken=None</code> 이면 빈 튜플이 대신 들어갑니다. <code>def __init__(self, taken=set())</code> 이라고 쓰지 않은 이유가 중요합니다 — 파이썬의 기본 인자는 <strong>함수 정의 때 한 번만</strong> 평가되므로, 그렇게 썼다면 집합 하나를 모든 인스턴스가 공유했을 것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>_taken</code> 이 <code>set</code> 인 것이 성능의 전부입니다.</strong> <code>candidate not in self._taken</code> 은 <code>set.__contains__</code> 이고, CPython 의 <code>set</code> 은 <strong>열린 주소법 해시 테이블</strong>이라 <code>hash(x)</code> 로 슬롯을 찾은 뒤 그 자리의 원소와 <code>==</code> 를 한 번 비교하는 것으로 끝납니다 — 평균 O(1) 입니다. 같은 코드를 <code>list</code> 로 바꾸면 <code>in</code> 이 앞에서부터 전부 비교하는 O(n) 이 되어, 10만 건 가져오기가 O(n²) 로 무너집니다. <code>x in s</code> 가 성립하려면 <code>x</code> 가 <strong>해시 가능</strong>해야 하는데, <code>TransactionId</code> 가 <code>@dataclass(frozen=True)</code> 라 <code>dataclasses</code> 가 <code>__hash__</code> 를 자동 생성해 준 덕분입니다(<code>frozen</code> 없이 <code>eq=True</code> 면 <code>__hash__</code> 가 <code>None</code> 이라 <code>TypeError: unhashable type</code> 이 납니다 — §2.3 노트 참조). 게다가 <code>TransactionId.__post_init__</code> 이 값을 <strong>정규형으로 다시 찍기</strong> 때문에 <code>TX-1</code> 과 <code>TX-000001</code> 이 같은 해시·같은 원소가 되고, 그래서 집합이 중복을 실제로 거릅니다. → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>set(taken or ())</code> 는 §3.2 노트의 단락 평가를 <strong>기본값 관용구</strong>로 쓴 것입니다. <code>taken=None</code> 이면 빈 튜플이 대신 들어갑니다. <code>def __init__(self, taken=set())</code> 이라고 쓰지 않은 이유가 중요합니다 — 파이썬의 기본 인자는 <strong>함수 정의 때 한 번만</strong> 평가되므로, 그렇게 썼다면 집합 하나를 모든 인스턴스가 공유했을 것입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <h3 id="43-id-스캔-검증-실패-줄에서도-id-를-건진다">4.3 ID 스캔 — 검증 실패 줄에서도 id 를 건진다</h3>
 <p>budget_app/storage/repositories.py:39-51</p>
@@ -776,8 +838,7 @@ CSV 행 3: id 없음     → next() → counter=8 → TX-000008 ✅  (7 과 충�
         <span class="k">return</span> <span class="n">TransactionId</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">raw</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — 정규식 두 개가 서로 다른 메서드를 씁니다. 검증용 <code>_EXACT</code>(<code>domain/tx_id.py:45</code>)는 <code>re.match</code> 로 <strong>문자열 처음부터</strong>만 맞춰 보고, 발굴용 <code>_SCAN</code>(<code>:48</code>)은 <code>re.search</code> 로 <strong>줄 어디서든</strong> 찾습니다. <code>re.compile</code> 로 미리 컴파일해 모듈 상수로 둔 것은, 컴파일 결과가 정규식 전용 바이트코드를 담은 <code>Pattern</code> 객체이고 그 컴파일이 한 번만 일어나면 되기 때문입니다(<code>re</code> 모듈에도 내부 캐시가 있지만 크기 제한이 있고, 상수로 두면 의도가 드러납니다). 패턴은 <code>TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'</code>(<code>domain/config.py:27</code>)라 <strong>JSON 이 깨진 줄에서도 <code>"id": "TX-000010"</code> 조각만 있으면</strong> 번호를 건집니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 정규식 두 개가 서로 다른 메서드를 씁니다. 검증용 <code>_EXACT</code>(<code>domain/tx_id.py:45</code>)는 <code>re.match</code> 로 <strong>문자열 처음부터</strong>만 맞춰 보고, 발굴용 <code>_SCAN</code>(<code>:48</code>)은 <code>re.search</code> 로 <strong>줄 어디서든</strong> 찾습니다. <code>re.compile</code> 로 미리 컴파일해 모듈 상수로 둔 것은, 컴파일 결과가 정규식 전용 바이트코드를 담은 <code>Pattern</code> 객체이고 그 컴파일이 한 번만 일어나면 되기 때문입니다(<code>re</code> 모듈에도 내부 캐시가 있지만 크기 제한이 있고, 상수로 두면 의도가 드러납니다). 패턴은 <code>TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'</code>(<code>domain/config.py:27</code>)라 <strong>JSON 이 깨진 줄에서도 <code>"id": "TX-000010"</code> 조각만 있으면</strong> 번호를 건집니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <p><strong><code>_scan_id</code> 의 2단 전략</strong>이 이 계층의 방어력을 결정합니다.</p>
 <div class="codehilite"><pre><span></span><code>줄 상태                          경로                       결과
@@ -795,9 +856,10 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
         <span class="k">return</span> <span class="n">IdAllocator</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">max_n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_watermark</span><span class="o">.</span><span class="n">read</span><span class="p">()),</span> <span class="n">taken</span><span class="o">=</span><span class="n">taken</span><span class="p">)</span>
 </code></pre></div>
 
-<p><code>IdWatermark</code>(<code>storage/ids.py:26-78</code>)는 <strong>발급된 적 있는 최대 번호를 숫자 한 줄짜리 파일(<code>id_counter</code>)에 남깁니다.</strong> 파일 스캔 최대값은 "지금 무엇이 있는가"라 삭제하면 줄어들고, 그러면 지운 번호가 부활해 예전에 내보낸 CSV 를 다시 가져올 때 서로 다른 거래가 "이미 있는 id"로 판정돼 조용히 버려집니다. 워터마크는 줄어들지 않는 기준선이라 그 경로를 막습니다. 이 파일이 없거나 깨져도 <code>read()</code> 가 0 을 돌려주므로 <strong>안전장치가 고장 나도 본체는 멈추지 않습니다.</strong></p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>remember</code> 가 <code>atomic_write_lines</code> 를 쓰는 것이 핵심입니다. 이 파일이 반쯤 쓰인 채로 남으면 <code>int(text)</code> 가 <code>ValueError</code> 를 내고 <code>read()</code> 가 0 으로 떨어져 <strong>방어가 통째로 사라집니다.</strong> 그래서 JSONL 이 아닌 파일인데도 §3.6 의 "tmp + fsync + replace" 를 똑같이 탑니다 — <code>atomic_write_lines</code> 에 밑줄이 없는 이유가 바로 이 사용처입니다. 참고로 <code>int("  12\n")</code> 처럼 앞뒤 공백은 <code>int()</code> 가 알아서 무시하지만 <code>int("12.0")</code> 은 <code>ValueError</code> 입니다(정수 리터럴 문법만 받습니다). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<p><code>IdWatermark</code>(<code>storage/ids.py:26-78</code>)는 <strong>발급된 적 있는 최대 번호를 숫자 한 줄짜리 파일(<code>id_counter</code>)에 남깁니다.</strong> 파일 스캔 최대값은 "지금 무엇이 있는가"라 삭제하면 줄어들고, 그러면 지운 번호가 부활해 예전에 내보낸 CSV 를 다시 가져올 때 서로 다른 거래가 "이미 있는 id"로 판정돼 조용히 버려집니다. 워터마크(발급한 적 있는 최대 번호를 따로 적어 둔, 줄어들지 않는 기준선)는 그 경로를 막습니다. 이 파일이 없거나 깨져도 <code>read()</code> 가 0 을 돌려주므로 <strong>안전장치가 고장 나도 본체는 멈추지 않습니다.</strong></p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 은행 번호표 발급기와 같습니다. 번호표를 뽑은 손님이 그냥 돌아가도 기계는 눈금을 되돌리지 않습니다. 되돌렸다가 다음 손님에게 같은 번호를 주면, 아까 그 번호로 접수된 서류와 헷갈리기 때문입니다. <code>id_counter</code> 파일이 그 되돌리지 않는 눈금이고, 지금 파일에 남아 있는 거래 중 <strong>가장 큰 번호</strong>를 보고 그다음을 주는 방식은 손님이 나갈 때마다 눈금을 되돌리는 것과 같습니다.
+다만 이 비유는 "고장 났을 때"에서 깨집니다 — 번호표 기계가 고장 나면 창구가 멈추지만, 이 파일은 없거나 깨져도 <code>read()</code> 가 0 을 돌려주고 프로그램은 그대로 돕니다. 그동안은 파일 스캔 값만 남으므로 보호가 없던 시절로 돌아갈 뿐입니다.</p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>remember</code> 가 <code>atomic_write_lines</code> 를 쓰는 것이 핵심입니다. 이 파일이 반쯤 쓰인 채로 남으면 <code>int(text)</code> 가 <code>ValueError</code> 를 내고 <code>read()</code> 가 0 으로 떨어져 <strong>방어가 통째로 사라집니다.</strong> 그래서 JSONL 이 아닌 파일인데도 §3.6 의 "tmp + fsync + replace" 를 똑같이 탑니다 — <code>atomic_write_lines</code> 에 밑줄이 없는 이유가 바로 이 사용처입니다. 참고로 <code>int("  12\n")</code> 처럼 앞뒤 공백은 <code>int()</code> 가 알아서 무시하지만 <code>int("12.0")</code> 은 <code>ValueError</code> 입니다(정수 리터럴 문법만 받습니다). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong>단건 <code>add</code> 와 배치 <code>import</code> 의 차이:</strong></p>
 <div class="table-wrap"><table>
@@ -824,7 +886,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <p>배치가 성능상 유리한 이유가 바로 이것입니다. 그리고 두 경로가 <strong>같은 <code>IdAllocator</code> 클래스</strong>를 쓰므로 규칙이 어긋날 수 없습니다.</p>
 <hr>
 <h2 id="5-transactionrepository-거래-저장소">5. <code>TransactionRepository</code> — 거래 저장소</h2>
-<p><code>JsonlStore</code> 를 상속하고 거래 고유의 것만 추가합니다.</p>
+<p>거래 파일 하나를 맡는 담당자입니다. <code>JsonlStore</code> 를 상속(부모 클래스가 가진 것을 그대로 물려받는 것)하고 거래에만 있는 것을 더합니다. 거래에만 있는 <strong>규칙</strong>은 둘입니다 — ID 발급, 그리고 카테고리 일괄 재지정. 여기에 거래 전용 조회·수정 연산(<code>get</code> · <code>exists</code> · <code>delete</code> · <code>replace</code>)이 함께 붙습니다(§5.1).</p>
 <h3 id="51-쓰기-연산-넷">5.1 쓰기 연산 넷</h3>
 <p>budget_app/storage/repositories.py:138-148</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">append_many</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">txs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
@@ -860,9 +922,8 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 </code></pre></div>
 
 <p>내용이 같은데 수정 시각(mtime)만 바뀌면 백업 도구나 파일 감시가 "변경됐다"고 오해합니다. 무엇보다 <strong>쓰지 않았는데 쓰기 실패로 죽을 이유가 없습니다.</strong></p>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>nonlocal</code> 은 PEP 3104 로 파이썬 3.0 에 들어왔습니다. 파이썬에서 함수 안의 <strong>대입문은 그 이름을 지역 변수로 만듭니다.</strong> <code>nonlocal found</code> 가 없으면 <code>found = True</code> 는 <code>_drop</code> 안에서만 사는 새 변수를 만들고, 바깥 <code>delete</code> 의 <code>found</code> 는 영영 <code>False</code> 로 남습니다(읽기만 한다면 선언이 필요 없지만, <strong>쓰기에는 필요합니다</strong>). 파이썬 2 에는 이 키워드가 없어 <code>found = [False]</code> 처럼 <strong>리스트에 담아 우회</strong>하는 관용구를 썼습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>nonlocal</code> 로 표시된 이름은 컴파일 시점에 바깥 함수의 지역 변수에서 <strong>셀(cell) 변수</strong>로 승격되고, 안쪽 함수는 <code>__closure__</code> 에 그 셀의 참조를 들고 다닙니다(전용 바이트코드 <code>LOAD_DEREF</code>/<code>STORE_DEREF</code>). 즉 두 함수가 <strong>같은 상자 하나를 공유</strong>합니다. 그래서 <code>self.rewrite(_drop)</code> 이 파일을 훑는 동안 <code>_drop</code> 이 기록한 결과를 <code>delete</code> 가 그대로 읽을 수 있고, "찾았는가"를 위해 파일을 다시 읽을 필요가 없습니다. <code>_swap</code>(§5.2)과 <code>_reassign</code> 의 <code>changed += 1</code> 도 완전히 같은 구조입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>nonlocal</code> 은 PEP 3104 로 파이썬 3.0 에 들어왔습니다. 파이썬에서 함수 안의 <strong>대입문은 그 이름을 지역 변수로 만듭니다.</strong> <code>nonlocal found</code> 가 없으면 <code>found = True</code> 는 <code>_drop</code> 안에서만 사는 새 변수를 만들고, 바깥 <code>delete</code> 의 <code>found</code> 는 영영 <code>False</code> 로 남습니다(읽기만 한다면 선언이 필요 없지만, <strong>쓰기에는 필요합니다</strong>). 파이썬 2 에는 이 키워드가 없어 <code>found = [False]</code> 처럼 <strong>리스트에 담아 우회</strong>하는 관용구를 썼습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>nonlocal</code> 로 표시된 이름은 컴파일 시점에 바깥 함수의 지역 변수에서 <strong>셀(cell) 변수</strong>로 승격되고, 안쪽 함수는 <code>__closure__</code> 에 그 셀의 참조를 들고 다닙니다(전용 바이트코드 <code>LOAD_DEREF</code>/<code>STORE_DEREF</code>). 즉 두 함수가 <strong>같은 상자 하나를 공유</strong>합니다. 그래서 <code>self.rewrite(_drop)</code> 이 파일을 훑는 동안 <code>_drop</code> 이 기록한 결과를 <code>delete</code> 가 그대로 읽을 수 있고, "찾았는가"를 위해 파일을 다시 읽을 필요가 없습니다. <code>_swap</code>(§5.2)과 <code>_reassign</code> 의 <code>changed += 1</code> 도 완전히 같은 구조입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p>budget_app/storage/repositories.py:194-214</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">reassign_category</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
@@ -912,6 +973,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <p>지금은 그 두 줄이 <code>domain/entities.py</code> 의 <code>Transaction.with_patch</code>(113-124)로 올라갔고, 저장소는 <strong>완성된 객체를 받아 교체만</strong> 합니다.</p>
 <hr>
 <h2 id="6-categorystore-이름-집합-관리">6. <code>CategoryStore</code> — 이름 집합 관리</h2>
+<p>카테고리 파일에 들어 있는 것은 이름 목록입니다. 여기서 신경 쓸 일은 둘뿐입니다. 같은 이름이 두 번 들어가지 않게 하는 것, 그리고 파일이 비어 있는 첫 실행 때 기본 이름 몇 개를 넣어 주는 것(시딩)입니다.</p>
 <p>budget_app/storage/repositories.py:226-235</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">seed_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;비어 있을 때만 기본 카테고리를 심는다. 심은 개수를 반환.</span>
@@ -925,8 +987,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">append_all</span><span class="p">(</span><span class="n">Category</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_CATEGORIES</span><span class="p">)</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — 마지막 줄의 <code>Category(name=name) for name in ...</code> 은 <strong>제너레이터 식</strong>(PEP 289, 파이썬 2.4)입니다. 보통은 괄호가 필요하지만, <strong>함수의 인자가 그것 하나뿐일 때는 괄호를 생략</strong>할 수 있습니다 — <code>append_all((...))</code> 의 바깥 괄호가 곧 제너레이터 식의 괄호 역할을 합니다. <code>append_all</code> 의 파라미터 타입이 <code>Iterable[T]</code> 라서 게으른 값을 그대로 받을 수 있고, 실제로 <code>append_all</code> 첫 줄의 <code>list(entities)</code> 가 그 시점에 소비합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 마지막 줄의 <code>Category(name=name) for name in ...</code> 은 <strong>제너레이터 식</strong>(PEP 289, 파이썬 2.4)입니다. 보통은 괄호가 필요하지만, <strong>함수의 인자가 그것 하나뿐일 때는 괄호를 생략</strong>할 수 있습니다 — <code>append_all((...))</code> 의 바깥 괄호가 곧 제너레이터 식의 괄호 역할을 합니다. <code>append_all</code> 의 파라미터 타입이 <code>Iterable[T]</code> 라서 게으른 값을 그대로 받을 수 있고, 실제로 <code>append_all</code> 첫 줄의 <code>list(entities)</code> 가 그 시점에 소비합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong><code>add</code> 와 <code>add_many</code> 가 둘 다 있는 이유</strong>는 <code>IdAllocator</code> 와 같은 논리입니다.</p>
 <div class="table-wrap"><table>
@@ -952,11 +1013,11 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 </table></div>
 <p>리팩터 전 <code>import_csv</code> 는 커밋 단계에서 <code>self.cats.add(name)</code> 을 반복 호출했습니다. 새 카테고리가 M개면 파일을 M번 훑었습니다.</p>
 <p><strong><code>add_many</code> 안에서 <code>known.add(cat.name)</code> 을 하는 것</strong>도 중요합니다. 같은 CSV 안에 같은 카테고리가 두 번 나와도 한 번만 추가됩니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>exists</code> 의 <code>any(...)</code> 는 조기 종료합니다.</strong> <code>any(c.name == target for c in self.stream())</code> 은 제너레이터를 하나씩 당기다가 <strong>처음 참을 만나는 순간 <code>True</code> 를 돌려주고 멈춥니다.</strong> 그러면 <code>stream()</code> → <code>iter_raw()</code> 도 거기서 멈추고, 열려 있던 파일은 제너레이터가 정리될 때 닫힙니다 — <strong>파일 뒷부분은 읽히지도 않습니다.</strong> 같은 구조가 <code>TransactionRepository.category_in_use</code>(<code>repositories.py:124</code>)에도 있습니다. 반대로 <code>add</code> 를 N 번 부르면 <code>exists</code> 가 N 번 파일을 여는 것이라, 배치 경로가 <code>name_set()</code> 한 번으로 바꾸는 것이 그래서 중요합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>exists</code> 의 <code>any(...)</code> 는 조기 종료합니다.</strong> <code>any(c.name == target for c in self.stream())</code> 은 제너레이터를 하나씩 당기다가 <strong>처음 참을 만나는 순간 <code>True</code> 를 돌려주고 멈춥니다.</strong> 그러면 <code>stream()</code> → <code>iter_raw()</code> 도 거기서 멈추고, 열려 있던 파일은 제너레이터가 정리될 때 닫힙니다 — <strong>파일 뒷부분은 읽히지도 않습니다.</strong> 같은 구조가 <code>TransactionRepository.category_in_use</code>(<code>repositories.py:124</code>)에도 있습니다. 반대로 <code>add</code> 를 N 번 부르면 <code>exists</code> 가 N 번 파일을 여는 것이라, 배치 경로가 <code>name_set()</code> 한 번으로 바꾸는 것이 그래서 중요합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <hr>
 <h2 id="7-budgetstore-같은-달은-덮어쓰기">7. <code>BudgetStore</code> — "같은 달은 덮어쓰기"</h2>
+<p>예산은 한 달에 하나만 있어야 합니다. 그런데 저장 형식은 줄을 이어 적는 장부라 그냥 두면 같은 달이 여러 줄 쌓입니다. 그래서 같은 달 예산을 다시 정할 때는 옛 줄을 지우고 새 줄을 붙이는 일을 <strong>한 번에</strong> 합니다.</p>
 <p>budget_app/storage/repositories.py:292-308</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Budget</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">target</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_month</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
@@ -981,6 +1042,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <p><strong><code>set</code> 은 <code>rewrite</code> 한 번으로 "지우고 붙이기"를 동시에</strong> 합니다. 삭제와 추가를 따로 하면 그 사이에 프로세스가 죽었을 때 예산이 사라진 상태가 됩니다.</p>
 <hr>
 <h2 id="8-csv_iopy-csv-경계-어댑터">8. <code>csv_io.py</code> — CSV 경계 어댑터</h2>
+<p>CSV 는 엑셀 같은 다른 프로그램과 주고받는 표 형식 파일입니다. 이 프로그램이 평소에 쓰는 형식과 다르니 번역이 필요합니다. 그 번역만 맡는 얇은 층이 <code>csv_io.py</code> 이고, "경계 어댑터"라는 이름이 그 자리를 가리킵니다. 번역만 하고, 무엇을 받아들이고 무엇을 버릴지는 정하지 않습니다.</p>
 <h3 id="81-왜-서비스에서-떼어냈나">8.1 왜 서비스에서 떼어냈나</h3>
 <p>budget_app/storage/csv_io.py:1-2</p>
 <div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;CSV 경계 어댑터 — 외부 교환 포맷과 도메인 사이의 번역만 담당한다.</span>
@@ -1080,24 +1142,17 @@ $ python -m budget_app import --from rt.csv
 </code></pre></div>
 
 <p><strong>빈 파일과 컬럼 누락을 구분</strong>하는 것이 리팩터에서 추가됐습니다. 이전에는 빈 CSV 도 "필수 컬럼이 없습니다: ['date', 'type', ...]" 라고 안내했는데, 실제 문제는 "헤더 행 자체가 없다"입니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>reader.fieldnames</code> 는 그 순간 첫 행을 읽습니다.</strong> <code>csv.DictReader.fieldnames</code> 는 평범한 속성이 아니라 <strong><code>@property</code> 로 구현된 지연 속성</strong>입니다. 처음 접근할 때 내부 <code>csv.reader</code> 에서 한 행을 꺼내 <code>self._fieldnames</code> 에 캐시하고, 그 뒤로는 캐시를 돌려줍니다. 즉 <code>_check_header(path, reader.fieldnames)</code> 라고 쓴 이 한 줄이 <strong>헤더 행을 실제로 소비하는 지점</strong>이고, 그래서 뒤이은 <code>enumerate(reader, ...)</code> 는 자동으로 2행부터 시작합니다(<code>CSV_DATA_START_LINE = 2</code> 와 짝이 맞는 이유). 로컬 3.13.1 에서 스트림 위치로 확인했습니다 — <code>fieldnames</code> 접근 전 <code>tell()</code> 은 <code>0</code>, 접근 후에는 헤더 길이만큼 전진해 있었습니다. 파일이 완전히 비어 있으면 꺼낼 행이 없어 <code>fieldnames</code> 가 <code>None</code> 이 되고, <code>_check_header</code> 의 <code>list(fieldnames or [])</code> 가 그 경우를 "헤더 없음"으로 갈라냅니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>yield from</code> 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. <code>for x in it: yield x</code> 의 축약처럼 보이지만 그 이상으로, 하위 이터러블에 <strong><code>send</code>/<code>throw</code>/<code>close</code> 까지 그대로 위임</strong>합니다. 여기서 중요한 것은 위임하는 동안 이 함수의 프레임이 <strong>살아 있다</strong>는 점입니다 — <code>with open(...)</code> 블록이 열린 채로 유지되고, 파일은 마지막 행을 꺼낸 뒤(또는 호출자가 중간에 그만둔 뒤)에야 닫힙니다. 소스 주석이 정확히 그 말을 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작 — <code>newline=""</code> 는 CSV 에서 선택이 아니라 필수입니다.</strong> <code>csv</code> 모듈은 <strong>자기가 개행을 직접 다루는</strong> 모듈이라, 파일 객체가 개행을 건드리지 않도록 요구합니다(<code>csv</code> 문서가 명시). 읽기에서 <code>newline=""</code> 를 빼면 범용 개행이 켜져 <strong>따옴표로 감싼 필드 안의 줄바꿈</strong>(메모에 여러 줄을 적은 경우)이 훼손될 수 있고, 쓰기에서 빼면 Windows 에서 <code>csv.writer</code> 가 내보낸 <code>\r\n</code> 의 <code>\n</code> 이 다시 <code>\r\n</code> 으로 변환돼 <strong><code>\r\r\n</code></strong> 이 됩니다. 로컬에서 확인한 결과입니다.</p>
-<p>```python</p>
-<blockquote>
-<blockquote>
-<blockquote>
-<p>csv.writer(open("a.csv","w",encoding="utf-8")).writerow(["a","b"])
-open("a.csv","rb").read()
-b'a,b\r\r\n'                       # ← 빈 줄이 하나씩 끼어 보이는 그 증상
-csv.writer(open("b.csv","w",encoding="utf-8",newline="")).writerow(["a","b"])
-open("b.csv","rb").read()
-b'a,b\r\n'
-```</p>
-</blockquote>
-</blockquote>
-</blockquote>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>reader.fieldnames</code> 는 그 순간 첫 행을 읽습니다.</strong> <code>csv.DictReader.fieldnames</code> 는 평범한 속성이 아니라 <strong><code>@property</code> 로 구현된 지연 속성</strong>입니다. 처음 접근할 때 내부 <code>csv.reader</code> 에서 한 행을 꺼내 <code>self._fieldnames</code> 에 캐시하고, 그 뒤로는 캐시를 돌려줍니다. 즉 <code>_check_header(path, reader.fieldnames)</code> 라고 쓴 이 한 줄이 <strong>헤더 행을 실제로 소비하는 지점</strong>이고, 그래서 뒤이은 <code>enumerate(reader, ...)</code> 는 자동으로 2행부터 시작합니다(<code>CSV_DATA_START_LINE = 2</code> 와 짝이 맞는 이유). 로컬 3.13.1 에서 스트림 위치로 확인했습니다 — <code>fieldnames</code> 접근 전 <code>tell()</code> 은 <code>0</code>, 접근 후에는 헤더 길이만큼 전진해 있었습니다. 파일이 완전히 비어 있으면 꺼낼 행이 없어 <code>fieldnames</code> 가 <code>None</code> 이 되고, <code>_check_header</code> 의 <code>list(fieldnames or [])</code> 가 그 경우를 "헤더 없음"으로 갈라냅니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>yield from</code> 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. <code>for x in it: yield x</code> 의 축약처럼 보이지만 그 이상으로, 하위 이터러블에 <strong><code>send</code>/<code>throw</code>/<code>close</code> 까지 그대로 위임</strong>합니다. 여기서 중요한 것은 위임하는 동안 이 함수의 프레임이 <strong>살아 있다</strong>는 점입니다 — <code>with open(...)</code> 블록이 열린 채로 유지되고, 파일은 마지막 행을 꺼낸 뒤(또는 호출자가 중간에 그만둔 뒤)에야 닫힙니다. 소스 주석이 정확히 그 말을 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>newline=""</code> 는 CSV 에서 선택이 아니라 필수입니다.</strong> <code>csv</code> 모듈은 <strong>자기가 개행을 직접 다루는</strong> 모듈이라, 파일 객체가 개행을 건드리지 않도록 요구합니다(<code>csv</code> 문서가 명시). 읽기에서 <code>newline=""</code> 를 빼면 범용 개행이 켜져 <strong>따옴표로 감싼 필드 안의 줄바꿈</strong>(메모에 여러 줄을 적은 경우)이 훼손될 수 있고, 쓰기에서 빼면 Windows 에서 <code>csv.writer</code> 가 내보낸 <code>\r\n</code> 의 <code>\n</code> 이 다시 <code>\r\n</code> 으로 변환돼 <strong><code>\r\r\n</code></strong> 이 됩니다. 로컬에서 확인한 결과입니다.</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.csv&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="s2">&quot;b&quot;</span><span class="p">])</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.csv&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">&#39;a,b</span><span class="se">\r\r\n</span><span class="s1">&#39;</span>                       <span class="c1"># ← 빈 줄이 하나씩 끼어 보이는 그 증상</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;b.csv&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="s2">&quot;b&quot;</span><span class="p">])</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;b.csv&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">&#39;a,b</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+</code></pre></div>
+
 <p>JSONL 은 반대로 <strong>파이썬이 개행을 쓰므로</strong> <code>newline="\n"</code> 으로 "변환하지 말고 LF 그대로"를 지시합니다(§3.6). 두 값이 다른 것은 <strong>개행의 주인이 누구인가</strong>가 다르기 때문입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p>budget_app/storage/csv_io.py:107-123</p>
@@ -1145,31 +1200,24 @@ b'a,b\r\n'
 </code></pre></div>
 
 <p><strong><code>include_id</code> 가 두 함수에 다 전달되는 이유</strong>: <code>DictWriter</code> 는 <code>fieldnames</code> 에 없는 키가 dict 에 있으면 <code>ValueError</code> 를 냅니다. 헤더와 행 내용이 반드시 일치해야 합니다.</p>
-<p><strong>BOM 방침이 docstring 에 명시된 이유</strong>는 실제로 겪을 수 있는 함정이기 때문입니다. Excel 호환을 위해 <code>utf-8-sig</code> 로 바꾸면 헤더 첫 컬럼명이 <code>﻿id</code> 가 되어 자기 파일을 다시 읽지 못합니다.</p>
+<p><strong>BOM 방침이 docstring 에 명시된 이유</strong>는 실제로 겪을 수 있는 함정이기 때문입니다. BOM 은 파일 맨 앞에 붙는, 화면에는 보이지 않는 표식입니다. Excel 호환을 위해 <code>utf-8-sig</code> 로 바꾸면 헤더 첫 컬럼명이 <code>﻿id</code> 가 되어 자기 파일을 다시 읽지 못합니다.</p>
 <p><strong>읽기와 쓰기의 인코딩이 일부러 다릅니다.</strong></p>
 <p>budget_app/storage/config.py:39-40</p>
 <div class="codehilite"><pre><span></span><code><span class="n">CSV_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
 <span class="n">CSV_READ_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;utf-8-sig&quot;</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>⚙️ 내부 동작 — <code>utf-8-sig</code> 는 <code>utf-8</code> 과 다른 코덱입니다.</strong> BOM(Byte Order Mark)은 UTF-8 로 인코딩된 U+FEFF, 즉 바이트 <code>EF BB BF</code> 입니다. <code>utf-8</code> 코덱은 그것을 <strong>평범한 문자 하나</strong>로 디코딩해 문자열 맨 앞에 <code>﻿</code> 를 남기고, <code>utf-8-sig</code> 코덱은 <strong>읽을 때 앞의 BOM 을 먹어 치우고</strong>(없으면 그냥 넘어감) 쓸 때는 <strong>BOM 을 앞에 붙입니다.</strong> 이 비대칭 정책이 막는 것이 정확히 무엇인지 로컬에서 확인했습니다.</p>
-<p>```python</p>
-<blockquote>
-<blockquote>
-<blockquote>
-<h1 id="엑셀이-저장한-csv-bom-있음">엑셀이 저장한 CSV (BOM 있음)</h1>
-<p>list(csv.DictReader(open("bom.csv", encoding="utf-8", newline="")))[0]
-{'﻿id': 'TX-000001', 'date': '2024-01-05'}     # ← 컬럼명이 'id' 가 아니다!
-list(csv.DictReader(open("bom.csv", encoding="utf-8-sig", newline="")))[0]
-{'id': 'TX-000001', 'date': '2024-01-05'}           # ← 정상
-open("out.csv","w",encoding="utf-8-sig").write("id,date\n")
-open("out.csv","rb").read()
-b'\xef\xbb\xbfid,date\n'                            # ← 쓰면 BOM 이 붙는다
-```</p>
-</blockquote>
-</blockquote>
-</blockquote>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>utf-8-sig</code> 는 <code>utf-8</code> 과 다른 코덱입니다.</strong> BOM(Byte Order Mark)은 UTF-8 로 인코딩된 U+FEFF, 즉 바이트 <code>EF BB BF</code> 입니다. <code>utf-8</code> 코덱은 그것을 <strong>평범한 문자 하나</strong>로 디코딩해 문자열 맨 앞에 <code>﻿</code> 를 남기고, <code>utf-8-sig</code> 코덱은 <strong>읽을 때 앞의 BOM 을 먹어 치우고</strong>(없으면 그냥 넘어감) 쓸 때는 <strong>BOM 을 앞에 붙입니다.</strong> 이 비대칭 정책이 막는 것이 정확히 무엇인지 로컬에서 확인했습니다.</p>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="c1"># 엑셀이 저장한 CSV (BOM 있음)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;bom.csv&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span>
+<span class="p">{</span><span class="s1">&#39;﻿id&#39;</span><span class="p">:</span> <span class="s1">&#39;TX-000001&#39;</span><span class="p">,</span> <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="s1">&#39;2024-01-05&#39;</span><span class="p">}</span>     <span class="c1"># ← 컬럼명이 &#39;id&#39; 가 아니다!</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;bom.csv&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8-sig&quot;</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span>
+<span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="s1">&#39;TX-000001&#39;</span><span class="p">,</span> <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="s1">&#39;2024-01-05&#39;</span><span class="p">}</span>           <span class="c1"># ← 정상</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;out.csv&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8-sig&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;id,date</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;out.csv&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xef\xbb\xbf</span><span class="s1">id,date</span><span class="se">\n</span><span class="s1">&#39;</span>                            <span class="c1"># ← 쓰면 BOM 이 붙는다</span>
+</code></pre></div>
+
 <p>헤더 검증(<code>_check_header</code>)은 <code>"id" in names</code> 같은 <strong>문자열 일치</strong>로 판정하므로, 컬럼명 하나가 <code>'﻿id'</code> 가 되는 순간 <code>id</code> 컬럼이 "없는" 것이 됩니다. 그래서 <strong>읽기는 <code>utf-8-sig</code> 로 관대하게</strong>(엑셀 CSV 를 받아 주고), <strong>쓰기는 <code>utf-8</code> 로 엄격하게</strong>(우리가 만든 파일에는 BOM 을 넣지 않아 왕복이 항상 성립하게) — 방향마다 다른 정책이 정답입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong><code>txs</code> 가 제너레이터여도 동작합니다.</strong> 서비스가 이렇게 넘깁니다.</p>
@@ -1187,6 +1235,7 @@ b'\xef\xbb\xbfid,date\n'                            # ← 쓰면 BOM 이 붙는�
 <p><code>(tx for tx in ...)</code> 는 제너레이터 식이라 <strong>필터를 통과한 거래가 메모리에 모이지 않습니다.</strong> 100만 건을 내보내도 메모리는 일정합니다.</p>
 <hr>
 <h2 id="9-backup_data_dir-서비스에서-저장소로">9. <code>backup_data_dir</code> — 서비스에서 저장소로</h2>
+<p>백업은 데이터 폴더의 파일들을 시각이 찍힌 새 폴더로 복사하는 일입니다. 내용을 해석하지 않고 바이트를 그대로 옮기므로 도메인 판단이 한 줄도 없습니다. 그래서 서비스가 아니라 이 계층에 있습니다.</p>
 <p>budget_app/storage/backup.py:17-33</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">backup_data_dir</span><span class="p">(</span><span class="n">data_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;data 폴더의 모든 ``*.jsonl`` 을 타임스탬프 폴더로 복사한다.</span>
@@ -1208,14 +1257,12 @@ b'\xef\xbb\xbfid,date\n'                            # ← 쓰면 BOM 이 붙는�
 <li><strong>위치</strong> — <code>services.py</code> → <code>storage/backup.py</code>. 도메인 판단이 전혀 없는 파일 복사입니다.</li>
 <li><strong><code>now</code> 주입</strong> — 기본은 현재 시각이지만 테스트에서 고정할 수 있습니다.</li>
 </ol>
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>now: datetime | None = None</code> 뒤에서 <code>(now or datetime.now())</code> 로 푸는 것은 <strong>가변/비순수 기본값을 피하는 관용구</strong>입니다. <code>def backup(..., now=datetime.now())</code> 라고 썼다면 기본값이 <strong>모듈을 import 한 순간에 한 번만</strong> 평가되어, 프로그램이 얼마나 오래 돌든 항상 같은 타임스탬프가 나옵니다. 파이썬의 기본 인자는 호출 때가 아니라 <strong>함수 정의 때</strong> 평가되기 때문입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>datetime.now()</code> 는 tzinfo 가 없는 <strong>naive</strong> 시각(로컬 시간)이라 백업 폴더 이름도 로컬 시간 기준입니다. <code>strftime("%Y%m%d_%H%M%S")</code> 은 C 표준 라이브러리의 <code>strftime</code> 으로 내려가며 초 단위까지만 찍으므로, 같은 초에 두 번 실행하거나 서머타임으로 시각이 되돌아가면 <strong>이름이 겹칠 수 있습니다</strong> — 그것을 바로 아래의 <code>exist_ok=False</code> 가 잡아 줍니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>now: datetime | None = None</code> 뒤에서 <code>(now or datetime.now())</code> 로 푸는 것은 <strong>가변/비순수 기본값을 피하는 관용구</strong>입니다. <code>def backup(..., now=datetime.now())</code> 라고 썼다면 기본값이 <strong>모듈을 import 한 순간에 한 번만</strong> 평가되어, 프로그램이 얼마나 오래 돌든 항상 같은 타임스탬프가 나옵니다. 파이썬의 기본 인자는 호출 때가 아니라 <strong>함수 정의 때</strong> 평가되기 때문입니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>datetime.now()</code> 는 tzinfo 가 없는 <strong>naive</strong> 시각(로컬 시간)이라 백업 폴더 이름도 로컬 시간 기준입니다. <code>strftime("%Y%m%d_%H%M%S")</code> 은 C 표준 라이브러리의 <code>strftime</code> 으로 내려가며 초 단위까지만 찍으므로, 같은 초에 두 번 실행하거나 서머타임으로 시각이 되돌아가면 <strong>이름이 겹칠 수 있습니다</strong> — 그것을 바로 아래의 <code>exist_ok=False</code> 가 잡아 줍니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <p><strong><code>exist_ok=False</code> 가 의도적</strong>이라는 점도 다시 짚습니다. 타임스탬프 폴더가 이미 있다면 같은 초에 백업이 두 번 실행된 비정상 상황이므로 <strong>일부러 오류를 냅니다</strong>. <code>exist_ok=True</code> 였다면 기존 백업을 조용히 덮어썼을 것입니다.</p>
 <p><strong><code>write_bytes(read_bytes())</code></strong> 는 바이너리 복사입니다. 백업은 내용 해석이 아니라 복제가 목적이므로 인코딩·줄바꿈 변환을 거치지 않아야 정확합니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>Path.read_bytes()</code> 는 <code>with self.open("rb") as f: return f.read()</code>, <code>Path.write_bytes(b)</code> 는 <code>with self.open("wb") as f: return f.write(b)</code> 와 같습니다. 텍스트 층(<code>TextIOWrapper</code>)이 아예 끼지 않으므로 <strong>인코딩도 개행 변환도 일어나지 않고</strong>, <code>surrogateescape</code> 로 보존한 손상 줄의 바이트까지 그대로 복제됩니다. 다만 파일 전체를 메모리에 올리므로 대용량에는 <code>shutil.copyfile</code> 이 맞습니다 — 가계부 JSONL 규모에서는 문제가 되지 않는 선택입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>Path.read_bytes()</code> 는 <code>with self.open("rb") as f: return f.read()</code>, <code>Path.write_bytes(b)</code> 는 <code>with self.open("wb") as f: return f.write(b)</code> 와 같습니다. 텍스트 층(<code>TextIOWrapper</code>)이 아예 끼지 않으므로 <strong>인코딩도 개행 변환도 일어나지 않고</strong>, <code>surrogateescape</code> 로 보존한 손상 줄의 바이트까지 그대로 복제됩니다. 다만 파일 전체를 메모리에 올리므로 대용량에는 <code>shutil.copyfile</code> 이 맞습니다 — 가계부 JSONL 규모에서는 문제가 되지 않는 선택입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong>복사 대상은 <code>*.jsonl</code> 만이 아닙니다.</strong></p>
 <p>budget_app/storage/backup.py:43-47</p>
@@ -1227,11 +1274,14 @@ b'\xef\xbb\xbfid,date\n'                            # ← 쓰면 BOM 이 붙는�
 </code></pre></div>
 
 <p><code>BACKUP_EXTRA_FILES = (ID_COUNTER_FILE_NAME,)</code> 이라 <strong>확장자 없는 <code>id_counter</code> 도 함께</strong> 복사됩니다. 빠뜨리면 백업을 복원했을 때 "발급한 적 있는 번호" 기록이 사라져 §4.3 의 id 재사용 버그가 되살아납니다.</p>
-<blockquote>
-<p><strong>⚙️ 내부 동작</strong> — <code>Path.glob("*.jsonl")</code> 은 셸이 아니라 파이썬이 직접 하는 일입니다. 디렉터리를 <code>os.scandir</code> 로 훑으면서 각 이름을 패턴과 대조하는데, 패턴 문법은 <code>fnmatch</code> 계열(<code>*</code>, <code>?</code>, <code>[...]</code>)이라 정규식이 아닙니다. 그래서 <code>*.jsonl</code> 은 <strong>확장자가 없는 파일을 절대 잡지 못하고</strong>, 위 코드처럼 따로 이어 붙여야 합니다. 이 함수 자체도 <code>yield from</code> 을 쓴 제너레이터라 호출자의 <code>for</code> 가 돌 때 비로소 디렉터리를 읽습니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>Path.glob("*.jsonl")</code> 은 셸이 아니라 파이썬이 직접 하는 일입니다. 디렉터리를 <code>os.scandir</code> 로 훑으면서 각 이름을 패턴과 대조하는데, 패턴 문법은 <code>fnmatch</code> 계열(<code>*</code>, <code>?</code>, <code>[...]</code>)이라 정규식이 아닙니다. 그래서 <code>*.jsonl</code> 은 <strong>확장자가 없는 파일을 절대 잡지 못하고</strong>, 위 코드처럼 따로 이어 붙여야 합니다. 이 함수 자체도 <code>yield from</code> 을 쓴 제너레이터라 호출자의 <code>for</code> 가 돌 때 비로소 디렉터리를 읽습니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <hr>
 <h2 id="9-unitofwork-여러-파일을-한-단위로-커밋">9. <code>UnitOfWork</code> — 여러 파일을 한 단위로 커밋</h2>
+<p>여기까지는 파일 하나를 안전하게 바꾸는 이야기였습니다. 이 절은 파일 <strong>둘</strong>을 함께 바꿔야 할 때의 이야기입니다. 하나는 바뀌고 하나는 안 바뀐 상태를 어떻게 줄이는가 — 그리고 그 상태를 완전히 없애지는 못한다는 사실을 어떻게 정직하게 적는가입니다. 준비(임시 파일 작성)와 커밋(실제 반영), 롤백(준비한 것을 되돌리기)이라는 세 낱말이 이 절의 뼈대입니다.</p>
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 서류 두 장을 함께 갈아 끼워야 하는 상황입니다. 두 장을 각각 새로 써 두었다가, 다 준비된 뒤에 마지막에 연달아 갈아 끼웁니다. 시간이 오래 걸리는 것은 새로 쓰는 쪽이고 그동안 원본 두 장은 그대로이므로, 도중에 그만두면 새로 쓰던 종이만 버리면 됩니다.
+다만 이 비유는 "연달아"와 "동시에"의 차이에서 깨집니다 — 첫 장을 갈아 끼운 직후 전원이 끊기면 한쪽만 바뀐 상태가 남습니다. 이 방식이 하는 일은 그 틈을 없애는 것이 아니라 밀리초 단위로 줄이는 것이고, §9.3 표의 마지막 줄이 그 한계입니다.</p>
+</blockquote>
 <h3 id="91-왜-필요한가">9.1 왜 필요한가</h3>
 <p>가져오기 커밋은 파일 <strong>둘</strong>을 바꿉니다. 두 쓰기 사이에 프로세스가 죽으면 <strong>카테고리만 늘어난 고아 상태</strong>가 남습니다. <code>--atomic</code> 이 "전부 반영 또는 전혀 반영 안 됨"을 약속하는데, 그 약속이 파일 하나 안에서만 지켜지고 있었습니다.</p>
 <h3 id="92-쓰기를-준비와-커밋으로-나누기">9.2 쓰기를 준비와 커밋으로 나누기</h3>
@@ -1313,21 +1363,21 @@ b'\xef\xbb\xbfid,date\n'                            # ← 쓰면 BOM 이 붙는�
             <span class="bp">self</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
 </code></pre></div>
 
-<blockquote>
-<p><strong>🔎 문법의 출처</strong> — <code>with</code> 문(PEP 343, 파이썬 2.5)이 요구하는 것은 <code>__enter__</code>/<code>__exit__</code> 두 메서드뿐입니다. <code>with UnitOfWork() as uow:</code> 는 대략 이렇게 풀립니다.</p>
-<p><code>python
-_mgr = UnitOfWork()
-uow = _mgr.__enter__()            # ← as 뒤의 이름은 __enter__ 의 반환값이다
-try:
-    ...본문...
-except BaseException as e:
-    if not _mgr.__exit__(type(e), e, e.__traceback__):
-        raise                     # ← __exit__ 이 참을 돌려주지 않으면 예외가 계속 간다
-else:
-    _mgr.__exit__(None, None, None)</code></p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>with</code> 문(PEP 343, 파이썬 2.5)이 요구하는 것은 <code>__enter__</code>/<code>__exit__</code> 두 메서드뿐입니다. <code>with UnitOfWork() as uow:</code> 는 대략 이렇게 풀립니다.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">_mgr</span> <span class="o">=</span> <span class="n">UnitOfWork</span><span class="p">()</span>
+<span class="n">uow</span> <span class="o">=</span> <span class="n">_mgr</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">()</span>            <span class="c1"># ← as 뒤의 이름은 __enter__ 의 반환값이다</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="o">...</span><span class="n">본문</span><span class="o">...</span>
+<span class="k">except</span> <span class="ne">BaseException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_mgr</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="n">e</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">__traceback__</span><span class="p">):</span>
+        <span class="k">raise</span>                     <span class="c1"># ← __exit__ 이 참을 돌려주지 않으면 예외가 계속 간다</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">_mgr</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
 <p>여기서 두 가지가 중요합니다. (1) <code>__exit__</code> 의 세 인자가 정확히 <code>(예외 타입, 예외 객체, 트레이스백)</code> 이라 <strong>"정상 종료인가"를 <code>exc_type is None</code> 으로 판정</strong>할 수 있습니다. (2) 이 <code>__exit__</code> 은 아무것도 <code>return</code> 하지 않으므로 <code>None</code>(거짓)을 돌려주고, 따라서 <strong>예외를 삼키지 않고 그대로 올려보냅니다</strong> — 롤백은 하되 실패를 감추지는 않겠다는 뜻입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>🔎 문법의 출처</strong> — <code>def __enter__(self) -&gt; UnitOfWork:</code> 에서 <strong>아직 정의가 끝나지 않은 클래스 이름</strong>을 반환 타입으로 쓸 수 있는 것은 파일 첫 줄의 <code>from __future__ import annotations</code>(PEP 563) 덕분입니다. 이 스위치가 켜지면 어노테이션이 평가되지 않고 <strong>문자열로만 저장</strong>되므로 전방 참조가 자유롭습니다. 그것이 없던 시절에는 <code>-&gt; "UnitOfWork"</code> 처럼 따옴표를 직접 붙였는데, <strong>이 소스에는 따옴표 어노테이션이 한 곳도 없습니다.</strong> 세 번째 인자의 <code>TracebackType</code> 은 <code>types</code> 모듈에서 가져옵니다 — 트레이스백 객체는 파이썬 문법으로 만들 수 없는 내장 타입이라 이름을 얻으려면 그 모듈이 필요합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
-<p><strong>⚙️ 내부 동작</strong> — <code>tmp.unlink(missing_ok=True)</code> 의 <code>missing_ok</code> 는 파이썬 3.8 에 추가된 인자로, 내부적으로 <code>os.unlink</code> 를 부르고 <code>FileNotFoundError</code> 만 삼킵니다(다른 <code>OSError</code> 는 통과시킵니다). 그래서 바깥의 <code>except OSError</code> 가 잡는 것은 "없어서"가 아니라 <strong>권한 문제나 Windows 의 파일 잠금</strong> 같은 진짜 실패입니다. 그 경우에도 원본은 손대지 않았으므로 <code>.tmp</code> 찌꺼기만 남고, 다음 실행이 같은 이름으로 덮어씁니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>def __enter__(self) -&gt; UnitOfWork:</code> 에서 <strong>아직 정의가 끝나지 않은 클래스 이름</strong>을 반환 타입으로 쓸 수 있는 것은 파일 첫 줄의 <code>from __future__ import annotations</code>(PEP 563) 덕분입니다. 이 스위치가 켜지면 어노테이션이 평가되지 않고 <strong>문자열로만 저장</strong>되므로 전방 참조가 자유롭습니다. 그것이 없던 시절에는 <code>-&gt; "UnitOfWork"</code> 처럼 따옴표를 직접 붙였는데, <strong>이 소스에는 따옴표 어노테이션이 한 곳도 없습니다.</strong> 세 번째 인자의 <code>TracebackType</code> 은 <code>types</code> 모듈에서 가져옵니다 — 트레이스백 객체는 파이썬 문법으로 만들 수 없는 내장 타입이라 이름을 얻으려면 그 모듈이 필요합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>tmp.unlink(missing_ok=True)</code> 의 <code>missing_ok</code> 는 파이썬 3.8 에 추가된 인자로, 내부적으로 <code>os.unlink</code> 를 부르고 <code>FileNotFoundError</code> 만 삼킵니다(다른 <code>OSError</code> 는 통과시킵니다). 그래서 바깥의 <code>except OSError</code> 가 잡는 것은 "없어서"가 아니라 <strong>권한 문제나 Windows 의 파일 잠금</strong> 같은 진짜 실패입니다. 그 경우에도 원본은 손대지 않았으므로 <code>.tmp</code> 찌꺼기만 남고, 다음 실행이 같은 이름으로 덮어씁니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong><code>commit</code> 이 <code>except OSError</code> 로 감싸여 있는 것도 이론적 대비가 아닙니다.</strong> §3.6 의 노트에서 본 대로, <strong>Windows 에서는 대상 파일을 누군가 열고 있으면 <code>os.replace</code> 가 <code>PermissionError</code>(= <code>OSError</code> 의 하위 클래스)로 실패</strong>합니다. 첫 rename 은 성공하고 두 번째가 이렇게 실패하는 상황이 실제로 일어나므로, 코드는 (1) 어디까지 반영됐는지 로그로 남기고 (2) 남은 <code>.tmp</code> 를 치우고 (3) 예외를 그대로 올립니다. <code>self._staged.pop(0)</code> 을 <strong>성공한 뒤에</strong> 하는 것이 그 3단계를 가능하게 하는 장치입니다 — 목록에 남아 있는 것이 곧 "아직 반영되지 않은 것"이 됩니다.</p>
 <h3 id="93-무엇을-보장하고-무엇을-보장하지-않나">9.3 무엇을 보장하고 무엇을 보장하지 않나</h3>
@@ -1368,6 +1418,7 @@ $ python -m budget_app import --from bad.csv --atomic --data-dir ./d
 
 <hr>
 <h2 id="10-정리-과제-방어용-요약">10. 정리 — 과제 방어용 요약</h2>
+<p>구술로 받을 법한 질문과 답을 모았습니다. 앞의 절에서 다룬 것을 한 문단씩으로 줄인 것이라, 시간이 없으면 여기부터 읽고 궁금한 절로 되짚어 가도 됩니다.</p>
 <p><strong>Q. 파일 기반 update/delete 를 어떻게 안전하게 처리했나요?</strong></p>
 <p>임시 파일에 전부 쓰고 <code>flush</code> + <code>fsync</code> 로 디스크에 내린 뒤 <code>os.replace</code> 로 이름을 교체합니다. <code>os.replace</code> 는 같은 파일시스템에서 원자적이라 "교체 전" 아니면 "교체 후"만 존재합니다. 쓰는 도중 프로세스가 죽어도 원본은 무사하고 <code>.tmp</code> 찌꺼기만 남습니다.</p>
 <p><strong>Q. 데이터가 깨지면 어떻게 되나요?</strong></p>
@@ -1377,13 +1428,13 @@ $ python -m budget_app import --from bad.csv --atomic --data-dir ./d
 <p><strong>Q. 제너레이터로 스트리밍한 방식과 그 이점은?</strong></p>
 <p><code>iter_raw()</code> 와 <code>stream()</code> 이 <code>yield</code> 기반이라 한 번에 한 줄만 메모리에 둡니다. <code>stream()</code> 은 자기 파일을 열지 않고 <code>iter_raw()</code> 를 소비하는 <strong>층층이 쌓은</strong> 구조입니다. 조기 종료가 가능한 소비자(<code>any()</code> 를 쓰는 <code>category_in_use</code>)는 파일 뒷부분을 아예 읽지 않고, 내보내기는 제너레이터 식을 그대로 CSV writer 에 넘겨 100만 건을 내보내도 메모리가 일정합니다.</p>
 <p><strong>Q. 세 저장소의 공통 코드는 어떻게 정리했나요?</strong></p>
-<p><code>JsonlStore(Generic[T])</code> 에 "JSONL 파일을 다루는 법"(열기·스트리밍·원자적 재작성·추가)을 두고, 하위 클래스는 엔티티 고유의 것만 갖습니다 — <code>TransactionRepository</code> 는 ID 발급과 카테고리 재지정, <code>CategoryStore</code> 는 이름 중복과 기본값 시딩, <code>BudgetStore</code> 는 "같은 달은 덮어쓰기". 한 줄을 세우는 것은 <code>self.entity_cls.from_dict(data)</code> 인데, 세 dataclass 가 같은 이름의 classmethod 를 갖고 있어서 가능한 덕 타이핑입니다.</p>
+<p><code>JsonlStore(Generic[T])</code> 에 "JSONL 파일을 다루는 법"(열기·스트리밍·원자적 재작성·추가)을 두고, 하위 클래스는 엔티티 고유의 것만 갖습니다 — <code>TransactionRepository</code> 는 ID 발급과 카테고리 재지정, <code>CategoryStore</code> 는 이름 중복과 기본값 시딩, <code>BudgetStore</code> 는 "같은 달은 덮어쓰기". 한 줄을 세우는 것은 <code>self.entity_cls.from_dict(data)</code> 인데, 세 dataclass 가 같은 이름의 classmethod 를 갖고 있어서 가능한 덕 타이핑(무슨 타입이라고 선언했는지가 아니라 필요한 것을 실제로 갖고 있는지로 판정하는 방식)입니다.</p>
 <p><strong>Q. CSV 처리는 왜 별도 모듈인가요?</strong></p>
 <p>리팩터 전에는 JSONL I/O 는 저장소, CSV I/O 는 서비스에 있어 규칙이 일관되지 않았습니다. 지금은 파일을 여는 코드가 전부 저장소 계층에 있습니다. 또 <code>csv_io</code> 는 <strong>정책을 모릅니다</strong> — 중복 id 를 어떻게 처리할지는 서비스가 정하고, 어댑터는 <code>ParsedRow</code>(id 가 아직 비어 있을 수 있는 값)까지만 만듭니다.</p>
 <hr>
 <p><strong>다음 문서</strong>: <a href="08-services.html">08. 서비스 계층</a> — 이 저장소들을 조합해 정책을 구현하는 곳.</p>
 <div class="pager"><span><a href="06-decorators.html">← 06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></span><span><a href="08-services.html">08. 서비스 계층 — `services/` 패키지 →</a></span></div>
-<footer>docs/07-repository.md 에서 자동 생성됨 (2026-08-14 00:56) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/07-repository.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>
