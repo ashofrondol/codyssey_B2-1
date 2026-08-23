@@ -144,7 +144,7 @@
 
 | 목적 | 예 | `frozen` |
 |---|---|---|
-| 저장 엔티티 | `Transaction`, `Budget`, `Category` | 아니오 (`__post_init__` 이 덮어씀) |
+| 저장 엔티티 | `Transaction`, `Budget`, `Category` | 예 (`__post_init__` 은 대입 대신 `object.__setattr__` 로 정규화) |
 | 변경 요청 | `TransactionPatch` | 예 |
 | 질의 조건 | `SearchFilter` | 아니오 |
 | 계산 결과 | `MonthlySummary`, `ImportReport`, `RawLine`, `ParsedRow` | 예 |

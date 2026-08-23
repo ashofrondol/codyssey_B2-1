@@ -170,7 +170,7 @@ from . import config, messages, output, presenter, prompts
 
 설계 의도: 프로젝트 내부 참조를 전부 상대 임포트로 통일하면, 나중에 패키지 이름이 바뀌어도 내부 코드는 한 줄도 고칠 필요가 없습니다. 반면 표준 라이브러리(`import sys`, `import csv` 등)는 절대 임포트로 씁니다.
 
-> **import 문을 읽으면 계층이 보입니다.** `cli.py` 는 11개 모듈을 가져오지만 `errors.py` 는 하나도 가져오지 않습니다. "위 계층이 아래를 알고, 아래는 위를 모른다"가 import 목록에 그대로 드러납니다([04 §2](./04-architecture.md)).
+> **import 문을 읽으면 계층이 보입니다.** `cli/app.py` 는 11개 모듈을 가져오지만 `errors.py` 는 하나도 가져오지 않습니다. "위 계층이 아래를 알고, 아래는 위를 모른다"가 import 목록에 그대로 드러납니다([04 §2](./04-architecture.md)).
 
 ---
 
@@ -303,7 +303,7 @@ budget_app/services/importexport.py:88-94
 
 `import_csv(path, True)` 는 **문법 오류가 아니라 TypeError** 로 거부되고, 반드시 `import_csv(path, atomic=True)` 로 써야 합니다. 실제 호출부도 그렇게 되어 있습니다.
 
-budget_app/services/importexport.py:166-177
+budget_app/services/importexport.py:168-179
 ```python
     def _commit(self, batch: _Batch, *, atomic: bool) -> ImportReport:
         """준비된 것을 파일에 반영한다 — 여기서 처음 파일이 바뀐다."""
@@ -450,7 +450,7 @@ budget_app/cli/prompts.py:106
             + messages.FMT_AVAILABLE_SUFFIX.format(available=", ".join(cat_service.list_names()))
 ```
 
-> **`startswith` 는 어디로 갔나요?** 리팩터(겉으로 하는 일은 그대로 두고 코드 구조만 다시 짜는 작업) 전에는 월별 집계가 `tx.date.startswith(target + "-")` 로 "이 달의 거래인가"를 판정했습니다. 지금은 `SearchFilter.for_month` 가 `calendar` 로 계산한 실제 말일 범위와 비교합니다(domain/queries.py:74-78). 문자열 접두 비교가 틀린 것은 아니었지만, **내보내기는 범위 비교, 요약은 접두 비교**로 같은 개념이 두 알고리즘으로 구현돼 있었던 것이 문제였습니다([04 §5](./04-architecture.md)).
+> **`startswith` 는 어디로 갔나요?** 리팩터(겉으로 하는 일은 그대로 두고 코드 구조만 다시 짜는 작업) 전에는 월별 집계가 `tx.date.startswith(target + "-")` 로 "이 달의 거래인가"를 판정했습니다. 지금은 `SearchFilter.for_month` 가 `calendar` 로 계산한 실제 말일 범위와 비교합니다(domain/queries.py:75-79). 문자열 접두 비교가 틀린 것은 아니었지만, **내보내기는 범위 비교, 요약은 접두 비교**로 같은 개념이 두 알고리즘으로 구현돼 있었던 것이 문제였습니다([04 §5](./04-architecture.md)).
 
 ### 4.2 왜 포맷 방식이 3가지나 쓰였는가
 
@@ -738,7 +738,7 @@ budget_app/domain/entities.py:144-151
 
 가져오기에서는 두 자료구조를 나란히 씁니다.
 
-budget_app/services/importexport.py:126-129
+budget_app/services/importexport.py:128-131
 ```python
             batch.transactions.append(parsed.to_transaction(tx_id))
             if parsed.category not in known_categories:
@@ -836,7 +836,7 @@ budget_app/services/budgets.py:56-58
 
 - `per_category.items()` 는 `("food", 50000)` 같은 (카테고리, 금액) 튜플들입니다.
 - `key=lambda kv: kv[1]` — 정렬 기준을 "튜플의 두 번째 값(금액)"으로 지정합니다. `lambda` 는 이름 없는 한 줄짜리 함수입니다. `reverse=True` 로 큰 금액부터 내림차순.
-- `[: max(0, top_n)]` — 앞에서 N 개만 자르는 **슬라이싱**입니다. `max(0, ...)` 방어가 중요합니다: 사용자가 `--top -3` 처럼 음수를 넣으면 `[:-3]` 은 "뒤 3개 제외"라는 전혀 다른 의미가 되는데, `max(0, -3)` → `[:0]` → 빈 리스트로 만들어 그 오동작을 차단합니다.
+- `[: max(0, top_n)]` — 앞에서 N 개만 자르는 **슬라이싱**입니다. `max(0, ...)` 방어가 중요합니다: 음수가 들어오면 `[:-3]` 은 "뒤 3개 제외"라는 전혀 다른 의미가 되는데, `max(0, -3)` → `[:0]` → 빈 리스트로 만들어 그 오동작을 차단합니다. 다만 CLI 로 들어오는 값은 여기까지 오지 못합니다 — `--top` 은 `type=positive_int`(cli/parser.py:141)라 `--top=-3` 은 파서가 `argument --top: 1 이상이어야 합니다: -3` 으로 거절하고 종료 코드 2 로 끝납니다. 즉 `max(0, top_n)` 은 서비스를 직접 부르는 경로(테스트·다른 진입점)를 위한 이중 방어입니다.
 - 바깥의 `tuple(...)` — 결과를 불변 튜플로 굳힙니다. `MonthlySummary` 가 `frozen=True` dataclass 라 담기는 값도 불변인 편이 일관됩니다.
 
 참고로 `items.sort(key=lambda t: (t.date, t.id), reverse=True)`(services/transactions.py:86)는 **튜플을 key 로** 써서 "날짜가 같으면 id 로" 2차 정렬하는 기법입니다(튜플은 앞 원소부터 차례로 비교됨).
@@ -898,7 +898,7 @@ def parse_amount(value: Any) -> int:
     return n
 ```
 
-`int("abc")` 는 ValueError, `int(None)` 은 TypeError — 원인은 달라도 사용자에게는 똑같이 "금액은 정수여야 합니다"이므로 함께 잡습니다.
+리팩터 전에는 여기에 `try: int(text)` / `except (ValueError, TypeError):` 가 있었습니다 — `int("abc")` 는 ValueError, `int(None)` 은 TypeError 로 원인은 달라도 사용자에게는 똑같이 "금액은 정수여야 합니다"이므로 튜플로 함께 잡았습니다. 지금은 정규식 `_INTEGER` 로 먼저 걸러 내고 `ValidationError` 를 직접 던지므로, 이 함수에는 `try`/`except` 가 한 줄도 없습니다. 튜플로 묶어 잡는 실제 사용처는 바로 아래의 `_LINE_ERRORS`(storage/jsonl.py:188)와 cli/output.py:62, services/importexport.py:114 입니다.
 
 **예외 튜플을 상수로 뽑는 기법**도 있습니다. 저장 파일의 한 줄을 도메인 객체로 세울 때 날 수 있는 예외들이 여러 개라, 이름과 주석을 붙여 한곳에 모았습니다.
 
@@ -1051,7 +1051,7 @@ def stage_lines(path: Path, lines: Iterable[str]) -> Path:
 >
 > 파이썬도 이것을 함정으로 인정해서, PEP 597 로 **파이썬 3.10** 부터 `EncodingWarning` 을 도입했습니다. `python -X warn_default_encoding` 으로 실행하면 인코딩을 생략한 `open` 마다 경고가 찍힙니다(실측: `EncodingWarning: 'encoding' argument not specified`). 이 프로젝트가 모든 `open` 에 `encoding=` 을 붙여 둔 것은 그 경고를 미리 통과한 상태라는 뜻입니다. → [12 §3](./12-syntax-and-stdlib.md)
 
-이 프로젝트의 **모든** `open` 호출은 인코딩을 명시하며, 값 자체도 상수입니다.
+이 프로젝트의 **텍스트 모드** `open` 호출은 모두 인코딩을 명시하며(바이너리 `"rb"` 는 애초에 `encoding` 을 받지 않으므로 해당 없음), 값 자체도 상수입니다.
 
 budget_app/storage/config.py:22-22
 ```python
@@ -1250,7 +1250,7 @@ budget_app/storage/jsonl.py:156-158
 >     p.with_suffix(".tmp")             # a.b.tmp       ← .jsonl 이 사라졌다! (틀린 사용)
 >     p.with_suffix(p.suffix + ".tmp")  # a.b.jsonl.tmp ← 소스의 방식 (원본 이름이 살아 있다)
 >
-> 왼쪽 방식으로 썼다면 `transactions.jsonl` 의 임시 파일이 `transactions.tmp` 가 되는데, 이름이 다르면 `os.replace` 로 되돌아갈 원본을 짐작할 수 없고, 실패로 남은 찌꺼기가 어느 파일의 것인지도 알 수 없습니다. `.jsonl.tmp` 라는 이름은 **"이건 transactions.jsonl 을 쓰다 만 것"** 이라는 정보를 파일 이름에 남기는 선택이며, 동시에 `*.jsonl` 글롭에 걸리지 않아 백업 대상에서 자동으로 빠집니다(storage/backup.py:36-47). → [12 §2-B](./12-syntax-and-stdlib.md)
+> 왼쪽 방식으로 썼다면 `transactions.jsonl` 의 임시 파일이 `transactions.tmp` 가 되는데, 이름이 다르면 `os.replace` 로 되돌아갈 원본을 짐작할 수 없고, 실패로 남은 찌꺼기가 어느 파일의 것인지도 알 수 없습니다. `.jsonl.tmp` 라는 이름은 **"이건 transactions.jsonl 을 쓰다 만 것"** 이라는 정보를 파일 이름에 남기는 선택이며, 동시에 `*.jsonl` 글롭에도 걸리지 않고 추가 복사 목록(`BACKUP_EXTRA_FILES`)에도 없어 백업 대상에서 자동으로 빠집니다(storage/backup.py:36-47). → [12 §2-B](./12-syntax-and-stdlib.md)
 
 ### 9.5 `glob` / `read_bytes` / `write_bytes` — 백업 함수에 총집합
 
@@ -1271,10 +1271,10 @@ def backup_data_dir(data_dir: Path, now: datetime | None = None) -> Path:
     return dest
 ```
 
-- `src.glob("*.jsonl")` — 패턴에 맞는 파일들을 순회합니다. 데이터 폴더에 다른 파일이 섞여 있어도 `.jsonl` 만 백업됩니다.
+- `src.glob("*.jsonl")` — 패턴에 맞는 파일들을 순회합니다. 다만 백업 대상이 `.jsonl` 뿐인 것은 아닙니다 — `_files_to_copy`(storage/backup.py:36-47)가 glob 결과를 내준 뒤 `BACKUP_EXTRA_FILES`(= `id_counter`)도 이어서 내주므로, glob 에 걸리지 않지만 데이터인 `id_counter` 가 함께 복사됩니다. 이걸 빠뜨리면 복원 후 삭제된 id 재사용 버그가 되살아난다는 것이 소스 docstring 의 설명입니다.
 - `p.read_bytes()` / `write_bytes(...)` — 파일 전체를 **바이트 그대로** 읽고 씁니다. 백업은 내용 해석이 아니라 복제가 목적이므로, 텍스트 모드(인코딩/줄바꿈 변환)를 거치지 않는 바이너리 복사가 정확합니다.
 - `p.name` — 경로에서 파일 이름만 (`data/transactions.jsonl` → `transactions.jsonl`).
-- `now: Optional[datetime] = None` — **의존성 주입**(필요한 것을 안에서 직접 만들지 않고 밖에서 받아 쓰는 방식)의 가장 작은 형태입니다. 기본은 현재 시각이지만, 테스트에서 시각을 넘기면 결과 폴더 이름을 예측할 수 있습니다.
+- `now: datetime | None = None` — **의존성 주입**(필요한 것을 안에서 직접 만들지 않고 밖에서 받아 쓰는 방식)의 가장 작은 형태입니다. 기본은 현재 시각이지만, 테스트에서 시각을 넘기면 결과 폴더 이름을 예측할 수 있습니다.
 
 이 17줄 함수 하나에 `exists`, `/` 연산자, `mkdir`, `glob`, `read_bytes`/`write_bytes`, `name` 이 모두 등장하므로, pathlib 복습용으로 통째로 읽어 보기를 권합니다.
 
@@ -1308,7 +1308,7 @@ budget_app/storage/jsonl.py:193 (Iterator — 하나씩 꺼내 쓰는 반복자�
     def stream(self) -> Iterator[T]:
 ```
 
-budget_app/storage/repositories.py:53 (Tuple — 정확히 (int, 문자열 집합) 2개 묶음 반환)
+budget_app/storage/repositories.py:53 (Tuple — 정확히 (int, TransactionId 값 객체의 집합) 2개 묶음 반환)
 ```python
     def id_state(self) -> tuple[int, set[TransactionId]]:
 ```
@@ -1350,7 +1350,7 @@ def ask_until(prompt: str, validator: Callable[[str], T]) -> T:
 
 | 부류 | 개수 | 표기 |
 |---|---|---|
-| 리스트/딕셔너리/튜플/집합 | 43 | `list[str]`, `dict[str, Any]`, `tuple[int, ...]` … **기본 자료형** |
+| 리스트/딕셔너리/튜플/집합 | 42 | `list[str]`, `dict[str, Any]`, `tuple[int, ...]` … **기본 자료형** |
 | "X 이거나 None" | 45 | `X \| None` |
 | `Iterable` 17, `Callable` 12, `Iterator` 9, `Sequence` 4, `Generic` 1 | 43 | **기본 자료형에 대응물이 없다** — `collections.abc` / `typing` |
 
@@ -1611,7 +1611,7 @@ budget_app/storage/repositories.py:65-77
         return IdAllocator(start=max(max_n, self._watermark.read()), taken=taken)
 ```
 
-budget_app/domain/queries.py:77-78
+budget_app/domain/queries.py:78-79
 ```python
         start, end = month_range(month)
         return cls(date_from=start, date_to=end, **extra)
@@ -1654,10 +1654,10 @@ budget_app/cli/presenter.py:72-73
 | 포맷 스펙 미니 언어 (`{:06d}`·`{:<7}`·`{!r}`) | domain/config.py:26, cli/messages.py:43, domain/specs.py:182 |
 | 컴프리헨션 3종 + dict.get 누적 | storage/repositories.py:238·242, domain/entities.py:144-150, services/budgets.py:54 |
 | enumerate/any/sorted/슬라이싱/max | storage/jsonl.py:175, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:56-58, storage/repositories.py:53-63 |
-| try/except/finally/raise | domain/validators.py:40-70, storage/jsonl.py:181-191, decorators.py:50-66 |
+| try/except/finally/raise | domain/validators.py:95-100·109-114, storage/jsonl.py:181-191, decorators.py:50-66 |
 | open 모드/encoding/newline/with/fsync | storage/jsonl.py:48-72, 220-247, storage/csv_io.py:131-148 |
 | pathlib.Path 전반 | storage/backup.py:17-33, storage/jsonl.py:48-60, 150-158 |
 | 타입 힌트 | storage/jsonl.py:25-28·193·213, cli/prompts.py:60 |
-| or 단락 평가·조건 표현식·bool 관례·언패킹·yield from | domain/validators.py:74, storage/csv_io.py:113-123, storage/repositories.py:248-254, domain/queries.py:77, services/transactions.py:87 |
+| or 단락 평가·조건 표현식·bool 관례·언패킹·yield from | domain/validators.py:74, storage/csv_io.py:113-123, storage/repositories.py:248-254, domain/queries.py:78, services/transactions.py:87 |
 
 이 문서의 문법 요소들이 **왜 그 자리에 배치되었는지**(계층 구조)는 [04. 아키텍처](./04-architecture.md)에서, 예외 처리와 dataclass·제너레이터·데코레이터의 전체 그림은 [03. 파이썬 중·고급 기법](./03-python-advanced.md)에서 이어집니다.

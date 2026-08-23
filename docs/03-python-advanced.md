@@ -55,7 +55,7 @@ budget_app 코드에 실제로 등장하는 dataclass, 제네릭, 데코레이�
 
 ## 1. dataclass 완전 해설
 
-이 프로젝트는 dataclass 를 **네 가지 목적**으로 씁니다. 목적마다 옵션(`frozen`)과 구성이 달라지므로, 그 대응 관계를 아는 것이 이 장의 핵심입니다.
+이 프로젝트는 dataclass 를 **여섯 가지 목적**으로 씁니다. 목적마다 옵션(`frozen`)과 구성이 달라지므로, 그 대응 관계를 아는 것이 이 장의 핵심입니다.
 
 | 목적 | 예 | `frozen` | 특징 |
 |---|---|---|---|
@@ -395,7 +395,7 @@ budget_app/domain/queries.py:80-82
 > "인스턴스 `__dict__` → 클래스" 순서로 이름을 찾다가 클래스에서 디스크립터를 만나면
 > 값을 돌려주는 대신 `__get__` 을 호출합니다. 그래서 `summary.usage_pct` 라고 쓰면
 > 그 자리에서 함수가 실행됩니다 — **저장된 값이 아니라 매번 계산된 값**입니다.
-> `setter` 를 정의하지 않았으므로 셋 다 읽기 전용이고, 대입하면 `AttributeError` 입니다.
+> `setter` 를 정의하지 않았으므로 넷 다 읽기 전용이고, 대입하면 `AttributeError` 입니다.
 > → [12 §1-B](./12-syntax-and-stdlib.md)
 
 **실제 코드.**
@@ -539,7 +539,7 @@ budget_app/domain/entities.py:113-124
 |---|---|---|---|
 | 인스턴스 메서드 | `self` | 인스턴스 필드 + 클래스 | `tx.to_dict()`, `flt.matches(tx)` |
 | `@classmethod` | `cls` (클래스 자체) | 클래스(생성자 포함) | `Transaction.from_dict(d)`, `SearchFilter.for_month(m)` |
-| `@staticmethod` | 없음 | 둘 다 접근 불가 (그냥 함수) | **이 프로젝트에는 남아 있지 않습니다** |
+| `@staticmethod` | 없음 | 둘 다 접근 불가 (그냥 함수) | `TransactionRepository._scan_id`, `._as_id`(storage/repositories.py:39, 93) — 다만 **검증기** staticmethod 는 전부 모듈 함수로 내렸습니다(§2.2) |
 
 - **인스턴스 메서드**는 "이 객체의 데이터"가 필요할 때 씁니다.
 - **classmethod** 는 인스턴스가 아직 없는 상태에서 클래스 자체가 필요할 때, 특히 **대체 생성자(alternative constructor)** 를 만들 때 씁니다.
@@ -1004,12 +1004,15 @@ add = log_call(add)     # add 라는 이름이 이제 wrapper 를 가리킨다
 
 > **⚙️ 내부 동작 — 겹쳐 쓰면 순서는 아래에서 위로** — 데코레이터를 두 개 쌓으면
 > `f = A(B(f))` 로 풀립니다. **적용은 `def` 에 가장 가까운(아래) 것부터, 실행은 가장 바깥(위)
-> 것부터**입니다. *(일반론 예시 — 이 소스에는 겹쳐 쓴 자리가 없습니다. 서비스 메서드는
-> `@log_call` 셋(services/transactions.py:27, 52, 72)과 `@measure_time` 하나
-> (services/budgets.py:30)로 전부 단독 사용이고, `@handle_errors` 도 `cli/app.py:61` 의
-> `_dispatch` 한 곳에만 붙습니다.)* 그래서 이 프로젝트에서는 순서 문제를 고민할 필요가
-> 없는데, **그 자체가 설계 결과**입니다 — 관측과 오류 처리를 서로 다른 계층에 두었기
-> 때문에 한 함수에 둘이 겹칠 일이 생기지 않았습니다(§4.4).
+> 것부터**입니다. 이 소스에서 겹쳐 쓴 자리는 `TransactionId`(domain/tx_id.py:51-52)
+> 하나뿐인데, 그마저 `@dataclass` 가 먼저 돌아 `__eq__` 를 만들어야
+> `@functools.total_ordering` 이 나머지 비교 메서드를 채울 수 있으므로 **아래에서 위로**
+> 라는 규칙이 그대로 적용됩니다(§3.3). 커스텀 데코레이터 셋은 전부 단독 사용입니다 —
+> 서비스 메서드는 `@log_call` 셋(services/transactions.py:27, 52, 72)과 `@measure_time`
+> 하나(services/budgets.py:30)뿐이고, `@handle_errors` 도 `cli/app.py:61` 의
+> `_dispatch` 한 곳에만 붙습니다. 그래서 이 프로젝트에서는 **커스텀** 데코레이터끼리
+> 순서를 고민할 필요가 없는데, **그 자체가 설계 결과**입니다 — 관측과 오류 처리를 서로
+> 다른 계층에 두었기 때문에 한 함수에 둘이 겹칠 일이 생기지 않았습니다(§4.4).
 > → [12 §1-C](./12-syntax-and-stdlib.md)
 
 ### 4.3 `functools.wraps` 가 없으면 생기는 문제
@@ -1583,7 +1586,7 @@ TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'
 | `^TX-(\d+)$` | 문자열 전체 | `TransactionId.__post_init__`(domain/tx_id.py:83-89) 과 `.number`(121-124) | "이 값이 올바른 id 인가" 검증 + 번호 추출 |
 | `"id"\s*:\s*"(TX-\d+)"` | 부분 일치 | `TransactionId.scan`(domain/tx_id.py:109-117), 이것을 `TransactionRepository._scan_id`(storage/repositories.py:39-51)가 부름 | JSON 이 깨진 줄에서도 id 를 발굴 |
 
-세 상수 모두 `r"..."`(raw 문자열)인 것은 백슬래시를 파이썬이 아니라 `re` 에게 넘기기 위해서이고, `TX_ID_SCAN_PATTERN` 만 작은따옴표 `r'...'` 인 것은 패턴 **안에** 큰따옴표(`"id"`)가 들어 있기 때문입니다. 문자열 리터럴 표기는 [02 §4](./02-python-basics.md)에서 다룹니다.
+두 **정규식** 상수가 `r"..."`(raw 문자열)인 것은 백슬래시를 파이썬이 아니라 `re` 에게 넘기기 위해서이고(`TX_ID_FORMAT` 은 정규식이 아니라 `str.format` 템플릿이라 raw 가 아닙니다), `TX_ID_SCAN_PATTERN` 만 작은따옴표 `r'...'` 인 것은 패턴 **안에** 큰따옴표(`"id"`)가 들어 있기 때문입니다. 문자열 리터럴 표기는 [02 §4](./02-python-basics.md)에서 다룹니다.
 
 컴파일은 모듈 로드 시 한 번만 합니다.
 
@@ -1679,7 +1682,7 @@ LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"
 > `setup_logging` 한 곳에서만 붙일 수 있는 근거가 이것입니다.
 > → [12 §2-B](./12-syntax-and-stdlib.md)
 
-**%-지연 포맷팅.** [02 §4.2](./02-python-basics.md)에서 다룬 내용이 그대로 적용됩니다. `logger.debug(config.LOG_CALL, func.__name__)` 처럼 **템플릿과 인자를 분리해서** 넘기면 문자열 결합이 **그 로그가 실제로 출력될 때만** 수행됩니다.
+**%-지연 포맷팅.** [02 §4.2](./02-python-basics.md)에서 다룬 내용이 그대로 적용됩니다. `logger.debug(LOG_CALL, func.__name__)`(decorators.py:42) 처럼 **템플릿과 인자를 분리해서** 넘기면 문자열 결합이 **그 로그가 실제로 출력될 때만** 수행됩니다.
 
 > **⚙️ 내부 동작 — "출력될 때만"의 정확한 경로** — `logger.debug(msg, *args)` 는 가장 먼저
 > `self.isEnabledFor(DEBUG)` 를 확인하고, **거짓이면 그 자리에서 반환**합니다.
@@ -2080,9 +2083,9 @@ budget_app/domain/queries.py:57-72
         return specs.And(*parts) if parts else specs.Always()
 ```
 
-**얻은 것**: 조건 추가가 **클래스 하나 추가**가 되고 기존 코드는 그대로입니다. `list`/`search`/`summary`/`export` 넷이 `SearchFilter` 를 공유하므로 표현력이 한 번 늘면 네 명령이 동시에 강해집니다.
+**얻은 것**: 조건 추가가 **클래스 하나 추가**가 되고 기존 코드는 그대로입니다. `search`/`summary`/`export` 셋이 `SearchFilter` 를 공유하므로 표현력이 한 번 늘면 세 명령이 동시에 강해집니다.
 
-**Null Object 도 함께 들어왔습니다.** 조건이 하나도 없는 `list` 는 `Always()` 를 받아 `None` 검사 없이 같은 코드로 처리됩니다.
+**Null Object 도 함께 들어왔습니다.** 조건 옵션 없이 실행한 `search` 는 `SearchFilter()` 가 조건 0개로 만들어져 `Always()` 를 조립하므로, 명세 쪽에 `None` 분기가 필요 없습니다.
 
 ### 10.2 Unit of Work — 두 파일 쓰기 사이의 빈틈
 

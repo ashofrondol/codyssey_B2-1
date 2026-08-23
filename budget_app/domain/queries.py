@@ -1,8 +1,9 @@
 """질의 모델 — 거래를 어떻게 고를 것인가.
 
-``SearchFilter`` 는 ``list``/``search``/``summary``/``export`` 네 명령이 공유하는 단
-하나의 필터다. **조건 판정은 하지 않는다** — 그건 ``specs`` 의 Specification 조합이
-하고, 이 모듈은 **CLI 인자를 명세로 조립하는 어댑터**다.
+``SearchFilter`` 는 ``search``/``summary``/``export`` 세 명령이 공유하는 단 하나의
+필터다. ``list`` 는 필터를 만들지 않는다 — 조건 옵션이 없고 ``stream_sorted()`` 를
+인자 없이 불러 전체를 최신순으로 낸다. **조건 판정은 하지 않는다** — 그건 ``specs``
+의 Specification 조합이 하고, 이 모듈은 **CLI 인자를 명세로 조립하는 어댑터**다.
 
 ## 왜 어댑터를 남겨 두나
 

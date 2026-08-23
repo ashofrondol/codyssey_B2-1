@@ -9,7 +9,7 @@
 - ``error_handler`` : 예외 → 사용자 메시지 → 종료 코드
 
 ``output`` 이 이 패키지 안에 있는 것은 실측 결과다 — 이 모듈을 import 하는 곳은
-``app``·``error_handler``·``prompts`` 셋뿐이고 전부 CLI 계층이다.
+``app``·``error_handler``·``handlers``·``prompts`` 넷뿐이고 전부 CLI 계층이다.
 
 ## 이 파일만 재수출을 한다
 

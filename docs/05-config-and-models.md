@@ -78,7 +78,7 @@ budget_app/errors.py:1-2
 
 ```
 
-**이 파일은 import 문이 하나도 없습니다.** 계층 그래프의 맨 아래에 있다는 뜻이고, 그래서 어느 모듈이든 안심하고 가져다 쓸 수 있습니다.
+**이 파일은 다른 모듈을 import 하지 않습니다**(`from __future__ import annotations` 한 줄뿐이고, 그것은 컴파일러 지시자입니다). 계층 그래프의 맨 아래에 있다는 뜻이고, 그래서 어느 모듈이든 안심하고 가져다 쓸 수 있습니다.
 
 ### 1.2 두 예외의 판별 기준
 
@@ -172,7 +172,7 @@ budget_app/config.py:1-20
 
 측정 결과가 그 분할을 뒷받침한다 — 이전 ``config.py`` 의 상수 46개 중 39개가
 **단일 계층에서만** 쓰였고, ``messages.py`` 는 105개 중 104개가 그랬다. 한 파일에
-모아 두면 도메인 검증기가 CLI 프롬프트 71개와 같은 모듈에 묶인다.
+모아 두면 도메인 검증기가 CLI 문구 77개와 같은 모듈에 묶인다.
 
 계층을 넘나드는 값은 **아래 계층이 소유하고 위 계층이 가져다 쓴다**.
 
@@ -371,8 +371,8 @@ budget_app/cli/messages.py:1-10
 ```python
 """CLI 계층의 사용자 노출 문자열 — 전체의 3분의 2가 여기 있다.
 
-프롬프트·결과·오류 표시가 전부 이 계층의 것이다. 이전에는 도메인 검증 메시지 7개와
-이 71개가 한 파일에 있어서, ``domain/validators.py`` 가 CLI 한국어 문구까지 들어 있는
+프롬프트·결과·오류 표시가 전부 이 계층의 것이다. 이전에는 도메인 검증 메시지 8개와
+이 77개가 한 파일에 있어서, ``domain/validators.py`` 가 CLI 한국어 문구까지 들어 있는
 모듈에 의존했다.
 
 동적 부분은 ``str.format`` 템플릿으로 둔다. **로그 포맷만 %-스타일**인데, ``logging``
@@ -726,7 +726,7 @@ budget_app/domain/entities.py:1-12
 | 변경 요청 | `TransactionPatch` | `domain/entities.py` | 127-154 |
 | 저장 엔티티 | `Budget` | `domain/entities.py` | 157-173 |
 | 저장 엔티티 | `Category` | `domain/entities.py` | 176-190 |
-| 질의 모델 | `SearchFilter` | `domain/queries.py` | 32-82 |
+| 질의 모델 | `SearchFilter` | `domain/queries.py` | 33-83 |
 | 결과 모델 | `MonthlySummary` | `domain/results.py` | 22-55 |
 | 결과 모델 | `ImportReport` | `domain/results.py` | 74-97 |
 
@@ -1000,7 +1000,7 @@ imported, skipped, errors = service.import_csv(path, atomic=True)
 
 # 리팩터 후
 report = service.import_csv(path, atomic=True, on_duplicate="skip")
-report.imported, report.duplicated, report.has_problems
+report.imported, report.duplicated, report.skipped
 #   ↑ 이름으로 접근, 필드를 추가해도 기존 호출부는 그대로
 ```
 
@@ -1025,7 +1025,7 @@ report.imported, report.duplicated, report.has_problems
      │  ← 어떤 경로로 만들어져도 반드시 여기를 지난다 →         │
      ▼                           ▼                           ▼
               ┌─────────────────────────────────────┐
-              │  Transaction — 존재하면 반드시 유효    │
+              │  Transaction — 존재하면 반드시 유효 │
               └─────────────────────────────────────┘
 ```
 
@@ -1061,7 +1061,7 @@ report.imported, report.duplicated, report.has_problems
 
 ## 정리
 
-- **errors.py** — 실패의 타입을 정의합니다. `ValidationError`(값) vs `AppError`(상황)의 구분이 종료 코드까지 이어집니다. import 가 0개라 어느 계층이든 안전하게 씁니다. `ValueError` 상속 덕분에 이 타입을 모르는 호출자도 `except ValueError` 로 받습니다(`__mro__` 를 따라 판정되기 때문).
+- **errors.py** — 실패의 타입을 정의합니다. `ValidationError`(값) vs `AppError`(상황)의 구분이 종료 코드까지 이어집니다. 패키지 내부 import 가 0개라 어느 계층이든 안전하게 씁니다. `ValueError` 상속 덕분에 이 타입을 모르는 호출자도 `except ValueError` 로 받습니다(`__mro__` 를 따라 판정되기 때문).
 - **config.py** — 바꾸면 **동작**이 달라지는 값. 함수도 클래스도 없는 순수 상수 파일이고, 계층마다 하나씩(루트 + domain/storage/services/cli) 있습니다.
 - **messages.py** — 바꿔도 **글자만** 달라지는 문구. `ERR_`/`HINT_` 짝 구조가 오류 UX 의 뼈대입니다. 사용자 문구는 `str.format` 템플릿, 로그만 `%`-스타일입니다(포매팅을 출력 직전까지 미루기 위해).
 - **validators.py** — 규칙 하나 = 함수 하나. 엔티티·CSV·대화형 입력이 전부 같은 함수를 부릅니다. `parse_date` 가 `strptime` 으로 **검증**하고 `strftime` 으로 **재직렬화**하는 것이 이 모듈의 핵심 동작입니다 — `strptime` 만으로는 `"2024-1-5"` 가 통과해 문자열 날짜 비교가 깨집니다.

@@ -101,7 +101,7 @@ budget_app 은 일을 네 구역으로 나눠 두었습니다 — 명령을 받�
 └───────────────────────────┬──────────────────────────────────┘
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  data/*.jsonl       transactions / categories / budgets        │
+│  data/*.jsonl       transactions / categories / budgets      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,7 +116,7 @@ budget_app 은 일을 네 구역으로 나눠 두었습니다 — 명령을 받�
 
 ### 1.1 왜 이렇게 잘게 나눴나 — "파일 하나 = 책임 하나"
 
-구현 파일이 38개(패키지 선언 `__init__.py` 5개 제외, 전체 4,203줄)인 것이 많아 보일 수 있습니다. 판단 기준은 **"이 파일을 고칠 이유가 몇 개인가"** 입니다.
+구현 파일이 38개(패키지 선언 `__init__.py` 5개 제외, 4,132줄 — 5개를 포함한 43개 파일은 4,207줄)인 것이 많아 보일 수 있습니다. 판단 기준은 **"이 파일을 고칠 이유가 몇 개인가"** 입니다.
 
 리팩터 전의 `cli.py` 는 512줄이었고, 고칠 이유가 네 개였습니다.
 
@@ -134,15 +134,15 @@ budget_app 은 일을 네 구역으로 나눠 두었습니다 — 명령을 받�
 | 파일 | 줄 수 | 파일 | 줄 수 |
 |---|---|---|---|
 | storage/jsonl.py | 329 | domain/validators.py | 169 |
-| storage/repositories.py | 308 | storage/csv_io.py | 163 |
+| storage/repositories.py | 308 | storage/csv_io.py | 164 |
 | domain/specs.py | 243 | cli/presenter.py | 141 |
 | cli/parser.py | 243 | domain/tx_id.py | 132 |
-| services/importexport.py | 206 | cli/prompts.py | 128 |
+| services/importexport.py | 208 | cli/prompts.py | 128 |
 | domain/entities.py | 190 | cli/messages.py | 121 |
 | cli/handlers.py | 190 | cli/error_handler.py | 121 |
 | storage/unit_of_work.py | 181 | storage/ids.py | 116 |
 
-나머지 22개 구현 파일은 전부 100줄 이하입니다(`cli/output.py` 100, `cli/app.py` 98, `domain/results.py` 97, `services/transactions.py` 91, `services/categories.py` 89, `domain/queries.py` 82, `context.py` 80, `services/budgets.py` 66, `decorators.py` 66, `errors.py` 51, `storage/backup.py` 47, … 가장 작은 `__main__.py` 8).
+나머지 22개 구현 파일은 전부 100줄 이하입니다(`cli/output.py` 100, `cli/app.py` 98, `domain/results.py` 97, `services/transactions.py` 91, `services/categories.py` 89, `domain/queries.py` 83, `context.py` 80, `services/budgets.py` 66, `decorators.py` 66, `errors.py` 51, `storage/backup.py` 47, … 가장 작은 `__main__.py` 8).
 
 가장 큰 `storage/jsonl.py` 329줄 중에서도 설명 주석·docstring 이 상당 부분을 차지합니다. 실제 로직은 어느 파일도 한 화면을 크게 벗어나지 않습니다.
 
@@ -941,7 +941,7 @@ python -m budget_app import --from data.csv --atomic --on-duplicate skip
       → presenter.import_problem_lines(report)       사유들 (stderr)
 ```
 
-budget_app/services/importexport.py:88-102
+budget_app/services/importexport.py:88-104
 
 ```python
     def import_csv(
@@ -953,9 +953,11 @@ budget_app/services/importexport.py:88-102
     ) -> ImportReport:
         """CSV 거래 일괄 등록.
 
-        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다.
-        카테고리 자동 등록과 ID 발급도 커밋 단계에서 한 번에 일어나므로, 원자
-        모드에서 준비 중 중단되면 카테고리·거래 어느 쪽도 남지 않는다.
+        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다. **ID 발급은
+        준비 단계에서 끝난다** — ``_resolve_id`` 가 행마다 번호를 확정해 완성된
+        ``Transaction`` 을 batch 에 담는다. 커밋 단계가 하는 일은 파일 반영뿐이고
+        (카테고리 자동 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
+        중단되면 카테고리·거래 어느 쪽도 남지 않는다.
         """
         batch = self._prepare(Path(in_path), atomic=atomic, on_duplicate=on_duplicate)
         return self._commit(batch, atomic=atomic)
@@ -1123,10 +1125,12 @@ def _add_backup(sub) -> None:
 
 | 예외 | 정의 위치 | 발생 계층 | 의미 |
 | --- | --- | --- | --- |
-| `ValidationError` | errors.py:33 | domain/validators, entities, tx_id, storage/jsonl | **값**이 규칙 위반 |
+| `ValidationError` | errors.py:33 | domain/validators, tx_id, cli/prompts (엔티티는 `__post_init__` 이 validators 를 불러 생성자에서 터진다) | **값**이 규칙 위반 |
 | `AppError` | errors.py:41 | services/*, storage/csv_io, cli | **상황**이 규칙 위반 |
 | `InputAborted` | cli/prompts.py:28 | cli/prompts | EOF 로 입력 중단 (AppError 의 자식) |
 | 내장 예외 | (파이썬) | storage/*, context | 파일 없음/권한/인코딩/폴더 아님 등 |
+
+`storage/jsonl.py` 가 이 칸에 없는 것은 의도적입니다 — 거기서 `ValidationError` 는 **던지는 것이 아니라 잡는 것**이고(`_LINE_ERRORS`, `storage/jsonl.py:40`), 손상된 줄 하나를 걸러 내는 데에만 쓰입니다. 발생지가 아니라 포획지입니다.
 
 `ValidationError` 는 `ValueError` 를 상속합니다(`errors.py:33`) — 이 예외를 모르는 호출자도 `except ValueError` 로 자연스럽게 받게 하려는 선택입니다. `AppError` 는 `message` 와 `hint` 두 속성을 갖는 것이 존재 이유이므로 `Exception` 을 직접 상속합니다(`errors.py:41-51`).
 
@@ -1352,7 +1356,7 @@ domain/queries.py :: SearchFilter.for_month()
 
 **Q. 계층 구조에서 가장 아쉬운 점은?**
 
-의존성 **역전**(추상 인터페이스)이 없어 서비스가 구체 저장소 클래스에 묶여 있습니다. 지금 규모에서는 실익이 없다고 판단했지만, 저장 방식을 실제로 교체하게 되면 `Protocol` 을 도입해야 합니다. 또 `update` 경로가 파일을 3번 훑습니다(서비스의 `get` → 저장소의 `get` → `rewrite`) — 정확성을 위해 성능을 양보한 지점입니다([10](./10-advanced-design.md)).
+의존성 **역전**(추상 인터페이스)이 없어 서비스가 구체 저장소 클래스에 묶여 있습니다. 지금 규모에서는 실익이 없다고 판단했지만, 저장 방식을 실제로 교체하게 되면 `Protocol` 을 도입해야 합니다. 또 `update` 경로가 거래 파일을 2번 훑습니다(저장소의 `txs.get` → `replace` 가 부르는 `rewrite`). 카테고리까지 함께 바꾸면 `cats.exists()` 로 카테고리 파일을 한 번 더 읽습니다 — 정확성을 위해 성능을 양보한 지점입니다([10](./10-advanced-design.md)).
 
 ---
 

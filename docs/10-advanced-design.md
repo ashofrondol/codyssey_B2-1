@@ -480,21 +480,26 @@ CSV 파일을 통째로 가져올 때 그 안에 잘못된 줄이 섞여 있으�
 ```
 [준비 단계 — 파일을 읽기만 함]
     ┌──────────────────────────────────────────┐
-    │ id_allocator()   거래 파일 1회 스캔        │
-    │ name_set()       카테고리 파일 1회 스캔     │
+    │ id_allocator()   거래 파일 1회 스캔      │
+    │ name_set()       카테고리 파일 1회 스캔  │
     │                                          │
     │ for row in csv:                          │
-    │     parse_row()  ← 실패 + atomic → 중단!  │
-    │     _resolve_id() ← 중복 + error → 중단!  │
-    │     batch 에 적재 (메모리)                 │
+    │     parse_row()  ← 실패 + atomic → 중단! │
+    │     _resolve_id() ← 중복 + error → 중단! │
+    │     batch 에 적재 (메모리)               │
     └──────────────────────────────────────────┘
                         │
                         │ 여기까지 파일은 그대로
                         ▼
 [커밋 단계 — 처음으로 파일이 바뀜]
     ┌──────────────────────────────────────────┐
-    │ cats.add_many(new_categories)            │
-    │ txs.append_many(transactions, atomic)    │
+    │ _commit(batch, atomic) 이 두 갈래로 갈림 │
+    │                                          │
+    │ 부분 성공: cats.add_many(new_categories) │
+    │            txs.append_many(transactions) │
+    │                                          │
+    │ 원자:      UnitOfWork stage 2회          │
+    │            → os.replace 2회              │
     └──────────────────────────────────────────┘
 ```
 

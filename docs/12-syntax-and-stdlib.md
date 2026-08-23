@@ -323,7 +323,7 @@ from .error_handler import handle_errors
 ```
 
 **없으면 어떻게 되나** — 절대 임포트(`from budget_app.context import AppContext`)로
-바꾸면 동작 자체는 같지만, 최상위 패키지 이름을 바꿀 때 **패키지 내부 임포트가 있는 31개 파일**을 고쳐야 합니다(나머지 12개는 상대 임포트가 한 줄도 없어 영향을 받지 않습니다 — `errors.py`, 각 계층의 `config.py`·`messages.py`, `__init__.py` 계열).
+바꾸면 동작 자체는 같지만, 최상위 패키지 이름을 바꿀 때 **패키지 내부 임포트가 있는 31개 파일**을 고쳐야 합니다(나머지 12개는 상대 임포트가 한 줄도 없어 영향을 받지 않습니다 — `errors.py`, 루트·`domain`·`services` 의 `config.py`, 네 계층의 `messages.py`, `cli` 를 제외한 `__init__.py` 넷).
 반대로 `level` 이 패키지 깊이보다 크면 위 `_resolve_name` 이
 `"attempted relative import beyond top-level package"` 로 즉시 막습니다.
 
@@ -470,7 +470,7 @@ def log_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
 한 곳만 성격이 다릅니다.
 
-budget_app/domain/queries.py:74-78
+budget_app/domain/queries.py:75-79
 ```python
     @classmethod
     def for_month(cls, month: str, **extra: Any) -> SearchFilter:
@@ -1260,7 +1260,7 @@ budget_app/domain/tx_id.py:83-89
 
 **`field(init=False)` 와의 상호작용** — 여기서 `SearchFilter` 가 재미있는 사례입니다.
 
-budget_app/domain/queries.py:51-55
+budget_app/domain/queries.py:52-56
 ```python
     #: 조립된 명세 — 생성 시 한 번만 만든다(거래마다 다시 만들지 않는다)
     spec: specs.Spec = field(init=False, repr=False)
@@ -1975,7 +1975,7 @@ budget_app/storage/repositories.py:30-31
 
 > **이 절은 무엇인가** — **"이 코드는 언제 실행되는가"** 하나로 묶인 절입니다. 큰 파일을 통째로 메모리에 올리지 않고 한 줄씩 흘려보내는 장치, 이미 적어 둔 정의를 다른 함수에 한 번 통과시켜 그 결과로 갈아 끼우는 장치(겉을 한 겹 감싸기도 하고, 원래 것에 내용만 채워 그대로 돌려주기도 합니다), 일이 잘못됐을 때 어디까지 되돌리고 무엇을 알릴지 정하는 장치, 그리고 한 번 연 것은 반드시 닫히게 만드는 장치를 차례로 봅니다. 저장 담당 코드와 명령줄 담당 코드의 뼈대라, 그 두 폴더를 읽는 동안 가장 자주 돌아오게 됩니다.
 
-이 절은 저장소와 CLI 계층의 뼈대입니다 — 파일을 한 줄씩 흘려보내는 제너레이터, 함수를 감싸는 데코레이터와 클로저, 열 단으로 늘어선 `except` 체인, `with` 가 보장하는 것, 그리고 애너테이션과 제네릭. **"이 코드는 언제 실행되는가"** 라는 하나의 질문이 절 전체를 관통합니다. 제너레이터의 본문이 언제 시작되는지, 로그 문자열이 언제 만들어지는지, 애너테이션이 언제(혹은 영영) 평가되지 않는지가 전부 같은 질문의 변주입니다.
+이 절은 저장소와 CLI 계층의 뼈대입니다 — 파일을 한 줄씩 흘려보내는 제너레이터, 함수를 감싸는 데코레이터와 클로저, 열한 단으로 늘어선 `except` 체인, `with` 가 보장하는 것, 그리고 애너테이션과 제네릭. **"이 코드는 언제 실행되는가"** 라는 하나의 질문이 절 전체를 관통합니다. 제너레이터의 본문이 언제 시작되는지, 로그 문자열이 언제 만들어지는지, 애너테이션이 언제(혹은 영영) 평가되지 않는지가 전부 같은 질문의 변주입니다.
 
 이 절의 실행 확인은 모두 **CPython 3.13.1**(Windows)에서 수행했습니다. 프로젝트의
 `requires-python` 은 `>=3.10` 이므로, "3.13 에서 관찰한 사실"과 "이 버전에서 도입되었다"는
@@ -2146,7 +2146,7 @@ del gen; gc.collect()   → closed = True   (참조가 사라지면 close() 가 
 
 **없으면 어떻게 되나** — 이 구조가 실제로 걸리는 자리는 원자 모드 가져오기입니다.
 
-budget_app/services/importexport.py:109-118
+budget_app/services/importexport.py:111-120
 ```python
         for lineno, row in csv_io.read_rows(in_path):
             try:
@@ -2519,7 +2519,7 @@ wraps 있음:  __name__='add',     원본 docstring 유지, __wrapped__ 있음,
 `NotADirectoryError`, `BrokenPipeError`)은 PEP 3151 *Reworking the OS and IO exception
 hierarchy* 로 **파이썬 3.3** 에 생겼습니다. 그전에는 전부 `IOError`/`OSError` 하나였고,
 구분하려면 `except OSError as e: if e.errno == errno.ENOENT:` 처럼 errno 를 손으로
-분기해야 했습니다. 이 소스의 10단 `except` 체인은 PEP 3151 이 있어서 가능한 형태입니다.
+분기해야 했습니다. 이 소스의 11단 `except` 체인은 PEP 3151 이 있어서 가능한 형태입니다.
 
 **규칙 — "먼저 일치하는 절"** — 파이썬은 `except` 절을 **위에서 아래로** 훑다가
 `isinstance` 로 처음 맞는 것 하나만 실행하고 나머지는 보지 않습니다. "가장 구체적인
@@ -2640,7 +2640,7 @@ budget_app/domain/validators.py:94-99
 `--debug` 로 스택을 남길 때는 원본이 함께 보존됩니다 — **사용자용 문구와 개발자용
 원인을 동시에 갖는 것**이 `from` 의 요점입니다. 같은 형태가
 `validators.py:112`(`parse_month`), `prompts.py:57`(`EOFError` → `InputAborted`),
-`parser.py:52`(`ValueError` → `ArgumentTypeError`), `importexport.py:118`
+`parser.py:52`(`ValueError` → `ArgumentTypeError`), `importexport.py:120`
 (`ValidationError` → `AppError`)에 있습니다.
 
 **없으면 어떻게 되나** — `from exc` 를 빼도 `__context__` 덕분에 원인이 완전히
@@ -2946,7 +2946,7 @@ budget_app/storage/unit_of_work.py:169-181
 을 돌려주므로 `UnitOfWork` 는 **예외를 절대 삼키지 않습니다.** 블록 안에서 예외가
 나면 `.tmp` 를 지우고 나서 그 예외를 그대로 올려 보냅니다. 사용처는 이렇습니다.
 
-budget_app/services/importexport.py:199-206
+budget_app/services/importexport.py:201-208
 ```python
         fresh_categories = [Category(name=n) for n in batch.new_categories]
         # 파일을 저장소 밖(UoW)에서 쓰므로 id 워터마크는 여기서 명시적으로 알린다.
@@ -3266,8 +3266,9 @@ class JsonlStore(Generic[T]):
 있는 `entity_cls: type` 이 이 설계의 핵심을 드러냅니다 — 런타임에 실제로 쓰이는
 "어떤 엔티티인가" 정보는 `T` 가 아니라 **평범한 클래스 속성 `entity_cls`** 입니다.
 `_parse_line` 이 `self.entity_cls.from_dict(data)` 를 호출하는 것이 그 증거입니다
-(jsonl.py:187). `T` 가 하는 일은 오직 `stream()` 의 반환 타입을
-`Iterator[Transaction]` 으로 좁혀 주는 것뿐입니다.
+(jsonl.py:187). `T` 가 하는 일은 `stream()` 의 반환 타입을 `Iterator[Transaction]` 으로
+좁히고, `append`/`append_all`/`plan_rewrite`/`rewrite` 의 인자 타입을 엔티티별로
+좁혀 주는 것뿐입니다 — 런타임 효과는 없습니다.
 
 budget_app/storage/repositories.py:27-27
 ```python
@@ -3910,10 +3911,11 @@ CSV_READ_ENCODING = "utf-8-sig"
 - **읽기 = `utf-8-sig`** → 엑셀이 저장한 CSV(BOM 있음)와 이 프로그램이 내보낸 CSV(BOM 없음)를 **둘 다** 받습니다. `utf-8-sig` 는 BOM 이 없어도 잘 읽히므로, 관용 범위가 순수하게 넓어지기만 합니다.
 - **쓰기 = `utf-8`** → BOM 을 붙이지 않습니다. 그 이유가 `write_transactions` 의 docstring 에 적혀 있습니다.
 
-budget_app/storage/csv_io.py:134-135
+budget_app/storage/csv_io.py:134-136
 ```python
-    인코딩은 BOM 없는 UTF-8 로 고정한다. BOM 을 넣으면 다시 ``import`` 할 때 헤더
-    첫 컬럼명이 ``﻿id`` 로 깨져 왕복이 실패한다(왕복 안전성 우선).
+    인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.
+    반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은
+    흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.
 ```
 
 여기서 흥미로운 점은, 이 소스가 읽기를 `utf-8-sig` 로 하고 있으니 **자기가 BOM 을 붙여 내보내도 자기는 다시 읽을 수 있다**는 것입니다. 그럼에도 안 붙이는 이유는 상대가 자기 자신만이 아니기 때문입니다. 내보낸 CSV 를 받는 다른 프로그램·스크립트가 BOM 을 처리하지 못하면 거기서 깨집니다. **"관대하게 받고, 엄격하게 내보낸다"** 는 원칙의 교과서적 적용입니다.
@@ -5110,7 +5112,11 @@ def main(argv: list[str] | None = None) -> int:
 |---|---|---|
 | 2 (인자 문법 오류, `--limit 0`, 알 수 없는 명령) | **argparse** 의 `SystemExit(2)` | `handle_errors` 를 **지나지 않음** |
 | 2 (`EXIT_VALIDATION`, 도메인 검증 실패) | `handle_errors` 의 `except ValidationError` | 방패 안 |
-| 0/1/3/4/6/130 | `handle_errors` 또는 핸들러 | 방패 안 |
+| 0/1/3/4/5/6/130 | `handle_errors` 또는 핸들러 | 방패 안 |
+
+마지막 행에서 5(`EXIT_NO_CATEGORY`)는 `handle_errors` 가 아니라 **핸들러가 직접**
+돌려주는 값입니다 — `handlers.py:33-37` 의 `cmd_add` 가 카테고리가 하나도 없으면
+`return config.EXIT_NO_CATEGORY` 로 끝냅니다. 나머지는 방패가 예외를 코드로 옮깁니다.
 
 **두 개의 2 가 우연히 같은 값**이라는 점을 아는 것이 중요합니다 — 의도된 정합이지 같은 경로가 아닙니다. 실행으로 확인하면 이렇습니다.
 
@@ -5401,7 +5407,7 @@ budget_app/domain/validators.py:40-40
 def parse_amount(value: Any) -> int:
 ```
 
-`parse_amount`·`parse_date`·`parse_type` 같은 함수의 인자는 JSONL 한 줄에서 갓 꺼낸 값이라 `str` 일 수도, `int` 일 수도, `None` 일 수도 있습니다. **그것을 판정하는 것이 이 함수의 일**이므로 인자 쪽에 좁은 타입을 적으면 함수의 존재 이유와 모순됩니다. `tx_id.py:105` 의 `parse(cls, value: Any)`, `tx_id.py:130` 의 `is_valid(value: Any)` 도 같은 이유이고, `tx_id.py:91` 의 `__lt__(self, other: Any) -> Any` 는 비교 연산 프로토콜이 `NotImplemented` 를 돌려줄 수 있어 반환도 좁힐 수 없는 경우입니다. `entities.py:144` 의 `dict[str, Any]` 와 `queries.py:75` 의 `**extra: Any` 는 값의 타입이 필드마다 다른 자리입니다.
+`parse_amount`·`parse_date`·`parse_type` 같은 함수의 인자는 JSONL 한 줄에서 갓 꺼낸 값이라 `str` 일 수도, `int` 일 수도, `None` 일 수도 있습니다. **그것을 판정하는 것이 이 함수의 일**이므로 인자 쪽에 좁은 타입을 적으면 함수의 존재 이유와 모순됩니다. `tx_id.py:105` 의 `parse(cls, value: Any)`, `tx_id.py:130` 의 `is_valid(value: Any)` 도 같은 이유이고, `tx_id.py:91` 의 `__lt__(self, other: Any) -> Any` 는 비교 연산 프로토콜이 `NotImplemented` 를 돌려줄 수 있어 반환도 좁힐 수 없는 경우입니다. `entities.py:144` 의 `dict[str, Any]` 와 `queries.py:76` 의 `**extra: Any` 는 값의 타입이 필드마다 다른 자리입니다.
 
 `TracebackType` 은 컨텍스트 매니저 프로토콜 한 곳입니다.
 
@@ -6174,7 +6180,7 @@ budget_app/storage/jsonl.py:150-158
 | `cli/parser.py` | `import as`, `argparse.SUPPRESS`, `add_subparsers`/`_SubParsersAction`, `set_defaults`, `type=` 콜러블과 `ArgumentTypeError`, `choices`/`store_true`/`store_false` | §1-A, §2-B |
 | `cli/presenter.py` | `yield` 제너레이터와 `limit` 의 조기 종료, `str.format`, `collections.abc` 에서 가져오는 `Iterable`/`Iterator` | §1-A, §1-C |
 | `cli/prompts.py` | 클로저로 검증기를 만들어 내보내기, `TypeVar` 로 표현한 "검증기의 반환 타입 = 함수의 반환 타입", `raise ... from exc`, `super().__init__()`, `", ".join(...)` | §1-A, §1-B, §1-C |
-| `domain/__init__.py` | 일반 패키지 표식(내용 없음) | §1-A |
+| `domain/__init__.py` | 실행 코드 없음 — 계층 개요 docstring 만(재수출하지 않는다) | §1-A |
 | `domain/config.py` | raw 문자열 `r"..."` 과 정규식 패턴 상수, `{:06d}` 포맷, `strftime` 지시자, 순서가 의미를 갖는 튜플 상수 | §1-A, §2-A, §2-B |
 | `domain/entities.py` | `@dataclass`, `frozen=True`, `object.__setattr__`, `__post_init__`, `fields()`, `**{**a, **b}`, `@classmethod` 대체 생성자, 내장 제네릭과 `X \| Y` | §1-A, §1-B, §1-C |
 | `domain/messages.py` | 문구 상수와 `str.format` 자리표시자 | §1-A |
@@ -6184,7 +6190,7 @@ budget_app/storage/jsonl.py:150-158
 | `domain/specs.py` | `abc.ABC`/`@abstractmethod` 와 `__abstractmethods__`, 본문 `...`(Ellipsis), `__and__`/`__or__`/`__invert__`, `any`/`all` + 제너레이터 표현식, `{!r}` | §1-A, §1-B, §1-C |
 | `domain/tx_id.py` | `@functools.total_ordering` + `@dataclass(frozen=True)` 중첩 순서, `__lt__` 와 `NotImplemented`, `frozen`+`eq` 가 만드는 `__hash__`, `re.compile` 과 `match` vs `search`, `{:06d}`, `@property` | §1-A, §1-B, §1-C, §2-A |
 | `domain/validators.py` | `strip`/`lower`/`split`, `str(value or "")` 관용구, `raise ... from exc`, `[0-9]` 를 택한 이유, `strptime`→`strftime` 정규화, `isinstance(x, Iterable)`, `Any` | §1-A, §1-C, §2-A, §2-B |
-| `services/__init__.py` | 일반 패키지 표식(내용 없음) | §1-A |
+| `services/__init__.py` | 실행 코드 없음 — 계층 개요 docstring 만(재수출하지 않는다) | §1-A |
 | `services/budgets.py` | `@measure_time` 과 `try/finally`, docstring 에만 남은 `startswith` 의 흔적 | §1-A, §1-C |
 | `services/categories.py` | 정규화 시점과 `strip()` — 가드가 우회되는 사고의 기록 | §1-A |
 | `services/config.py` | 순서가 의미를 갖는 튜플 상수(argparse `choices` 로 넘어감) | §2-B |
@@ -6192,7 +6198,7 @@ budget_app/storage/jsonl.py:150-158
 | `services/maintenance.py` | `Path()` 재감싸기, 얇은 위임 계층 | §2-B |
 | `services/messages.py` | `AppError` 의 message/hint 문구 상수 | §1-A |
 | `services/transactions.py` | `@log_call`, 키워드 전용 `hint`, `None` 센티널 기본값, `stream_sorted` 의 `yield from` 과 정렬의 한계, 정렬 키 튜플이 `TransactionId.__lt__` 를 부르는 경로 | §1-A, §1-C, §2-A |
-| `storage/__init__.py` | 일반 패키지 표식(내용 없음) | §1-A |
+| `storage/__init__.py` | 실행 코드 없음 — 계층 개요 docstring 만(재수출하지 않는다) | §1-A |
 | `storage/backup.py` | f-string 으로 만드는 경로, `Path` 의 `/`·`glob`·`write_bytes`, `now` 주입과 `datetime.now()`, `strftime` 의 플랫폼 의존성 | §1-A, §2-A, §2-B, §3 |
 | `storage/config.py` | `utf-8` vs `utf-8-sig` 비대칭, `surrogateescape`, `LINE_TERMINATOR`, `TMP_SUFFIX` | §2-A, §3 |
 | `storage/csv_io.py` | `csv.DictReader` 의 지연 `fieldnames`, `DictWriter._dict_to_list`, `newline=""`, BOM 흡수, `yield from` 과 `with` 의 수명, 키워드 전용 인자 | §1-A, §1-C, §2-A, §3 |

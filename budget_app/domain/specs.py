@@ -136,8 +136,9 @@ class Not(Spec):
 class Always(Spec):
     """조건 없음 — 전부 통과.
 
-    Null Object 다. ``list`` 처럼 조건이 하나도 없는 경우를 ``None`` 검사 없이
-    같은 코드로 처리하려고 둔다. ``And()`` 의 항등원이기도 하다.
+    Null Object 다. ``search`` 를 옵션 없이 부른 것처럼 조건이 하나도 없는 필터를
+    ``None`` 검사 없이 같은 코드로 처리하려고 둔다. ``And()`` 의 항등원이기도 하다.
+    (``list`` 는 아예 필터를 만들지 않으므로 여기 오지 않는다.)
     """
 
     def is_satisfied_by(self, tx: Transaction) -> bool:

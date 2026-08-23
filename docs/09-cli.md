@@ -55,7 +55,7 @@
 
 > **🔎 문법의 출처** — `from .cli import main` 의 앞점(`.`)은 **명시적 상대 import** 로, PEP 328 이 도입하고 파이썬 3 에서 유일한 상대 import 문법이 되었습니다(암묵적 상대 import 는 3.0 에서 제거). 점 하나는 "현재 패키지", 두 개(`from ..domain ...`)는 "부모 패키지"를 뜻하며, 이 계산은 실행 시 모듈의 `__package__` 값을 기준으로 이뤄집니다. 그래서 상대 import 가 있는 파일은 **스크립트로 직접 실행할 수 없고**(`__package__` 가 비어 있음) `python -m budget_app` 처럼 패키지로 실행해야 합니다. → [12 §1-A](./12-syntax-and-stdlib.md)
 
-**`output.py` 가 이 패키지 안에 있는 것은 실측 결과입니다.** 이 모듈을 import 하는 곳은 `app`·`error_handler`·`prompts` 셋뿐이고 전부 CLI 계층입니다([04 §1.2](./04-architecture.md)).
+**`output.py` 가 이 패키지 안에 있는 것은 실측 결과입니다.** 이 모듈을 import 하는 곳은 `app`·`error_handler`·`handlers`·`prompts` 넷뿐이고 전부 CLI 계층입니다([04 §1.2](./04-architecture.md)).
 
 ### 1.1 왜 나눴나 — 고칠 이유가 넷이었다
 
@@ -367,7 +367,7 @@ def _add_export(sub) -> None:
 >
 > 여기서 `dest="include_id"` 가 없으면 어떻게 될까요. argparse 는 긴 옵션 이름의 앞 대시를 떼고 남은 대시를 밑줄로 바꿔 `dest` 를 만들므로 `--no-id` → **`args.no_id`** 가 되고, "id 를 뺄까"라는 이중 부정이 핸들러까지 흘러갑니다. `dest` 하나로 **명령줄의 이름(부정형)과 코드 안의 이름(긍정형)을 분리**한 것입니다. `--from` 이 예약어라 `dest="from_"` 인 것도 같은 도구의 다른 용도입니다. → [12 §2-B](./12-syntax-and-stdlib.md)
 
-**`choices=list(config.ON_DUPLICATE_CHOICES)`** 는 상수를 그대로 씁니다. 정책을 추가하면 config 한 곳만 고치면 CLI 검증까지 따라옵니다.
+**`choices=list(services_config.ON_DUPLICATE_CHOICES)`** 는 상수를 그대로 씁니다. 정책을 추가하면 `services/config.py` 한 곳만 고치면 CLI 검증까지 따라옵니다.
 
 > **⚙️ 내부 동작** — `choices` 검사는 타입 변환 **뒤에** 일어납니다. argparse 는 `_get_value()` 로 `type=` 을 적용한 다음 `_check_value()` 에서 `value not in choices` 를 봅니다. 그래서 `choices` 에 담기는 값은 명령줄 문자열이 아니라 **변환 결과**여야 합니다. 이 소스에서는 `--type`·`--on-duplicate` 모두 `type=` 이 없어 문자열 그대로이므로 문제가 되지 않습니다. `ON_DUPLICATE_CHOICES`(`services/config.py:12`)와 `VALID_TYPES`(`domain/config.py:15`)는 둘 다 **튜플**이고, `list(...)` 로 감싼 것은 argparse 액션이 공용 상수 객체를 그대로 붙들지 않도록 사본을 넘기는 방어입니다.
 
@@ -970,7 +970,7 @@ from __future__ import annotations
 | `cmd_export` | 5 | `cmd_category_add` | 7 |
 | `cmd_search` | 12 | `cmd_import` | 9 |
 | `cmd_add` | 18 | `cmd_category_remove` | 14 |
-| `cmd_update` | 17 | | |
+| `cmd_update` | 10 | | |
 
 가장 긴 `cmd_add`(18줄)도 대부분이 서비스에 넘길 인자 나열입니다.
 

@@ -66,7 +66,7 @@ docstring 이 나열하는 네 개의 유스케이스 서비스에, 폴더 단�
 | `TransactionService` | `services/transactions.py:20-91` | 거래 추가/수정/삭제/조회 |
 | `BudgetService` | `services/budgets.py:20-66` | 예산 설정 + 월별 요약 |
 | `CategoryService` | `services/categories.py:15-89` | 카테고리 추가/조회/삭제 (사용 중 보호) |
-| `ImportExportService` | `services/importexport.py:61-206` | CSV 가져오기/내보내기 정책 |
+| `ImportExportService` | `services/importexport.py:61-208` | CSV 가져오기/내보내기 정책 |
 | `BackupService` | `services/maintenance.py:29-37` | 데이터 폴더 백업 (얇은 위임) |
 
 여기에 준비 단계 누적 상태를 담는 `_Batch`(`services/importexport.py:30-58`)가 있습니다.
@@ -446,7 +446,7 @@ budget_app/services/importexport.py:77-84
 > **💡 쉽게 말하면** — 장부에 옮겨 적기 전에 연습장에 전부 계산해 보는 것과 같습니다. 장부는 연습장을 다 채운 뒤에야 펴고, 그전까지는 한 글자도 쓰지 않습니다. 준비 단계가 연습장이고 커밋 단계가 장부입니다. 연습장에서 어긋난 줄을 만났을 때 그 줄만 빼고 나머지를 옮길지, 아예 장부를 펴지 않고 그만둘지는 `--atomic` 이 정합니다.
 > 다만 이 비유는 두 군데서 깨집니다 — 하나는 연습장이 무한하지 않다는 것으로, 준비 단계의 `_Batch` 는 메모리이므로 가져오는 CSV 가 클수록 커밋할 때까지 그만큼을 들고 있어야 합니다. 다른 하나는 "어긋나면 그만둔다"가 기본 동작이 아니라는 것으로, 아래 코드의 기본값이 `atomic: bool = False` 이고 그 모드에서는 어긋난 줄을 건너뛴 채 나머지가 그대로 장부에 옮겨집니다.
 
-budget_app/services/importexport.py:88-102
+budget_app/services/importexport.py:88-104
 
 ```python
     def import_csv(
@@ -458,9 +458,11 @@ budget_app/services/importexport.py:88-102
     ) -> ImportReport:
         """CSV 거래 일괄 등록.
 
-        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다.
-        카테고리 자동 등록과 ID 발급도 커밋 단계에서 한 번에 일어나므로, 원자
-        모드에서 준비 중 중단되면 카테고리·거래 어느 쪽도 남지 않는다.
+        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다. **ID 발급은
+        준비 단계에서 끝난다** — ``_resolve_id`` 가 행마다 번호를 확정해 완성된
+        ``Transaction`` 을 batch 에 담는다. 커밋 단계가 하는 일은 파일 반영뿐이고
+        (카테고리 자동 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
+        중단되면 카테고리·거래 어느 쪽도 남지 않는다.
         """
         batch = self._prepare(Path(in_path), atomic=atomic, on_duplicate=on_duplicate)
         return self._commit(batch, atomic=atomic)
@@ -474,7 +476,7 @@ budget_app/services/importexport.py:88-102
 
 ### 5.4 준비 단계
 
-budget_app/services/importexport.py:104-131
+budget_app/services/importexport.py:106-133
 
 ```python
     def _prepare(self, in_path: Path, *, atomic: bool, on_duplicate: str) -> _Batch:
@@ -534,7 +536,7 @@ budget_app/services/importexport.py:104-131
 
 ### 5.5 중복 정책 — `_resolve_id`
 
-budget_app/services/importexport.py:133-140
+budget_app/services/importexport.py:135-142
 
 ```python
     def _resolve_id(
@@ -570,13 +572,13 @@ csv_id 가 있고 이미 쓰였다  ── on_duplicate ──┬─ "new-id" �
 
 두 경우를 따로 처리하는 코드가 필요 없다는 것이 이 설계의 장점입니다.
 
-**`None` 반환이 "이 행은 저장하지 않는다"** 를 뜻한다는 계약이 반환 타입 `TransactionId | None` 과 docstring(`importexport.py:141`)에 명시되어 있습니다. 호출부(`importexport.py:123`)가 `if tx_id is None:` 으로 그 계약을 받습니다.
+**`None` 반환이 "이 행은 저장하지 않는다"** 를 뜻한다는 계약이 반환 타입 `TransactionId | None` 과 docstring(`importexport.py:143`)에 명시되어 있습니다. 호출부(`importexport.py:125`)가 `if tx_id is None:` 으로 그 계약을 받습니다.
 
 > **⚙️ 내부 동작** — 여기서 `== None` 이 아니라 `is None` 인 것이 관례가 아니라 정확성입니다. `is` 는 두 이름이 **같은 객체를 가리키는가**(CPython 에서는 주소 비교)를 묻고, `None` 은 인터프리터 전체에 **딱 하나만 존재하는 싱글턴**이라 이 비교가 항상 옳습니다. `==` 는 `__eq__` 를 부르므로 클래스가 그것을 재정의하면 `None` 과 같다고 우길 수 있습니다. `TransactionId` 는 dataclass 라 실제로 `__eq__` 가 자동 생성되어 있으므로, `is` 를 쓰는 편이 그 경로를 아예 지나지 않습니다. → [12 §1-B](./12-syntax-and-stdlib.md)
 
 ### 5.6 커밋 단계 — 모드에 따라 갈린다
 
-budget_app/services/importexport.py:168-177
+budget_app/services/importexport.py:170-179
 
 ```python
         imported = (
@@ -600,7 +602,7 @@ budget_app/services/importexport.py:168-177
 
 **원자 모드는 `UnitOfWork` 로 두 파일을 한 단위로 커밋합니다.** `UnitOfWork` 는 작업 단위, 즉 여러 파일에 걸친 변경을 하나로 묶어 되도록 전부 반영하거나 전부 취소하게 해 주는 장치입니다(되도록인 이유는 §5.6 에 있습니다).
 
-budget_app/services/importexport.py:188-206
+budget_app/services/importexport.py:190-208
 
 ```python
     def _commit_atomic(self, batch: _Batch) -> int:
@@ -817,7 +819,7 @@ $ python -m budget_app import --from mixed.csv --atomic --data-dir ./d5
 $ wc -l < ./d5/transactions.jsonl
 0                                              ← 거래 0건
 $ python -m budget_app category list --data-dir ./d5 | wc -l
-5                                              ← 기본 5개 그대로 (salary 안 늘어남)
+5                                              ← 기본 5개 그대로 (mixed.csv 의 badcat 등록 안 됨)
 ```
 
 ---

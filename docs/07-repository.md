@@ -740,7 +740,7 @@ budget_app/storage/repositories.py:39-51
 정상                             raw.data["id"]             TX-000001
 amount=0 (검증 실패)              raw.data["id"]             TX-000009  ← 건짐!
 {"id":"TX-000010", 뒤가 깨짐      정규식 search              TX-000010  ← 건짐!
-완전히 다른 텍스트                 정규식 실패 → ""           건너뜀
+완전히 다른 텍스트                 정규식 실패 → None         건너뜀
 ```
 
 `id_state()` 가 **최대 번호와 사용 중 집합을 한 번의 순회로** 구하는 것도 눈여겨보세요. 두 값을 따로 구하면 파일을 두 번 읽어야 합니다.
@@ -790,7 +790,7 @@ budget_app/storage/repositories.py:138-148
         return self.append_all(txs)
 ```
 
-원자 모드는 `rewrite(lambda tx: tx, extra=txs)` 한 줄입니다 — "모든 기존 항목은 그대로 두고, 뒤에 신규를 붙인 파일을 원자적으로 만들어라".
+원자 모드는 `UnitOfWork` 가 `plan_rewrite(_keep, extra=txs)` 로 최종 내용을 `.tmp` 에 준비한 뒤 `os.replace` 로 커밋합니다(§9) — "모든 기존 항목은 그대로 두고, 뒤에 신규를 붙인 파일을 원자적으로 만들어라". `append_many` 에 있던 `atomic=True` 분기는 UoW 도입과 함께 제거됐습니다.
 
 budget_app/storage/repositories.py:159-167
 
@@ -1166,7 +1166,7 @@ CSV_READ_ENCODING = "utf-8-sig"
 >     >>> open("out.csv","rb").read()
 >     b'\xef\xbb\xbfid,date\n'                            # ← 쓰면 BOM 이 붙는다
 >
-> 헤더 검증(`_check_header`)은 `"id" in names` 같은 **문자열 일치**로 판정하므로, 컬럼명 하나가 `'﻿id'` 가 되는 순간 `id` 컬럼이 "없는" 것이 됩니다. 그래서 **읽기는 `utf-8-sig` 로 관대하게**(엑셀 CSV 를 받아 주고), **쓰기는 `utf-8` 로 엄격하게**(우리가 만든 파일에는 BOM 을 넣지 않아 왕복이 항상 성립하게) — 방향마다 다른 정책이 정답입니다. → [12 §3](./12-syntax-and-stdlib.md)
+> BOM 이 붙으면 첫 컬럼명이 `'﻿id'` 가 되고, `parse_row` 의 `row.get("id")` 가 `None` 을 돌려줘 그 행이 **새 id 를 발급받습니다** — 왕복이 깨지는 자리는 헤더 검증이 아니라 여기입니다. (엑셀이 저장한 외부 CSV 처럼 첫 컬럼이 `date` 인 경우에는 `_check_header` 의 필수 컬럼 검사가 실패합니다.) 그래서 **읽기는 `utf-8-sig` 로 관대하게**(엑셀 CSV 를 받아 주고), **쓰기는 `utf-8` 로 엄격하게**(우리가 만든 파일에는 BOM 을 넣지 않아 왕복이 항상 성립하게) — 방향마다 다른 정책이 정답입니다. → [12 §3](./12-syntax-and-stdlib.md)
 
 **`txs` 가 제너레이터여도 동작합니다.** 서비스가 이렇게 넘깁니다.
 

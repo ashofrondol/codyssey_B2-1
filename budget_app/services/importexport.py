@@ -94,9 +94,11 @@ class ImportExportService:
     ) -> ImportReport:
         """CSV 거래 일괄 등록.
 
-        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다.
-        카테고리 자동 등록과 ID 발급도 커밋 단계에서 한 번에 일어나므로, 원자
-        모드에서 준비 중 중단되면 카테고리·거래 어느 쪽도 남지 않는다.
+        준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다. **ID 발급은
+        준비 단계에서 끝난다** — ``_resolve_id`` 가 행마다 번호를 확정해 완성된
+        ``Transaction`` 을 batch 에 담는다. 커밋 단계가 하는 일은 파일 반영뿐이고
+        (카테고리 자동 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
+        중단되면 카테고리·거래 어느 쪽도 남지 않는다.
         """
         batch = self._prepare(Path(in_path), atomic=atomic, on_duplicate=on_duplicate)
         return self._commit(batch, atomic=atomic)

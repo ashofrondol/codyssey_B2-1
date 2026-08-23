@@ -799,7 +799,8 @@ print("검증 완료")
        │  if not self.txs.delete(tx_id):
        ▼
 3) repository.TransactionRepository.delete → False             [storage/repositories.py:150-171]
-       │  (exists() 가 False → 파일을 건드리지 않고 False 반환)
+       │  (파일을 한 번 훑는 동안 일치하는 id 를 못 만나 found=False,
+       │   plan.changed=False 라 파일을 건드리지 않고 False 반환)
        ▼
 4) services 가 False 를 받아 AppError 로 승격
        raise AppError(messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id),

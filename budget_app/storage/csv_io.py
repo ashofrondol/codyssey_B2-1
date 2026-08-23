@@ -131,8 +131,9 @@ def parse_row(row: dict[str, str]) -> ParsedRow:
 def write_transactions(path: Path, txs: Iterable[Transaction], *, include_id: bool = True) -> int:
     """거래를 CSV 로 저장하고 작성 건수를 반환한다.
 
-    인코딩은 BOM 없는 UTF-8 로 고정한다. BOM 을 넣으면 다시 ``import`` 할 때 헤더
-    첫 컬럼명이 ``﻿id`` 로 깨져 왕복이 실패한다(왕복 안전성 우선).
+    인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.
+    반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은
+    흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
