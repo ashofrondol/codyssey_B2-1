@@ -180,7 +180,7 @@ def atomic_write_lines(path: Path, lines: Iterable[str]) -> None:
 `fsync` 는 리팩터에서 추가됐습니다. 이전 코드는 `os.replace` 만 있었습니다.
 지금은 **두 쓰기 경로가 같은 내구성을 약속합니다** — 재작성 경로(`stage_lines`,
 storage/jsonl.py:70-71)뿐 아니라 이어 쓰기 경로(`_append_lines`,
-storage/jsonl.py:246-247)도 `flush` + `fsync` 로 끝납니다. 한쪽만 fsync 하면
+storage/jsonl.py:268-269)도 `flush` + `fsync` 로 끝납니다. 한쪽만 fsync 하면
 "어느 명령으로 저장했느냐"에 따라 내구성이 달라지는데, 사용자가 그 차이를
 알 방법이 없습니다.
 
@@ -319,9 +319,9 @@ budget_app/storage/unit_of_work.py:145-156
 > 다만 이 비유는 **줄 번호**에서 깨집니다 — 앞의 줄이 지워지면 번진 줄이 놓인 위치는
 > 당겨집니다(아래 "주의할 점").
 
-**구현**: 재작성의 재료가 `iter_raw()`(모든 줄, storage/jsonl.py:162-179) 이고, 해석 불가 줄은 `raw.text` 를 그대로 다시 씁니다.
+**구현**: 재작성의 재료가 `iter_raw()`(모든 줄, storage/jsonl.py:162-182) 이고, 해석 불가 줄은 `raw.text` 를 그대로 다시 씁니다.
 
-budget_app/storage/jsonl.py:289-292
+budget_app/storage/jsonl.py:311-314
 
 ```python
         for raw in self.iter_raw():
@@ -342,7 +342,7 @@ budget_app/storage/jsonl.py:289-292
 > **⚙️ 내부 동작** — 대리 문자는 정상 문자가 아니므로 그대로 `print` 하면
 > `UnicodeEncodeError` 가 납니다. 이 코드가 안전한 이유는 손상 줄을 **화면에 찍지
 > 않고** 파일로만 되돌려 쓰기 때문입니다. 로그에는 파일명·줄 번호·오류 사유만
-> 남습니다(storage/jsonl.py:203). → [12 §3](./12-syntax-and-stdlib.md)
+> 남습니다(storage/jsonl.py:225). → [12 §3](./12-syntax-and-stdlib.md)
 
 **리팩터 전 위반 사례**:
 
@@ -428,7 +428,7 @@ $ tail -1 data/transactions.jsonl
 
 **보장 내용**: 내보낸 CSV 를 그대로 다시 가져오면 데이터가 변하지 않습니다.
 
-**구현**: export 가 `id` 컬럼을 포함하고(storage/csv_io.py:131-148), import 가 이미 있는 id 를 중복으로 인식합니다(`_resolve_id`, services/importexport.py:133-164).
+**구현**: export 가 `id` 컬럼을 포함하고(storage/csv_io.py:145-186), import 가 이미 있는 id 를 중복으로 인식합니다(`_resolve_id`, services/importexport.py:187-218).
 
 > **⚙️ 내부 동작 — 왕복을 지키는 인코딩 비대칭** — 쓰기는 `utf-8`, 읽기는
 > `utf-8-sig` 입니다(storage/config.py:39-40). `utf-8-sig` 는 파일 맨 앞의
@@ -475,6 +475,8 @@ CSV 파일을 통째로 가져올 때 그 안에 잘못된 줄이 섞여 있으�
 
 **두 축이 독립이라는 것**이 설계의 핵심입니다. "깨진 줄은 전부 거부하되 중복은 조용히 넘어간다"(`--atomic --on-duplicate skip`) 같은 조합이 자연스럽게 표현됩니다.
 
+세 번째 축처럼 보이는 `--auto-category` 는 실은 **실패 축에 얹힌 스위치**입니다. 미등록 카테고리 행은 기본적으로 "데이터가 잘못된 줄"로 취급되어(기본 모드면 `skipped`, `--atomic` 이면 전수 롤백) 실패 축의 규칙을 그대로 따르고, `--auto-category` 는 그 줄을 잘못된 것으로 볼지 말지만 바꿉니다.
+
 ### 3.2 준비→커밋 = 사실상의 트랜잭션
 
 ```
@@ -515,9 +517,9 @@ CSV 파일을 통째로 가져올 때 그 안에 잘못된 줄이 섞여 있으�
 
 ### 3.3 부수 효과까지 롤백되는 이유
 
-**카테고리 자동 등록이 커밋 단계에 있습니다.**
+**`--auto-category` 로 요청한 카테고리 등록이 커밋 단계에 있습니다.**
 
-budget_app/services/importexport.py:188-206
+budget_app/services/importexport.py:243-261
 ```python
     def _commit_atomic(self, batch: _Batch) -> int:
         """원자 모드 — 두 파일을 **한 단위로** 커밋한다.
@@ -535,15 +537,18 @@ budget_app/services/importexport.py:188-206
 
 준비 단계에서는 `batch.new_categories` 리스트에 **이름만 모읍니다.** 만약 준비 중에 카테고리를 바로 등록했다면, 원자 모드에서 실패했을 때 "거래는 안 들어갔는데 카테고리만 늘어난" 상태가 남습니다.
 
+(`--auto-category` 가 없으면 미등록 카테고리 행은 준비 단계에서 아예 거부되므로 이 목록이 비어 있고, 커밋 단계까지 갈 일도 없습니다.)
+
 **실제 검증:**
 
 ```bash
-$ python -m budget_app import --from mixed.csv --atomic --data-dir ./d5
-[오류] 원자적 가져오기 실패 — line 3: ... (반영된 항목 없음)
-$ wc -l < ./d5/transactions.jsonl
+$ python -m budget_app import --from mixed.csv --atomic --auto-category --data-dir ./d6
+[오류] 원자적 가져오기 실패 — line 4: 날짜 형식이 올바르지 않습니다 (YYYY-MM-DD). (반영된 항목 없음)
+[힌트] CSV 를 고쳐 다시 시도하거나, --atomic 없이 부분 가져오기를 사용하세요.
+$ wc -l < ./d6/transactions.jsonl
 0                                        ← 거래 0건
-$ python -m budget_app category list --data-dir ./d5 | wc -l
-5                                        ← 기본 5개만 (CSV 의 salary 안 늘어남)
+$ python -m budget_app category list --data-dir ./d6 | wc -l
+5                                        ← 기본 5개만 (CSV 의 badcat 안 늘어남)
 ```
 
 **ID 발급도 같은 논리입니다.** 준비 단계의 `IdAllocator` 는 메모리 객체이므로, 실패하면 발급 기록이 흔적 없이 사라집니다.
@@ -552,7 +557,7 @@ $ python -m budget_app category list --data-dir ./d5 | wc -l
 
 **부분 성공 모드(기본)의 커밋 단계 안에는 두 번의 파일 쓰기가 있습니다.**
 
-budget_app/services/importexport.py:185-186
+budget_app/services/importexport.py:240-241
 
 ```python
         self.cats.add_many(batch.new_categories)
@@ -612,7 +617,7 @@ budget_app/services/importexport.py:185-186
 | 명령 | 시간 | 추가 메모리 | 거래 파일 읽기/쓰기 | 그 밖의 파일 | 지배 요인 |
 | --- | --- | --- | --- | --- | --- |
 | `add` | O(N + C) | **O(N)** | 1 읽기 + append | 카테고리 **3+ 읽기**, `id_counter` | `next_id()` 의 전체 스캔 |
-| `list` | O(N log N) | O(N) | 1 읽기 | — | 필터 없음 → 전량 정렬 |
+| `list` | O(N log L) | **O(L)** | 1 읽기 | — | `--limit L`(기본 20) → 상위 L 만 힙 유지 |
 | `search` | O(N + k log k) | O(k) | 1 읽기 | — | 스캔 + 통과분만 정렬 |
 | `summary` | O(N + B + C log C) | O(C) | 1 읽기 | 예산 1 읽기 | 단일 패스 집계 + TOP 정렬 |
 | `update` | O(N) | O(N) | **2 읽기** + rewrite | (`--category` 시 카테고리 1 읽기) | 아래 §4.3 |
@@ -627,7 +632,9 @@ budget_app/services/importexport.py:185-186
 
 **`add` 의 "카테고리 3+ 읽기"도 표를 정직하게 쓴 결과입니다.** `cmd_add` 가 (1) 목록이 비었는지 보려고 `list_names()`, (2) 대화형 입력 검증에서 `exists()`(재입력할 때마다 한 번 더), (3) 서비스의 `_require_registered_category` 에서 `exists()` 를 각각 부릅니다. 카테고리 수 C 가 수십 개 규모라 문제가 되지 않을 뿐, **같은 질문을 세 번 묻는 구조**인 것은 맞습니다.
 
-**`update`/`delete`/`rewrite` 계열의 메모리도 O(N)** 입니다. `plan_rewrite` 가 새 파일의 **모든 줄을 리스트로 만든 뒤** `stage_lines` 에 넘기기 때문입니다(storage/jsonl.py:286, 302). 스트리밍 재작성(한 줄씩 읽어 곧바로 한 줄씩 흘려 쓰는 방식)으로 바꾸면 O(1) 이 되지만, 그러면 "바뀐 것이 없으면 파일을 건드리지 않는다"(`RewritePlan.changed`)를 쓰기 전에 알 수 없습니다.
+**`list` 의 메모리가 O(N) 이 아닌 것**도 표에서 눈여겨볼 자리입니다. `--limit L`(기본 20)이 서비스까지 내려가 `heapq.nlargest(L, ...)` 가 되므로, 유지되는 것은 크기 L 짜리 힙뿐입니다. 전체를 한 번 훑어야 하는 것은 그대로라 **시간은 여전히 파일 크기에 비례**하지만, 메모리는 파일 크기와 무관합니다. 한도가 없는 `search` 만 통과분 k 개를 모읍니다.
+
+**`update`/`delete`/`rewrite` 계열의 메모리도 O(N)** 입니다. `plan_rewrite` 가 새 파일의 **모든 줄을 리스트로 만든 뒤** `stage_lines` 에 넘기기 때문입니다(storage/jsonl.py:308, 302). 스트리밍 재작성(한 줄씩 읽어 곧바로 한 줄씩 흘려 쓰는 방식)으로 바꾸면 O(1) 이 되지만, 그러면 "바뀐 것이 없으면 파일을 건드리지 않는다"(`RewritePlan.changed`)를 쓰기 전에 알 수 없습니다.
 
 ### 4.2 `export` 만 O(1) 메모리인 이유
 
@@ -648,31 +655,41 @@ budget_app/services/importexport.py:83-84
 > 차이가 §4.1 표에서 `export` 의 메모리를 O(N) 에서 O(1) 로 바꿉니다.
 > → [12 §1-C](./12-syntax-and-stdlib.md)
 
-반면 `list`/`search` 는 정렬 때문에 전부 모아야 합니다. **정렬은 본질적으로 전체를 봐야 하는 연산**이라 스트리밍이 불가능합니다.
+반면 `list`/`search` 는 정렬 때문에 **전체를 한 번은 훑어야** 합니다. 훑는 것은 피할 수 없지만 **모으는 것**은 갈립니다 — `limit` 이 있으면 상위 N 만 힙에 남기고, 없으면 통과분 전체를 모읍니다.
 
-budget_app/services/transactions.py:85-87
+budget_app/services/transactions.py:104-108
 
 ```python
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
-**모으는 것은 필터를 통과한 것뿐입니다.** 그래서 `search` 의 메모리는 O(N) 이 아니라 O(k) 입니다. `list` 는 필터가 없어 k = N 이 되는 특수한 경우일 뿐입니다.
+**`list --limit N` 의 메모리는 O(N) 입니다** — 파일 크기와 무관합니다. 한도가 없는 `search` 만 통과분을 모으고, 그때도 담기는 것은 필터를 통과한 것뿐이라 메모리는 O(전체) 가 아니라 O(k) 입니다.
 
-> **⚙️ 내부 동작 — `list.sort`** — CPython 의 리스트 정렬은 **Timsort** 입니다.
-> 최악 O(n log n) 이지만 이미 정렬된 구간(run)을 찾아 병합하므로 **거의 정렬된
+> **⚙️ 내부 동작 — `heapq.nlargest`** — 앞의 `n` 개로 크기 `n` 짜리 최소 힙을 만든 뒤
+> 나머지를 흘려보내며 **힙의 최솟값보다 큰 것만** 밀어 넣고 최솟값을 버립니다.
+> 메모리 `O(n)`, 시간 `O(N log n)` 이고, 마지막에 힙을 정렬해 내림차순으로 돌려주므로
+> 결과 순서는 전체 정렬과 같습니다(정렬 키가 유일하므로 동점 처리 차이도 드러나지
+> 않습니다 — id 는 유일합니다). `n` 이 전체에 가까우면 이점이 사라지는데, CPython 은
+> 그 경우 `sorted(...)[:n]` 로 넘어가는 분기를 스스로 갖고 있습니다.
+> → [12 §1-A](./12-syntax-and-stdlib.md)
+
+> **⚙️ 내부 동작 — `sorted`** — 한도가 없는 경로가 쓰는 CPython 의 정렬은 **Timsort**
+> 입니다. 최악 O(n log n) 이지만 이미 정렬된 구간(run)을 찾아 병합하므로 **거의 정렬된
 > 입력에서는 O(n) 에 가깝습니다** — 파일에 날짜순으로 쌓인 가계부 데이터가 정확히
 > 그런 입력입니다. **안정 정렬**이라 키가 같은 원소의 원래 순서가 보존되고,
 > `reverse=True` 도 이 안정성을 깨지 않습니다(뒤집는 것이 아니라 비교 방향만
-> 바꿉니다). 병합에 최대 n/2 만큼의 임시 공간을 씁니다.
-> `sorted(...)` 가 아니라 `items.sort(...)` 인 것은 이미 우리 것인 리스트를
-> 제자리에서 정렬해 사본 하나를 아끼기 때문입니다.
+> 바꿉니다). 병합에 최대 n/2 만큼의 임시 공간을 씁니다. 제자리 정렬인 `list.sort` 가
+> 아니라 `sorted(...)` 인 것은 인자가 리스트가 아니라 **제너레이터**이기 때문입니다
+> — `sorted` 가 그것을 소비하며 리스트를 만들어 줍니다.
 > → [12 §1-A](./12-syntax-and-stdlib.md)
 
-> **⚙️ 내부 동작 — `key=lambda t: (t.date, t.id)`** — 정렬 키가 **튜플**이면 파이썬은
+> **⚙️ 내부 동작 — `key=_sort_key`(= `(tx.date, tx.id)`)** — 정렬 키가 **튜플**이면 파이썬은
 > 앞 원소부터 비교하다 같을 때만 다음으로 내려갑니다(사전식 비교). 즉 "날짜순,
-> 같으면 id 순"이 한 줄로 표현됩니다. 그런데 `t.id` 는 `TransactionId` 값 객체라
+> 같으면 id 순"이 한 줄로 표현됩니다. 그런데 `tx.id` 는 `TransactionId` 값 객체라
 > 비교 연산이 있어야 하고, 그래서 그 클래스에 `__lt__` + `@functools.total_ordering`
 > 이 붙어 있습니다(domain/tx_id.py:51, 91-95). 없으면 **날짜가 겹치는 거래가 둘 이상
 > 생기는 순간** `TypeError` 로 죽습니다 — 날짜가 전부 다르면 드러나지 않는 버그입니다.
@@ -685,13 +702,13 @@ budget_app/services/transactions.py:85-87
 **둘의 횟수가 다른 것이 설계의 흔적입니다.** 소스로 따라가 보면 이렇습니다.
 
 ```
-update (services/transactions.py:52-70)
+update (services/transactions.py:59-77)
   1) self.txs.get(tx_id)          ← 현재 상태 조회 (없으면 AppError)
      · 도메인이 current.with_patch(patch) 로 새 객체를 만든다  (파일 접근 없음)
   2) self.txs.replace(tx_id, updated) → rewrite(_swap) → plan_rewrite → iter_raw
                                   ← 재작성 (읽으면서 쓸 줄을 만든다)
 
-delete (services/transactions.py:72-77)
+delete (services/transactions.py:79-84)
   1) self.txs.delete(tx_id) → rewrite(_drop) → plan_rewrite → iter_raw
                                   ← 읽기와 판정과 재작성이 한 번에
 ```
@@ -802,7 +819,7 @@ M=1000 행에 새 카테고리 K=10개인 CSV 를 가져올 때:
 
 | 순위 | 병목 | 증상 | 개선 방향 |
 |---|---|---|---|
-| 1 | `list` 전량 정렬 | 메모리 O(N), 정렬 O(N log N) | 파일을 날짜 역순으로 유지하거나 인덱스 |
+| 1 | `search` 의 한도 없는 정렬 | 통과분 전체를 모음 → 메모리 O(k) | 파일을 날짜 역순으로 유지하거나 인덱스 (`list --limit L` 은 `heapq.nlargest` 로 메모리 O(L) 해결됨, 시간은 여전히 전체 스캔) |
 | 2 | `add` 의 ID 스캔 | 1건 추가에 전체 읽기 | 메타 파일 캐시 |
 | 3 | `update`/`delete` 재작성 | 1건 수정에 전체 재작성 | 삭제 마커(tombstone) + 주기적 압축 |
 | 4 | `search` 전체 스캔 | 조건과 무관하게 O(N) | 날짜/카테고리 인덱스 |
@@ -836,7 +853,7 @@ M=1000 행에 새 카테고리 K=10개인 CSV 를 가져올 때:
 > 규칙은 한 줄에 하나의 JSON 값, 구분자는 `\n`, 파일 전체는 유효한 JSON 이 **아님**
 > — 그게 전부입니다. 그래서 파이썬 표준 라이브러리에도 `jsonl` 모듈은 없고,
 > 이 프로젝트는 `json.dumps` 한 줄 + `"\n"` 으로 **직접 구현**합니다
-> (storage/jsonl.py:207-208, 69). 규격이 없다는 것이 오히려 요점입니다 —
+> (storage/jsonl.py:229-230, 69). 규격이 없다는 것이 오히려 요점입니다 —
 > 구현할 것이 거의 없습니다.
 
 **"한 줄 = 한 레코드"가 두 가지를 동시에 사 줍니다.**
@@ -844,7 +861,7 @@ M=1000 행에 새 카테고리 K=10개인 CSV 를 가져올 때:
 - **append 가 O(1)**: 파일 끝에 줄 하나를 붙이면 끝입니다. 단일 JSON 배열이면
   닫는 `]` 를 지우고 다시 써야 하므로 전체 재작성입니다.
 - **손상이 한 줄에 갇힘**: 파서를 줄 단위로 돌릴 수 있으므로, 깨진 줄에서 난 예외가
-  그 줄에서 끝납니다. 이 프로젝트의 `_parse_line`(storage/jsonl.py:181-191)이
+  그 줄에서 끝납니다. 이 프로젝트의 `_parse_line`(storage/jsonl.py:201-213)이
   예외를 밖으로 던지지 않고 `RawLine` 으로 **돌려주는** 것이 그 구조를 그대로
   이용한 것입니다.
 
@@ -854,7 +871,7 @@ M=1000 행에 새 카테고리 K=10개인 CSV 를 가져올 때:
 
 **타입 보존**은 CSV 대비 이점입니다. `tags` 가 리스트로, `amount` 가 정수로 저장되므로 읽을 때마다 파싱할 필요가 없습니다.
 
-**그래서 CSV 는 저장 포맷이 아니라 교환 포맷으로만 씁니다.** `export`/`import` 가 CSV 를 쓰는 것은 엑셀·타 가계부와 주고받기 위해서이고, 그 경계에서 `csv_io.parse_row` 가 모든 값을 `validators` 로 다시 세웁니다(storage/csv_io.py:107-123).
+**그래서 CSV 는 저장 포맷이 아니라 교환 포맷으로만 씁니다.** `export`/`import` 가 CSV 를 쓰는 것은 엑셀·타 가계부와 주고받기 위해서이고, 그 경계에서 `csv_io.parse_row` 가 모든 값을 `validators` 로 다시 세웁니다(storage/csv_io.py:121-137).
 
 > **🔎 출처 — RFC 4180 과 파이썬 `csv` 모듈** — CSV 는 표준이 **나중에** 생긴
 > 포맷입니다. 수십 년간 쓰이던 관행을 2005년 RFC 4180 이 뒤늦게 기술한 것이라,
@@ -864,7 +881,7 @@ M=1000 행에 새 카테고리 K=10개인 CSV 를 가져올 때:
 > `excel` 을 씁니다. → [12 §2-A](./12-syntax-and-stdlib.md)
 
 > **⚙️ 내부 동작 — `newline=""` 이 필수인 이유** — CSV 를 여는 `open()` 은 전부
-> `newline=""` 입니다(storage/csv_io.py:82, 142). `csv` 모듈은 **줄바꿈을 스스로
+> `newline=""` 입니다(storage/csv_io.py:89, 142). `csv` 모듈은 **줄바꿈을 스스로
 > 처리합니다** — 필드 안에 개행이 든 따옴표 인용 값(`"메모\n두 줄"`)을 한 레코드로
 > 읽어야 하기 때문입니다. `newline` 을 주지 않으면 `TextIOWrapper` 의 범용 개행
 > 변환이 먼저 끼어들어, 쓸 때는 Windows 에서 `\r\r\n` 이 되고 읽을 때는 인용된
@@ -1019,28 +1036,28 @@ finally:
 | # | 방어 대상 | 구현 | 위치 |
 |---|---|---|---|
 | 1 | 잘못된 필드 값 | 생성자 불변식 (`__post_init__`) | domain/entities.py:68-80 |
-| 2 | 손상된 JSONL 줄 (읽기) | `_parse_line` 이 예외 대신 `RawLine` 반환 | storage/jsonl.py:181-191 |
-| 3 | 손상된 JSONL 줄 (쓰기) | `plan_rewrite` 가 원문 보존 | storage/jsonl.py:289-292 |
+| 2 | 손상된 JSONL 줄 (읽기) | `_parse_line` 이 예외 대신 `RawLine` 반환 | storage/jsonl.py:201-213 |
+| 3 | 손상된 JSONL 줄 (쓰기) | `plan_rewrite` 가 원문 보존 | storage/jsonl.py:311-314 |
 | 4 | 쓰기 중 crash | 임시 파일 + fsync + `os.replace` | storage/jsonl.py:48-87 |
 | 5 | ID 재발급 | `iter_raw` 기반 스캔 + `taken` 집합 + 워터마크 | storage/repositories.py:39-77, storage/ids.py:26-116 |
-| 6 | 왕복 중복 | CSV `id` 컬럼 + 중복 정책 | storage/csv_io.py:131-148 + services/importexport.py:133-164 |
+| 6 | 왕복 중복 | CSV `id` 컬럼 + 중복 정책 | storage/csv_io.py:145-186 + services/importexport.py:187-218 |
 | 7 | 대화형 EOF 무한 대기 | `InputAborted` | cli/prompts.py:28-37, 52-57 |
 | 8 | 잘못된 입력 무한 루프 | `for _ in range(MAX_INPUT_RETRIES)` | cli/prompts.py:66 |
 | 9 | 참조 무결성 (카테고리) | 사용 중 삭제 차단 + 재지정 | services/categories.py:38-89 |
 | 10 | 파이프 끊김 | `raise` → `_silence_broken_pipe` | cli/error_handler.py:57-60 + cli/app.py:50-58, 91-94 |
 | 11 | Ctrl+C | `except KeyboardInterrupt` → 130 | cli/error_handler.py:61-63 (`EXIT_INTERRUPT`, cli/config.py:29) |
-| 12 | 스택트레이스 노출 | `except Exception` + `logger.exception`(= `exc_info=True`) | cli/error_handler.py:106-119 |
+| 12 | 스택트레이스 노출 | `except Exception` + `logger.error(..., exc_info=output.debug_enabled())` — 기본 실행에서는 붙지 않고 `--debug` 일 때만 | cli/error_handler.py:113-126 |
 | 13 | 인코딩 불일치 | 모든 `open` 에 `encoding` 명시 | 전역 (값은 storage/config.py:22, 39-40) |
-| 14 | CRLF 오염 | JSONL 은 `newline="\n"`, CSV 는 `newline=""` | storage/jsonl.py:66, 239 / storage/csv_io.py:82, 142 |
+| 14 | CRLF 오염 | JSONL 은 `newline="\n"`, CSV 는 `newline=""` | storage/jsonl.py:66, 239 / storage/csv_io.py:89, 142 |
 | 15 | 음수 `--top` | `max(0, top_n)` | services/budgets.py:57 |
 | 16 | 환경변수 `=0` 오독 | `FALSY_ENV_VALUES` 집합 | cli/config.py:19 |
 | 17 | falsy 반환값 오독 | `EXIT_OK if result is None else result` | cli/error_handler.py:54 |
 | 18 | 백업 폴더 덮어쓰기 | `mkdir(exist_ok=False)` | storage/backup.py:30 |
 | 19 | 검색 조건 정규화 누락 | 각 명세 생성자가 `validators` 를 호출 | domain/specs.py:176, 189, 200, 211 |
 | 20 | 부분 수정 필드명 오타 | `TransactionPatch` dataclass | domain/entities.py:127-154 |
-| 21 | 바뀐 것 없는데 재작성 | `RewritePlan.changed` 선판정 후 건너뜀 | storage/jsonl.py:264-311, 325-327 |
-| 22 | 빈 CSV 오진단 | 헤더 없음과 컬럼 누락 구분 | storage/csv_io.py:90-104 |
-| 23 | 찢어진 꼬리에 이어 쓰기 | 마지막 바이트를 `rb`+`seek` 로 확인 후 개행 보충 | storage/jsonl.py:249-262 |
+| 21 | 바뀐 것 없는데 재작성 | `RewritePlan.changed` 선판정 후 건너뜀 | storage/jsonl.py:286-333, 325-327 |
+| 22 | 빈 CSV 오진단 | 헤더 없음과 컬럼 누락 구분 | storage/csv_io.py:104-118 |
+| 23 | 찢어진 꼬리에 이어 쓰기 | 마지막 바이트를 `rb`+`seek` 로 확인 후 개행 보충 | storage/jsonl.py:271-284 |
 | 24 | 다중 파일 부분 커밋 은폐 | 어디까지 반영됐는지 로그 + 예외 재전파 | storage/unit_of_work.py:145-156 |
 | 25 | 백업에서 `id_counter` 누락 | glob 밖의 데이터 파일을 명시 목록으로 | storage/backup.py:36-47 |
 
@@ -1097,10 +1114,10 @@ finally:
 > 임시 파일에 전부 쓰고 `flush`+`fsync` 로 디스크에 내린 뒤 `os.replace` 로 이름을 바꿉니다. `os.replace` 는 POSIX 의 `rename(2)`, Windows 의 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` 로 내려가고, 같은 파일시스템 안에서 원자적이라 "이전" 아니면 "이후"만 존재합니다. 경계는 두 군데입니다 — 디렉터리 엔트리는 fsync 하지 않아 아주 짧은 창이 남고(개인용 CLI 규모에서 의도적으로 생략), Windows 에서는 대상 파일이 열려 있으면 `os.replace` 가 `PermissionError` 로 **그냥 실패**합니다. 후자는 `UnitOfWork.commit` 이 어디까지 반영됐는지 로그로 남기고 예외를 그대로 올립니다.
 
 **"거래가 10만 건이면요?"**
-> `list` 의 전량 정렬이 먼저 무너집니다(메모리 O(N)). 그다음이 `add` 의 ID 스캔 — 시간뿐 아니라 **메모리도 O(N)** 입니다. 파일의 모든 id 를 `taken` 집합에 담아야 재발급을 막을 수 있기 때문입니다. 그다음이 `update`/`delete` 의 전량 재작성입니다. 공통 해법은 인덱스이고, 제대로 하려면 SQLite 가 맞습니다. 서비스 계층에 `open()` 이 없으므로 저장소만 교체하면 됩니다.
+> 한도 없는 전량 정렬(`search`)이 먼저 무너집니다(메모리 O(k)). `list --limit L` 은 `heapq.nlargest` 덕분에 메모리가 O(L) 로 묶이지만 시간은 여전히 전체 스캔입니다. 그다음이 `add` 의 ID 스캔 — 시간뿐 아니라 **메모리도 O(전체)** 입니다. 파일의 모든 id 를 `taken` 집합에 담아야 재발급을 막을 수 있기 때문입니다. 그다음이 `update`/`delete` 의 전량 재작성입니다. 공통 해법은 인덱스이고, 제대로 하려면 SQLite 가 맞습니다. 서비스 계층에 `open()` 이 없으므로 저장소만 교체하면 됩니다.
 
 **"import 에 깨진 행이 섞이면요?"**
-> 두 축으로 답합니다. 잘못된 데이터는 `--atomic` 여부로, 이미 저장된 거래는 `--on-duplicate` 로 정합니다. 두 숫자(`skipped`/`duplicated`)를 나눠 보고하는 이유는 사용자가 해야 할 일이 정반대이기 때문입니다. 원자 모드에서는 준비 단계가 끝나기 전에 파일을 건드리지 않으므로 카테고리 자동 등록까지 함께 롤백됩니다.
+> 두 축으로 답합니다. 잘못된 데이터는 `--atomic` 여부로, 이미 저장된 거래는 `--on-duplicate` 로 정합니다. 미등록 카테고리 행도 "잘못된 데이터" 축이라 기본은 `skipped`, `--atomic` 이면 전수 롤백이고, 받아들이려면 `--auto-category` 를 명시해야 합니다. 두 숫자(`skipped`/`duplicated`)를 나눠 보고하는 이유는 사용자가 해야 할 일이 정반대이기 때문입니다. 원자 모드에서는 준비 단계가 끝나기 전에 파일을 건드리지 않으므로 `--auto-category` 로 요청한 카테고리 등록까지 함께 롤백됩니다.
 
 **"동시에 두 번 실행하면요?"**
 > 안전하지 않습니다. ID 중복 발급과 lost update 가 가능합니다. 단일 사용자 CLI 를 전제한 설계이며, 필요하면 잠금 디렉터리(`mkdir` 의 원자성 이용)나 SQLite 로 해결할 수 있습니다. `os.replace` 의 원자성은 격리성을 보장하지 않는다는 점을 구분해서 말하는 것이 중요합니다.

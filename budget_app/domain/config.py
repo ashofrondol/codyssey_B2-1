@@ -17,6 +17,10 @@ VALID_TYPES = (TYPE_INCOME, TYPE_EXPENSE)
 #: 태그 구분자 — 도메인 규칙이고 CSV 는 이것을 빌려 쓴다(이전 이름: CSV_TAG_SEPARATOR)
 TAG_SEPARATOR = ","
 
+#: 텍스트 필드가 표현 가능해야 하는 인코딩. 저장(JSONL)도 교환(CSV)도 UTF-8 이므로,
+#: **여기서 통과한 값은 어느 출구로도 나갈 수 있다**는 것이 이 상수의 뜻이다.
+TEXT_ENCODING = "utf-8"
+
 # 날짜/월 형식
 DATE_FORMAT = "%Y-%m-%d"
 MONTH_FORMAT = "%Y-%m"

@@ -185,8 +185,8 @@ budget_app/cli/app.py:84-98
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:
@@ -225,7 +225,7 @@ EXIT_INTERRUPT = 130
 | EXIT_IO | 3 | 파일 입출력 오류 |
 | EXIT_APP | 4 | 애플리케이션 정의 오류(AppError) |
 | EXIT_NO_CATEGORY | 5 | 등록된 카테고리 없음 |
-| EXIT_ENCODING | 6 | UTF-8 이 아닌 파일 |
+| EXIT_ENCODING | 6 | 인코딩 오류 (읽을 파일이 UTF-8 아님 / UTF-8 로 쓸 수 없는 값) |
 | EXIT_INTERRUPT | 130 | Ctrl+C 중단 (128+SIGINT 관례) |
 
 설계 의도: 각 명령 핸들러가 정수를 반환하고, 그것이 `main()` → `sys.exit()` 를 거쳐 셸까지 전달되므로, 이 프로그램을 셸 스크립트에서 호출해 `if` 문으로 성공/실패를 분기할 수 있습니다. 예외 종류별로 어떤 코드가 반환되는지는 `error_handler.py` 의 `handle_errors` 가 결정합니다([06](./06-decorators.md)).
@@ -238,7 +238,7 @@ EXIT_INTERRUPT = 130
 
 인자에 `= 값` 을 붙이면 호출 시 생략할 수 있고, 생략하면 기본값이 쓰입니다.
 
-budget_app/services/transactions.py:27-35
+budget_app/services/transactions.py:34-42
 ```python
     @log_call
     def add(
@@ -251,7 +251,7 @@ budget_app/services/transactions.py:27-35
         tags: list[str] | None = None,
 ```
 
-`date`~`amount` 는 필수, `memo` 와 `tags` 는 선택입니다. 주의할 점: `tags` 의 기본값이 `[]` 가 아니라 `None` 입니다. 파이썬에서 **기본값은 함수 정의 시점에 딱 한 번 만들어져 모든 호출이 공유**하므로, 리스트 같은 가변(mutable — 만든 뒤에도 내용을 바꿀 수 있는) 객체를 기본값으로 쓰면 호출들끼리 값이 섞이는 유명한 버그가 생깁니다. 그래서 `None` 을 기본값으로 두고, 실제 빈 리스트 변환은 `validators.parse_tags`(domain/validators.py:128-169)가 담당합니다.
+`date`~`amount` 는 필수, `memo` 와 `tags` 는 선택입니다. 주의할 점: `tags` 의 기본값이 `[]` 가 아니라 `None` 입니다. 파이썬에서 **기본값은 함수 정의 시점에 딱 한 번 만들어져 모든 호출이 공유**하므로, 리스트 같은 가변(mutable — 만든 뒤에도 내용을 바꿀 수 있는) 객체를 기본값으로 쓰면 호출들끼리 값이 섞이는 유명한 버그가 생깁니다. 그래서 `None` 을 기본값으로 두고, 실제 빈 리스트 변환은 `validators.parse_tags`(domain/validators.py:151-195)가 담당합니다.
 
 > **💡 쉽게 말하면** — 기본값은 함수를 만들 때 한 번 준비해 두고 계속 돌려쓰는 물건입니다. 빈 바구니를 기본값으로 두면 손님마다 새 바구니를 내주는 게 아니라 **모두가 같은 바구니 하나**를 씁니다. 앞 손님이 담아 둔 물건이 다음 손님 바구니에 그대로 들어 있게 됩니다. `None` 을 기본값으로 두는 것은 "바구니는 미리 주지 않을 테니 필요하면 그때 새로 꺼내 쓰라"고 미루는 셈입니다.
 > 다만 이 비유는 기본값이 늘 위험하다는 인상을 주는 데서 깨집니다 — 공유돼도 안전한 것, 즉 내용이 바뀔 수 없는 값(숫자, 문자열)은 기본값으로 두어도 아무 일이 없습니다. 바로 윗줄의 `memo: str = ""` 가 그대로 남아 있는 이유입니다.
@@ -288,7 +288,7 @@ budget_app/cli/handlers.py:41-48
 
 시그니처의 `*` **뒤에 오는 인자는 반드시 이름을 붙여서만** 넘길 수 있습니다.
 
-budget_app/services/importexport.py:88-94
+budget_app/services/importexport.py:88-95
 ```python
     def import_csv(
         self,
@@ -303,7 +303,7 @@ budget_app/services/importexport.py:88-94
 
 `import_csv(path, True)` 는 **문법 오류가 아니라 TypeError** 로 거부되고, 반드시 `import_csv(path, atomic=True)` 로 써야 합니다. 실제 호출부도 그렇게 되어 있습니다.
 
-budget_app/services/importexport.py:168-179
+budget_app/services/importexport.py:220-232
 ```python
     def _commit(self, batch: _Batch, *, atomic: bool) -> ImportReport:
         """준비된 것을 파일에 반영한다 — 여기서 처음 파일이 바뀐다."""
@@ -340,7 +340,7 @@ f(1, b=2)             # OK — c, d 는 기본값 사용
 f(1, d=4, b=2)        # OK — 키워드끼리는 순서도 자유
 ```
 
-기본값이 있고 없고와도 무관합니다. 바로 위에서 본 `import_csv`(services/importexport.py:88-94)가 실제로 `*` 뒤에 인자 두 개를 두는 예입니다.
+기본값이 있고 없고와도 무관합니다. 바로 위에서 본 `import_csv`(services/importexport.py:88-95)가 실제로 `*` 뒤에 인자 두 개를 두는 예입니다.
 
 참고로 `f(1, b=2, 3)` 처럼 키워드 인자 **뒤에** 위치 인자를 쓰면 `TypeError` 가 아니라 `SyntaxError: positional argument follows keyword argument` 입니다.
 
@@ -397,7 +397,7 @@ budget_app/domain/entities.py:113-124
 
 **strip + lower** — 입력 정규화의 기본입니다. 앞뒤 공백을 지우고 소문자로 통일합니다.
 
-budget_app/domain/validators.py:73-77
+budget_app/domain/validators.py:96-100
 ```python
 def parse_type(value: Any) -> str:
     v = str(value or "").strip().lower()
@@ -412,7 +412,7 @@ def parse_type(value: Any) -> str:
 
 **split + join** — 문자열 ↔ 리스트 변환의 짝입니다. 태그는 저장할 땐 리스트, CSV 로 내보낼 땐 쉼표 문자열입니다.
 
-budget_app/domain/validators.py:128-158 (split — 쉼표 문자열을 리스트로)
+budget_app/domain/validators.py:151-183 (split — 쉼표 문자열을 리스트로)
 ```python
 def parse_tags(value: Any) -> list[str]:
     """리스트 또는 쉼표 구분 문자열을 태그 리스트로 정규화한다.
@@ -430,7 +430,7 @@ def parse_tags(value: Any) -> list[str]:
     seen: list[str] = []
 ```
 
-budget_app/storage/csv_io.py:151-159 (join — 리스트를 쉼표 문자열로)
+budget_app/storage/csv_io.py:189-197 (join — 리스트를 쉼표 문자열로)
 ```python
 def _to_row(tx: Transaction, include_id: bool) -> dict[str, object]:
     row: dict[str, object] = {
@@ -508,7 +508,7 @@ budget_app/cli/handlers.py:49
 
 ID 생성 템플릿도 같은 방식입니다.
 
-budget_app/domain/config.py:26
+budget_app/domain/config.py:30
 ```python
 TX_ID_FORMAT = "TX-{:06d}"
 ```
@@ -543,7 +543,7 @@ LOG_DONE = "done %s"
 LOG_TOOK = "%s took %.2fms"
 ```
 
-budget_app/storage/jsonl.py:203
+budget_app/storage/jsonl.py:225
 ```python
                 logger.warning(messages.LOG_CORRUPT_LINE, self.path.name, raw.lineno, raw.error)
 ```
@@ -609,7 +609,7 @@ f"{C()!s}"      # 'STR'
 
 | 소스의 표기 | 위치 | 뜻 | 결과 |
 |---|---|---|---|
-| `{:06d}` | domain/config.py:26 `TX_ID_FORMAT` | 너비 6, 빈자리 `0`, 십진 정수 | `7` → `"000007"` → `"TX-000007"` |
+| `{:06d}` | domain/config.py:30 `TX_ID_FORMAT` | 너비 6, 빈자리 `0`, 십진 정수 | `7` → `"000007"` → `"TX-000007"` |
 | `{last_day:02d}` | domain/periods.py:30 | 너비 2, 0 채움 | `5` → `"05"` |
 | `{type:<7}` | cli/messages.py:43 `FMT_TX_LINE` | 왼쪽 정렬, 너비 7 | `"income"` → `"income "` (표의 열 맞춤) |
 | `{self.value!r}` | domain/specs.py:182 등 `__repr__` | repr 변환 | `"2024-01"` → `'2024-01'` (따옴표 포함) |
@@ -638,20 +638,18 @@ DEFAULT_CATEGORIES = ("food", "transport", "rent", "salary", "etc")
 
 리스트가 아니라 튜플인 이유: 튜플은 불변(immutable — 만든 뒤에는 내용을 바꿀 수 없는)이라 어디선가 실수로 `append` 할 수 없습니다. "허용 타입 목록"처럼 프로그램 내내 고정인 값에 적합합니다. 같은 이유로 `ImportReport.errors` 도 `tuple[RejectedRow, ...]` 입니다(domain/results.py:96) — **결과 보고서는 만들어진 뒤 바뀌면 안 되기 때문**입니다.
 
-**list — 순서 있는 수집.** 정렬 전 거래를 모으는 버퍼로 쓰입니다.
+**list — 순서 있는 수집.** 한도 없는 정렬(`search`)에서 통과분을 모으는 버퍼로 쓰입니다.
 
-budget_app/services/transactions.py:79-87
+budget_app/services/transactions.py:104-108
 ```python
-    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
-        """최신순 정렬된 거래를 yield 한다.
-
-        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).
-        그러나 메모리 사용량은 '필터 통과 항목'으로 제한된다.
-        """
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
+
+`sorted(...)` 가 그 리스트를 만듭니다. `limit` 이 있는 `list` 경로는 리스트 대신 크기 `limit` 짜리 **힙**만 유지합니다(`heapq.nlargest`).
 
 **dict — 이름표가 달린 값 묶음.** 카테고리별 합계 누적이 대표적입니다.
 
@@ -711,12 +709,12 @@ budget_app/storage/repositories.py:238
 
 조건을 붙이면 걸러 낼 수도 있습니다.
 
-budget_app/services/transactions.py:85
+budget_app/services/transactions.py:104
 ```python
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
 ```
 
-`if` 절이 뒤에 붙어 "통과한 것만" 남깁니다. 이 한 줄이 `list`/`search` 의 메모리 사용량을 **필터를 통과한 건수**로 제한합니다 — 파일 전체가 아니라.
+`if` 절이 뒤에 붙어 "통과한 것만" 남깁니다. 대괄호가 아니라 **소괄호**라 아직 아무것도 만들지 않은 제너레이터이고(§11.4), 그래서 이 한 줄이 `search` 의 메모리 사용량을 **필터를 통과한 건수**로 제한합니다 — 파일 전체가 아니라.
 
 **딕셔너리 컴프리헨션** — `{키식: 값식 for ... if ...}`. 변경된 필드만 골라낼 때 씁니다.
 
@@ -738,12 +736,22 @@ budget_app/domain/entities.py:144-151
 
 가져오기에서는 두 자료구조를 나란히 씁니다.
 
-budget_app/services/importexport.py:128-131
+budget_app/services/importexport.py:172-185
 ```python
-            batch.transactions.append(parsed.to_transaction(tx_id))
-            if parsed.category not in known_categories:
-                known_categories.add(parsed.category)
-                batch.new_categories.append(parsed.category)
+        if name in known_categories:
+            return True
+        if not auto_category:
+            reason = messages.ERR_IMPORT_CATEGORY_NOT_REGISTERED.format(name=name)
+            if atomic:
+                raise AppError(
+                    messages.ERR_ATOMIC_IMPORT_FAILED.format(lineno=lineno, reason=reason),
+                    hint=messages.HINT_IMPORT_CATEGORY,
+                )
+            batch.note_error(lineno, reason)
+            return False
+        known_categories.add(name)
+        batch.new_categories.append(name)
+        return True
 ```
 
 `known_categories`(set)는 "중복 없는 빠른 소속 검사"용, `new_categories`(list)는 "등록 **순서** 유지"용 — 같은 데이터를 두 자료구조로 이중 관리하는 이유가 각각 다르다는 점이 학습 포인트입니다.
@@ -762,7 +770,7 @@ budget_app/services/importexport.py:128-131
 
 `enumerate` 는 반복하면서 (번호, 원소) 튜플을 내놓습니다. `start` 로 시작 번호를 정할 수 있습니다.
 
-budget_app/storage/jsonl.py:162-179
+budget_app/storage/jsonl.py:162-182
 ```python
     def iter_raw(self) -> Iterator[RawLine]:
         """모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.
@@ -784,16 +792,17 @@ budget_app/storage/jsonl.py:162-179
 
 CSV 가져오기에서는 시작 번호가 2 입니다 — 1행은 헤더가 차지하므로 데이터는 2행부터이기 때문입니다. 그 숫자마저 상수로 뽑혀 있습니다.
 
-budget_app/storage/csv_io.py:87
+budget_app/storage/csv_io.py:96-97
 ```python
-        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
+            for item in enumerate(reader, start=config.CSV_DATA_START_LINE):
+                yield item
 ```
 
-`yield from` 은 "이 반복을 통째로 위임한다"는 뜻입니다([§11.5](#115-yield-from--반복을-통째로-위임)). `for` 로 받아 그대로 `yield` 하던 것을 한 줄로 줄인 것이고, ruff 의 `UP028` 이 지적해 준 자리입니다.
+한때 이 자리는 `yield from enumerate(...)` 한 줄이었습니다([§11.5](#115-yield-from--반복을-통째로-위임)). 지금 `for` 로 풀어 쓴 것은 파서가 던지는 `csv.Error` 를 감싸는 `try` 의 범위를 눈에 보이게 하기 위해서입니다 — `yield` 가 `try` 안에서 일어난다는 사실이 코드에 드러납니다.
 
 지출 TOP N 출력에서는 순위 표시용으로 씁니다. `(category, amount)` 부분은 튜플 안의 튜플을 한 번에 푸는 **중첩 언패킹**(묶음으로 온 값을 그 자리에서 여러 변수로 풀어 받는 것)입니다.
 
-budget_app/cli/presenter.py:76-78
+budget_app/cli/presenter.py:80-82
 ```python
         yield messages.MSG_TOP_EXPENSE_HEADER.format(n=len(summary.top_expense))
         for rank, (category, amount) in enumerate(summary.top_expense, start=1):
@@ -839,7 +848,7 @@ budget_app/services/budgets.py:56-58
 - `[: max(0, top_n)]` — 앞에서 N 개만 자르는 **슬라이싱**입니다. `max(0, ...)` 방어가 중요합니다: 음수가 들어오면 `[:-3]` 은 "뒤 3개 제외"라는 전혀 다른 의미가 되는데, `max(0, -3)` → `[:0]` → 빈 리스트로 만들어 그 오동작을 차단합니다. 다만 CLI 로 들어오는 값은 여기까지 오지 못합니다 — `--top` 은 `type=positive_int`(cli/parser.py:141)라 `--top=-3` 은 파서가 `argument --top: 1 이상이어야 합니다: -3` 으로 거절하고 종료 코드 2 로 끝납니다. 즉 `max(0, top_n)` 은 서비스를 직접 부르는 경로(테스트·다른 진입점)를 위한 이중 방어입니다.
 - 바깥의 `tuple(...)` — 결과를 불변 튜플로 굳힙니다. `MonthlySummary` 가 `frozen=True` dataclass 라 담기는 값도 불변인 편이 일관됩니다.
 
-참고로 `items.sort(key=lambda t: (t.date, t.id), reverse=True)`(services/transactions.py:86)는 **튜플을 key 로** 써서 "날짜가 같으면 id 로" 2차 정렬하는 기법입니다(튜플은 앞 원소부터 차례로 비교됨).
+참고로 `sorted(filtered, key=_sort_key, reverse=True)` 의 `_sort_key`(services/transactions.py:22-24)가 `(tx.date, tx.id)` **튜플을 key 로** 돌려주는데, 이것이 "날짜가 같으면 id 로" 2차 정렬하는 기법입니다(튜플은 앞 원소부터 차례로 비교됨).
 
 > **⚙️ 내부 동작 — `key` 는 원소당 딱 한 번만 계산됩니다.** `sorted`/`list.sort` 는 비교할 때마다 `key` 를 부르지 않습니다. 먼저 전체를 훑어 키 값 배열을 만들어 두고(그래서 호출 횟수는 정확히 **n 회**), 그다음부터는 키끼리만 비교합니다. `lambda t: (t.date, t.id)` 처럼 튜플을 새로 만드는 key 함수를 마음 놓고 쓸 수 있는 이유입니다.
 >
@@ -883,7 +892,7 @@ budget_app/storage/repositories.py:53-63
 
 `except (A, B) as exc:` 처럼 괄호(튜플)로 묶으면 여러 종류의 예외를 같은 블록에서 처리합니다.
 
-budget_app/domain/validators.py:40-70
+budget_app/domain/validators.py:63-93
 ```python
 def parse_amount(value: Any) -> int:
     """금액을 양의 정수로 검증·정규화한다.
@@ -898,7 +907,7 @@ def parse_amount(value: Any) -> int:
     return n
 ```
 
-리팩터 전에는 여기에 `try: int(text)` / `except (ValueError, TypeError):` 가 있었습니다 — `int("abc")` 는 ValueError, `int(None)` 은 TypeError 로 원인은 달라도 사용자에게는 똑같이 "금액은 정수여야 합니다"이므로 튜플로 함께 잡았습니다. 지금은 정규식 `_INTEGER` 로 먼저 걸러 내고 `ValidationError` 를 직접 던지므로, 이 함수에는 `try`/`except` 가 한 줄도 없습니다. 튜플로 묶어 잡는 실제 사용처는 바로 아래의 `_LINE_ERRORS`(storage/jsonl.py:188)와 cli/output.py:62, services/importexport.py:114 입니다.
+리팩터 전에는 여기에 `try: int(text)` / `except (ValueError, TypeError):` 가 있었습니다 — `int("abc")` 는 ValueError, `int(None)` 은 TypeError 로 원인은 달라도 사용자에게는 똑같이 "금액은 정수여야 합니다"이므로 튜플로 함께 잡았습니다. 지금은 정규식 `_INTEGER` 로 먼저 걸러 내고 `ValidationError` 를 직접 던지므로, 이 함수에는 `try`/`except` 가 한 줄도 없습니다. 튜플로 묶어 잡는 실제 사용처는 바로 아래의 `_LINE_ERRORS`(storage/jsonl.py:210)와 cli/output.py:62, services/importexport.py:121 입니다.
 
 **예외 튜플을 상수로 뽑는 기법**도 있습니다. 저장 파일의 한 줄을 도메인 객체로 세울 때 날 수 있는 예외들이 여러 개라, 이름과 주석을 붙여 한곳에 모았습니다.
 
@@ -910,7 +919,7 @@ budget_app/storage/jsonl.py:37-40
 _LINE_ERRORS = (json.JSONDecodeError, ValidationError, KeyError, TypeError)
 ```
 
-budget_app/storage/jsonl.py:181-191
+budget_app/storage/jsonl.py:201-213
 ```python
     def _parse_line(self, lineno: int, line: str) -> RawLine:
         try:
@@ -987,12 +996,12 @@ def ask_until(prompt: str, validator: Callable[[str], T]) -> T:
 
 | 모드 | 의미 | 이 프로젝트의 사용처 |
 |---|---|---|
-| `"r"` (기본) | 읽기 | storage/jsonl.py:174 — JSONL 스트리밍 읽기 |
+| `"r"` (기본) | 읽기 | storage/jsonl.py:177 — JSONL 스트리밍 읽기 |
 | `"w"` | 새로 쓰기 (기존 내용 삭제) | storage/jsonl.py:61 — 임시 파일 전체 쓰기 |
-| `"a"` | 끝에 이어 쓰기 (append) | storage/jsonl.py:234 — 엔티티 이어 쓰기 |
-| `"rb"` | 바이너리 읽기 | storage/jsonl.py:258 — 마지막 바이트가 개행인지 확인 |
+| `"a"` | 끝에 이어 쓰기 (append) | storage/jsonl.py:256 — 엔티티 이어 쓰기 |
+| `"rb"` | 바이너리 읽기 | storage/jsonl.py:280 — 마지막 바이트가 개행인지 확인 |
 
-budget_app/storage/jsonl.py:210-212
+budget_app/storage/jsonl.py:232-234
 ```python
     def append(self, entity: T) -> None:
         self._append_lines([self._encode(entity)])
@@ -1058,7 +1067,7 @@ budget_app/storage/config.py:22-22
 FILE_ENCODING = "utf-8"
 ```
 
-UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, `handle_errors` 가 이를 잡아 "엑셀에서 CSV UTF-8 로 다시 저장하라"는 힌트(cli/messages.py:115-116)를 보여줍니다.
+UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, `handle_errors` 가 이를 잡아 "엑셀에서 CSV UTF-8 로 다시 저장하라"는 힌트(cli/messages.py:116-117)를 보여줍니다.
 
 한 가지 예외가 있는데, 그것도 상수로 설명되어 있습니다. JSONL 파일은 `errors="surrogateescape"`(storage/config.py:25)로 엽니다.
 
@@ -1071,7 +1080,7 @@ UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, `handle_erro
 텍스트 모드의 파이썬은 기본적으로 줄바꿈을 OS 방식으로 자동 변환합니다(Windows 에서 `"\n"` 을 쓰면 실제 파일엔 `"\r\n"`). 이 프로젝트는 목적에 따라 두 값을 구분해 씁니다.
 
 - **JSONL 쓰기: `newline="\n"`** (storage/jsonl.py:61, 234) — 자동 변환을 끄고 항상 LF 로 고정합니다. Windows 에서 만든 데이터 파일과 리눅스에서 만든 파일이 바이트 단위로 같아져, 어느 OS 에서든 동일하게 읽힙니다.
-- **CSV 읽고 쓰기: `newline=""`** (storage/csv_io.py:82, 142) — csv 모듈 공식 문서가 요구하는 값입니다. 줄바꿈 처리를 csv 모듈에 완전히 맡긴다는 뜻으로, 이를 빼면 Windows 에서 `\r\r\n` 이 생겨 한 줄 걸러 빈 줄이 들어가는 유명한 버그가 납니다.
+- **CSV 읽고 쓰기: `newline=""`** (storage/csv_io.py:89, 142) — csv 모듈 공식 문서가 요구하는 값입니다. 줄바꿈 처리를 csv 모듈에 완전히 맡긴다는 뜻으로, 이를 빼면 Windows 에서 `\r\r\n` 이 생겨 한 줄 걸러 빈 줄이 들어가는 유명한 버그가 납니다.
 
 > **⚙️ 내부 동작 — 세 값이 실제로 무엇을 바꾸는가.** `newline` 은 맨 위 `TextIOWrapper` 층의 옵션이며, 쓰기와 읽기에서 하는 일이 다릅니다.
 >
@@ -1091,19 +1100,23 @@ UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, `handle_erro
 >         f.write("a\nb\n")
 >     Path("b.txt").read_bytes()      # b'a\nb\n'       ← 코드 그대로
 >
-> 이것이 왜 데이터 파일에서 중요하냐면, JSONL 은 **줄이 곧 레코드**라서 줄 끝 바이트가 파일 포맷의 일부이기 때문입니다. 기본값으로 두면 같은 프로그램이 만든 파일이 OS 마다 바이트가 달라지고, `_has_torn_tail` 처럼 **마지막 바이트를 직접 검사하는 코드**(storage/jsonl.py:249-262)가 플랫폼마다 다른 답을 내게 됩니다. `newline=config.LINE_TERMINATOR` 는 그 변수를 아예 없애는 선택입니다. → [12 §3](./12-syntax-and-stdlib.md)
+> 이것이 왜 데이터 파일에서 중요하냐면, JSONL 은 **줄이 곧 레코드**라서 줄 끝 바이트가 파일 포맷의 일부이기 때문입니다. 기본값으로 두면 같은 프로그램이 만든 파일이 OS 마다 바이트가 달라지고, `_has_torn_tail` 처럼 **마지막 바이트를 직접 검사하는 코드**(storage/jsonl.py:271-284)가 플랫폼마다 다른 답을 내게 됩니다. `newline=config.LINE_TERMINATOR` 는 그 변수를 아예 없애는 선택입니다. → [12 §3](./12-syntax-and-stdlib.md)
 
-budget_app/storage/csv_io.py:141-148
+budget_app/storage/csv_io.py:169-178
 ```python
-    count = 0
-    with open(path, "w", encoding=config.CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for tx in txs:
-            writer.writerow(_to_row(tx, include_id))
-            count += 1
-    return count
+    try:
+        with open(tmp, "w", encoding=config.CSV_ENCODING, newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for tx in txs:
+                writer.writerow(_to_row(tx, include_id))
+                count += 1
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
 ```
+
+여는 대상이 `path` 가 아니라 `tmp` 인 것에 주목하세요. 다 쓰고 `fsync` 한 뒤에야 `os.replace` 로 이름을 바꾸므로, 내보내는 도중 실패해도 헤더만 남은 반쪽 CSV 가 생기지 않습니다(§8.5 의 JSONL 쓰기와 같은 규칙).
 
 ### 8.4 with 문(컨텍스트 매니저)이 보장하는 것
 
@@ -1291,7 +1304,7 @@ def backup_data_dir(data_dir: Path, now: datetime | None = None) -> Path:
 
 > **🔎 문법의 출처 — 표기 자리와 의미가 따로 들어왔습니다.** `def f(x: int) -> str:` 이라는 **자리**는 PEP 3107(파이썬 3.0)이 "함수 어노테이션"이라는 이름으로 먼저 뚫어 둔 것입니다. 그때는 아무 객체나 적을 수 있는 빈 슬롯이었고, "여기 적히는 것은 **타입**이다"라는 의미를 확정한 것이 7년 뒤 PEP 484(**파이썬 3.5**)입니다. 그래서 `typing` 모듈은 문법이 아니라 **나중에 얹힌 라이브러리**이고, 이 절 전체의 이상한 사정(`List` 와 `list` 가 둘 다 있는 것 등)이 여기서 나옵니다.
 >
-> 변수에 붙이는 표기 — 이 소스의 `seen: list[str] = []`(domain/validators.py:158) 나 `taken: set[TransactionId] = set()`(storage/repositories.py:56) 같은 것 — 은 또 별개로 PEP 526(**파이썬 3.6**)에서 들어왔습니다. dataclass 가 `field: type` 줄만으로 필드를 선언할 수 있는 것도 이 PEP 526 표기 위에 세워진 기능입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+> 변수에 붙이는 표기 — 이 소스의 `seen: list[str] = []`(domain/validators.py:183) 나 `taken: set[TransactionId] = set()`(storage/repositories.py:56) 같은 것 — 은 또 별개로 PEP 526(**파이썬 3.6**)에서 들어왔습니다. dataclass 가 `field: type` 줄만으로 필드를 선언할 수 있는 것도 이 PEP 526 표기 위에 세워진 기능입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
 budget_app/storage/jsonl.py:25-28
 ```python
@@ -1303,7 +1316,7 @@ from typing import Any, Generic, TypeVar
 
 이 프로젝트에 실제로 쓰인 대표 시그니처들:
 
-budget_app/storage/jsonl.py:193 (Iterator — 하나씩 꺼내 쓰는 반복자를 반환)
+budget_app/storage/jsonl.py:215 (Iterator — 하나씩 꺼내 쓰는 반복자를 반환)
 ```python
     def stream(self) -> Iterator[T]:
 ```
@@ -1333,7 +1346,7 @@ budget_app/storage/repositories.py:112 (`| None` — "Transaction 또는 None")
 
 아래 넷이 **기본 자료형이 아니라 `collections.abc`** 에서 오는 것이 우연이 아닙니다. 이들은 "무엇으로 만들어졌는가"가 아니라 **"무엇을 할 수 있는가"** 를 말하는 추상 기반 클래스입니다. 그 차이가 §10.2 의 주제입니다.
 
-`Iterable` 과 `Iterator` 의 구분이 실전 포인트입니다. `append_all(self, entities: Iterable[T])`(storage/jsonl.py:213)는 "리스트든 제너레이터든 반복만 되면 받겠다"는 **관대한 입력**이고, `stream(self) -> Iterator[T]`(storage/jsonl.py:193)은 "한 번 순회하면 소진되는 반복자를 준다"는 **정확한 출력** 선언입니다.
+`Iterable` 과 `Iterator` 의 구분이 실전 포인트입니다. `append_all(self, entities: Iterable[T])`(storage/jsonl.py:235)는 "리스트든 제너레이터든 반복만 되면 받겠다"는 **관대한 입력**이고, `stream(self) -> Iterator[T]`(storage/jsonl.py:215)은 "한 번 순회하면 소진되는 반복자를 준다"는 **정확한 출력** 선언입니다.
 
 `Callable` 은 함수를 인자로 받는 자리에 쓰입니다.
 
@@ -1360,12 +1373,12 @@ def ask_until(prompt: str, validator: Callable[[str], T]) -> T:
 
 `list` 는 **구체적인 자료형**(메모리에 다 들어 있고, `len()` 이 되고, 몇 번이든 다시 순회 가능)이고 `Iterable` 은 **약속**(한 번 for 문에 넣을 수 있다)입니다. 후자가 훨씬 넓습니다. 이 코드는 그 차이를 의도적으로 씁니다 — **받을 때는 넓게, 돌려줄 때는 정확하게**.
 
-budget_app/storage/jsonl.py:213 (받는 쪽 — 리스트든 제너레이터든 튜플이든)
+budget_app/storage/jsonl.py:235 (받는 쪽 — 리스트든 제너레이터든 튜플이든)
 ```python
     def append_all(self, entities: Iterable[T]) -> int:
 ```
 
-budget_app/storage/jsonl.py:193 (주는 쪽 — "한 번 순회하면 소진된다"는 경고)
+budget_app/storage/jsonl.py:215 (주는 쪽 — "한 번 순회하면 소진된다"는 경고)
 ```python
     def stream(self) -> Iterator[T]:
 ```
@@ -1374,7 +1387,7 @@ budget_app/storage/jsonl.py:193 (주는 쪽 — "한 번 순회하면 소진된�
 
 #### ② `Sequence` 를 고른 자리는 버그 방지선이다
 
-budget_app/cli/presenter.py:96-101
+budget_app/cli/presenter.py:100-105
 ```python
 def category_lines(names: Sequence[str]) -> Iterator[str]:
     if not names:
@@ -1490,7 +1503,7 @@ TransactionPatch(catgeory="food")   # TypeError: 오타가 즉시 드러남
 
 파이썬의 `or` 는 왼쪽이 거짓 같은 값(None, `""`, 0, 빈 리스트 …)이면 오른쪽을 반환합니다. `(value or "")` 는 "value 가 None 이면 빈 문자열로 대체"라는 뜻입니다.
 
-budget_app/domain/validators.py:74
+budget_app/domain/validators.py:97
 ```python
     v = str(value or "").strip().lower()
 ```
@@ -1545,7 +1558,7 @@ budget_app/cli/error_handler.py:50-54
 
 > **🔎 문법의 출처 — 순서가 이상한 데는 사연이 있습니다.** 조건 표현식은 PEP 308 로 **파이썬 2.5** 에 들어왔습니다. C 계열의 `조건 ? A : B` 와 달리 **값이 먼저, 조건이 가운데** 오는 것은 "평소에 쓰는 값을 앞세우고 예외 조건을 뒤에 단다"는 영어 어순(`x if y else z`)을 따른 결과입니다. 그 전에는 `조건 and A or B` 라는 관용구를 썼는데, **`A` 가 거짓 같은 값이면 조건이 참인데도 `B` 가 나오는** 치명적 버그가 있어 PEP 308 이 도입된 직접적 이유가 되었습니다. 이 소스의 `TransactionId.parse(raw_id) if raw_id else None` 이 딱 그 함정에 걸릴 자리인데(정상 결과가 거짓일 수 있는 값이라면), 조건 표현식은 조건만 보고 가지를 고르므로 안전합니다. → [12 §1-A](./12-syntax-and-stdlib.md)
 
-budget_app/storage/csv_io.py:113-123
+budget_app/storage/csv_io.py:127-137
 ```python
     raw_id = (row.get(config.CSV_ID_COLUMN) or "").strip()
     return ParsedRow(
@@ -1562,7 +1575,7 @@ budget_app/storage/csv_io.py:113-123
 
 "id 값이 있으면 형식을 검증하고, 없으면 None(= 새로 발급해 달라)" — 빈 id 가 오류가 아니라는 정책이 한 줄에 들어 있습니다.
 
-budget_app/storage/jsonl.py:189
+budget_app/storage/jsonl.py:211
 ```python
             data_dict = data if isinstance(data, dict) else None
 ```
@@ -1584,7 +1597,7 @@ budget_app/storage/repositories.py:248-254
 
 호출부는 이 반환값으로 메시지만 바꿉니다.
 
-budget_app/cli/handlers.py:84-90
+budget_app/cli/handlers.py:88-94
 ```python
 def cmd_category_add(ctx: AppContext, args: argparse.Namespace) -> int:
     name = prompts.ask_category_name(args.name)
@@ -1595,7 +1608,7 @@ def cmd_category_add(ctx: AppContext, args: argparse.Namespace) -> int:
     return config.EXIT_OK
 ```
 
-"이미 존재하는 카테고리 추가"는 사용자 실수라기보다 정상 시나리오이므로 예외가 아닌 False 가 적절합니다. 같은 관례가 `TransactionRepository.delete`(storage/repositories.py:150-171)에도 쓰이는데, 이쪽은 서비스 계층(services/transactions.py:72-77)이 False 를 받아 AppError 로 승격시킵니다 — **"저장소는 사실만 보고, 오류 판정은 서비스가 한다"** 는 계층 분리입니다([04](./04-architecture.md)).
+"이미 존재하는 카테고리 추가"는 사용자 실수라기보다 정상 시나리오이므로 예외가 아닌 False 가 적절합니다. 같은 관례가 `TransactionRepository.delete`(storage/repositories.py:150-171)에도 쓰이는데, 이쪽은 서비스 계층(services/transactions.py:79-84)이 False 를 받아 AppError 로 승격시킵니다 — **"저장소는 사실만 보고, 오류 판정은 서비스가 한다"** 는 계층 분리입니다([04](./04-architecture.md)).
 
 ### 11.4 튜플 언패킹 — 여러 값을 한 번에 받기
 
@@ -1621,14 +1634,14 @@ budget_app/domain/queries.py:78-79
 
 ### 11.5 `yield from` — 반복을 통째로 위임
 
-budget_app/services/transactions.py:87
+budget_app/services/transactions.py:108
 ```python
-        yield from items
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
-`for it in items: yield it` 과 같은 뜻이지만 한 줄입니다. 프레젠터에서는 다른 제너레이터 함수에 위임하는 데 씁니다.
+`for it in sorted(...): yield it` 과 같은 뜻이지만 한 줄입니다. 프레젠터에서는 다른 제너레이터 함수에 위임하는 데 씁니다.
 
-budget_app/cli/presenter.py:72-73
+budget_app/cli/presenter.py:76-77
 ```python
     if summary.budget is not None:
         yield from _budget_lines(summary)
@@ -1638,7 +1651,7 @@ budget_app/cli/presenter.py:72-73
 
 > **🔎 문법의 출처 / ⚙️ 왜 for 문보다 나은가** — `yield from` 은 PEP 380 으로 **파이썬 3.3** 에 들어왔습니다. 그 전에는 `for it in items: yield it` 이 유일한 방법이었습니다. 단순한 줄임말처럼 보이지만 하는 일이 더 많습니다 — `yield from`은 바깥 소비자와 안쪽 제너레이터를 **직접 연결**해서, 값뿐 아니라 `send()`·`throw()`·`close()` 와 안쪽의 `return` 값까지 그대로 통과시킵니다.
 >
-> 이 소스에서 실질적인 이득은 **닫힘의 전파**입니다. `tx_table` 이 `limit` 에 도달해 `break` 하면 상류 제너레이터가 닫히는데, `yield from` 으로 이어져 있으면 그 닫힘이 `_budget_lines`·`stream_sorted` 를 거쳐 `open()` 된 파일까지 한 번에 전해집니다. 손으로 쓴 for 루프는 그 신호를 삼켜 버릴 수 있습니다. ruff 의 `UP028` 규칙이 `for ... : yield ...` 를 지적하는 것도 이 때문이고, §6.1 의 `yield from enumerate(...)` 가 바로 그 지적을 받아 고친 자리입니다. 제너레이터의 자세한 동작은 [03 §4](./03-python-advanced.md)에서 다룹니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+> 이 소스에서 실질적인 이득은 **닫힘의 전파**입니다. `tx_table` 이 `limit` 에 도달해 `break` 하면 상류 제너레이터가 닫히는데, `yield from` 으로 이어져 있으면 그 닫힘이 `_budget_lines`·`stream_sorted` 를 거쳐 `open()` 된 파일까지 한 번에 전해집니다. 손으로 쓴 for 루프는 그 신호를 삼켜 버릴 수 있습니다. ruff 의 `UP028` 규칙이 `for ... : yield ...` 를 지적하는 것도 이 때문입니다(§6.1 의 CSV 읽기는 `csv.Error` 를 감싸는 `try` 범위를 드러내려고 일부러 풀어 쓴 예외입니다). 제너레이터의 자세한 동작은 [03 §4](./03-python-advanced.md)에서 다룹니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
 ---
 
@@ -1648,16 +1661,16 @@ budget_app/cli/presenter.py:72-73
 |---|---|
 | 패키지/`__main__`/상대 임포트 | `__init__.py:1-3`, `__main__.py:1-8`, cli/handlers.py:22-30 |
 | `if __name__` + `sys.exit` | cli/app.py:97-98, cli/config.py:22-29 |
-| 기본값·키워드·키워드 전용 인자 | services/transactions.py:27-35, cli/handlers.py:33-50, services/importexport.py:88-94 |
+| 기본값·키워드·키워드 전용 인자 | services/transactions.py:34-42, cli/handlers.py:33-50, services/importexport.py:88-95 |
 | `*args`/`**kwargs`, `{**A, **B}` 병합 | decorators.py:37-47, domain/entities.py:113-124 |
-| 문자열 메서드·3가지 포맷 | domain/validators.py:73-77, domain/periods.py:30, cli/messages.py:48, storage/jsonl.py:203 |
-| 포맷 스펙 미니 언어 (`{:06d}`·`{:<7}`·`{!r}`) | domain/config.py:26, cli/messages.py:43, domain/specs.py:182 |
+| 문자열 메서드·3가지 포맷 | domain/validators.py:96-100, domain/periods.py:30, cli/messages.py:48, storage/jsonl.py:225 |
+| 포맷 스펙 미니 언어 (`{:06d}`·`{:<7}`·`{!r}`) | domain/config.py:30, cli/messages.py:43, domain/specs.py:182 |
 | 컴프리헨션 3종 + dict.get 누적 | storage/repositories.py:238·242, domain/entities.py:144-150, services/budgets.py:54 |
-| enumerate/any/sorted/슬라이싱/max | storage/jsonl.py:175, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:56-58, storage/repositories.py:53-63 |
-| try/except/finally/raise | domain/validators.py:95-100·109-114, storage/jsonl.py:181-191, decorators.py:50-66 |
-| open 모드/encoding/newline/with/fsync | storage/jsonl.py:48-72, 220-247, storage/csv_io.py:131-148 |
+| enumerate/any/sorted/슬라이싱/max | storage/jsonl.py:178, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:56-58, storage/repositories.py:53-63 |
+| try/except/finally/raise | domain/validators.py:118-121·132-135, storage/jsonl.py:201-213, decorators.py:50-66 |
+| open 모드/encoding/newline/with/fsync | storage/jsonl.py:48-72, 220-247, storage/csv_io.py:145-186 |
 | pathlib.Path 전반 | storage/backup.py:17-33, storage/jsonl.py:48-60, 150-158 |
 | 타입 힌트 | storage/jsonl.py:25-28·193·213, cli/prompts.py:60 |
-| or 단락 평가·조건 표현식·bool 관례·언패킹·yield from | domain/validators.py:74, storage/csv_io.py:113-123, storage/repositories.py:248-254, domain/queries.py:78, services/transactions.py:87 |
+| or 단락 평가·조건 표현식·bool 관례·언패킹·yield from | domain/validators.py:97, storage/csv_io.py:127-137, storage/repositories.py:248-254, domain/queries.py:78, services/transactions.py:87 |
 
 이 문서의 문법 요소들이 **왜 그 자리에 배치되었는지**(계층 구조)는 [04. 아키텍처](./04-architecture.md)에서, 예외 처리와 dataclass·제너레이터·데코레이터의 전체 그림은 [03. 파이썬 중·고급 기법](./03-python-advanced.md)에서 이어집니다.

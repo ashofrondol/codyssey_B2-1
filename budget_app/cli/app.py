@@ -84,8 +84,8 @@ def _dispatch(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:

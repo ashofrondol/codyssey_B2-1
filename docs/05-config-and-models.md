@@ -194,7 +194,7 @@ budget_app/config.py:1-20
 
 **도메인 정책**
 
-budget_app/domain/config.py:8-22
+budget_app/domain/config.py:8-26
 
 ```python
 # 도메인 정책 — 거래 타입 어휘
@@ -253,7 +253,7 @@ TMP_SUFFIX = ".tmp"
 
 **거래 ID 형식**은 파일이 아니라 **도메인 규칙**이라 도메인이 소유합니다.
 
-budget_app/domain/config.py:24-27
+budget_app/domain/config.py:28-31
 
 ```python
 # 거래 ID — 형식·검증·발굴 세 패턴이 값 객체(tx_id.TransactionId)와 짝을 이룬다
@@ -457,13 +457,31 @@ budget_app/domain/validators.py:1-2
 | `parse_type` | `income`/`expense` | strip + lower | 오류 |
 | `parse_date` | `YYYY-MM-DD` | strip | 오류 |
 | `parse_month` | `YYYY-MM` | strip | 오류 |
-| `parse_category` | 비어 있지 않음 | strip | 오류 |
-| `parse_memo` | (없음) | strip, None → `""` | **허용** |
-| `parse_tags` | 구분자 미포함 | 쉼표 분리, 빈 항목 제거, 순서 보존 중복 제거 | **허용** |
+| `parse_category` | 비어 있지 않음 + **UTF-8 표현 가능** | strip | 오류 |
+| `parse_memo` | **UTF-8 표현 가능** | strip, None → `""` | **허용** |
+| `parse_tags` | 구분자 미포함 + **UTF-8 표현 가능** | 쉼표 분리, 빈 항목 제거, 순서 보존 중복 제거 | **허용** |
 
 > **거래 id 규칙은 이 표에 없습니다.** 예전에는 `validators.parse_tx_id` / `validators.tx_id_number` 두 함수가 여기 있었지만, 형식 검증뿐 아니라 번호 변환·생성·손상 줄 발굴이라는 **고유 행동**이 붙어 있어 값 객체 `TransactionId` 로 옮겼습니다([§4.4](#44-transactionid--값-객체로-모은-거래-id)). **지금 소스에 그 두 이름은 없습니다** — 각각 `domain/tx_id.py` 의 `TransactionId.parse`(클래스메서드)와 `TransactionId.number`(property)가 그 자리를 대신합니다. "규칙이 함수 하나로 끝나는" 필드만 이 표에 남습니다.
 
 **빈 값 허용 여부가 필드마다 다르다**는 점을 눈여겨보세요. 메모와 태그는 없어도 되는 정보라 오류가 아니고, 나머지는 필수입니다. 이 정책이 함수 안에 들어 있어서 호출부는 신경 쓸 필요가 없습니다.
+
+**세 텍스트 필드에만 UTF-8 검사가 붙는 것**도 같은 종류의 정책입니다. 날짜·타입·금액은 형식 자체가 아스키라 검사할 것이 없고, 사용자가 임의의 글자를 넣는 곳은 카테고리·메모·태그뿐입니다.
+
+budget_app/domain/validators.py:40-60
+
+```python
+def _require_utf8(text: str) -> str:
+    """UTF-8 로 저장할 수 있는 문자열인가 — 아니면 ``ValidationError``.
+    ...
+    """
+    try:
+        text.encode(config.TEXT_ENCODING)
+    except UnicodeEncodeError as exc:
+        raise ValidationError(messages.ERR_NOT_UTF8) from exc
+    return text
+```
+
+**왜 경계에서 막는가**: 파이썬은 비-UTF-8 바이트를 `surrogateescape` 로 읽으면 대리 문자(U+DC80~U+DCFF)로 들고 있습니다. 그 값이 그대로 저장되면 파일은 더 이상 유효한 UTF-8 이 아니고, 나중에 엄격한 UTF-8 로 쓰는 경로(`export`)가 `UnicodeEncodeError` 로 죽습니다 — **저장은 성공했다고 안내받은 거래를 영원히 내보낼 수 없는 상태**가 됩니다. 막을 자리는 입력 시점이라, 대화형 입력은 `ask_until` 이 `ValidationError` 를 잡아 그 자리에서 다시 묻고 CSV 가져오기는 그 줄만 `skipped` 로 떨어집니다.
 
 ### 4.3 대표 코드
 
@@ -478,7 +496,7 @@ _INTEGER = re.compile(r"^[+-]?[0-9]+$")
 
 > **⚙️ 내부 동작 — `re.compile` 을 왜 최상위에서 하나** — `re.compile(pattern)` 은 패턴 문자열을 파싱해 바이트코드로 바꾸고 `re.Pattern` 객체로 돌려줍니다. 사실 `re.match(패턴, 문자열)` 처럼 매번 문자열을 넘겨도 CPython 은 `re._compile` 안의 **내부 캐시**(딕셔너리 `re._cache`, 키는 `(타입, 패턴, 플래그)`)에 컴파일 결과를 넣어 두고 재사용합니다 — 로컬 3.13.1 에서 상한은 `re._MAXCACHE = 512` 이고, 가득 차면 가장 오래 안 쓴 항목부터 버립니다(LRU). 그래도 최상위에서 미리 컴파일하는 편이 나은 이유는 셋입니다. (1) 캐시 조회(패턴 문자열 해시 계산)조차 생략됩니다. (2) **패턴 오타가 import 시점에 즉시 터집니다** — 검증 함수가 처음 불리는 런타임까지 숨지 않습니다. (3) 패턴에 이름을 붙일 수 있어 `_INTEGER.match(...)` 가 정규식 문자열보다 읽기 쉽습니다. `domain/tx_id.py:45,48` 의 `_EXACT`/`_SCAN` 도 같은 이유로 최상위에 있습니다. → [12 §2-A](./12-syntax-and-stdlib.md)
 
-budget_app/domain/validators.py:40-70
+budget_app/domain/validators.py:63-93
 
 ```python
 def parse_amount(value: Any) -> int:
@@ -517,7 +535,7 @@ def parse_amount(value: Any) -> int:
 >
 > 다만 이 비유는 **잘못 적혔을 때의 결말**에서 깨집니다 — 주소는 틀리게 적혀도 집배원이 알아서 찾아가 주지만, 여기서는 아무도 알아채지 못합니다. 오류 메시지 한 줄 없이 1월 요약의 합계만 조용히 틀립니다.
 
-budget_app/domain/validators.py:80-99
+budget_app/domain/validators.py:103-122
 
 ```python
 def parse_date(value: Any) -> str:
@@ -577,9 +595,9 @@ False        # 1월 5일이 1월 31일보다 "크다"고 판정된다
 >     >>> [str(v or "") for v in (None, 0, "", False, [], "0")]
 >     ['', '', '', '', '', '0']
 >
-> `0` 과 `False` 와 `[]` 가 전부 `""` 가 됩니다. 날짜·카테고리·메모에서는 "빈 값"이 맞는 처리라 문제가 없지만, **금액에서는 치명적입니다** — 그래서 `parse_amount` 만 `str(value or "")` 가 아니라 **`str(value)`** 를 씁니다(validators.py:64). 만약 여기도 `or ""` 를 썼다면 `parse_amount(0)` 이 `""` 가 되어 "금액은 정수여야 합니다"라는 **틀린 이유**가 나갔을 것입니다. 지금은 `"0"` 이 정규식을 통과하고 `n <= 0` 에서 걸려 "양의 정수여야 합니다"라는 맞는 이유가 나갑니다. 같은 관용구를 어디에 쓰고 어디에 쓰지 않았는지가 의도적이라는 점을 보여 주는 자리입니다.
+> `0` 과 `False` 와 `[]` 가 전부 `""` 가 됩니다. 날짜·카테고리·메모에서는 "빈 값"이 맞는 처리라 문제가 없지만, **금액에서는 치명적입니다** — 그래서 `parse_amount` 만 `str(value or "")` 가 아니라 **`str(value)`** 를 씁니다(validators.py:87). 만약 여기도 `or ""` 를 썼다면 `parse_amount(0)` 이 `""` 가 되어 "금액은 정수여야 합니다"라는 **틀린 이유**가 나갔을 것입니다. 지금은 `"0"` 이 정규식을 통과하고 `n <= 0` 에서 걸려 "양의 정수여야 합니다"라는 맞는 이유가 나갑니다. 같은 관용구를 어디에 쓰고 어디에 쓰지 않았는지가 의도적이라는 점을 보여 주는 자리입니다.
 
-budget_app/domain/validators.py:128-158
+budget_app/domain/validators.py:151-183
 
 ```python
 def parse_tags(value: Any) -> list[str]:
@@ -921,7 +939,7 @@ patch = TransactionPatch(catgeory="food")
 
 `is_empty` property 덕분에 CLI 의 "수정할 필드가 없습니다" 검사도 한 줄이 됩니다.
 
-budget_app/cli/handlers.py:135-144
+budget_app/cli/handlers.py:139-148
 
 ```python
 def cmd_update(ctx: AppContext, args: argparse.Namespace) -> int:

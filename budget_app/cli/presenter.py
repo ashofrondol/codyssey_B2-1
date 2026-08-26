@@ -43,7 +43,11 @@ def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[
     """거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.
 
     제너레이터인 이유: 상류(``stream_sorted``)가 제너레이터이므로 여기서 리스트로
-    모으면 스트리밍이 끊긴다. ``limit`` 이 걸리면 그 지점에서 상류 소비도 멈춘다.
+    모으면 스트리밍이 끊긴다.
+
+    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
+    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
+    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
     """
     count = 0
     for tx in rows:
@@ -126,6 +130,14 @@ def import_problem_lines(report: ImportReport) -> list[str]:
     어떤 문장으로 보여 줄지는 화면의 결정이다.
     """
     lines: list[str] = []
+    if report.new_categories:
+        # 마스터 데이터가 늘어난 것은 사용자가 알아야 할 부수 효과다
+        # (`--auto-category` 를 명시했을 때만 일어난다).
+        lines.append(
+            messages.MSG_IMPORT_NEW_CATEGORIES.format(
+                count=len(report.new_categories), names=", ".join(report.new_categories)
+            )
+        )
     if report.errors:
         lines.append(messages.MSG_IMPORT_ERROR_HEADER)
         lines.extend(

@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import csv
+import os
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,6 +75,12 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며
     ``id`` 는 요구하지 않는다.
+
+    ``csv.Error`` 를 ``AppError`` 로 바꾸는 이유: 파서가 던지는 이 예외는 **일반
+    사용자 조작만으로** 닿는다(한 필드가 128KB 를 넘거나, 따옴표가 닫히지 않아 파일
+    끝까지 한 필드로 읽히는 CSV). 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가
+    "예기치 못한 오류"로 표시된다 — 원인도 해결 방법도 알 수 있는 오류인데
+    분류되지 않은 버그처럼 보이는 것은 요구사항 Q2(원인 + 해결 힌트)에 어긋난다.
     """
     path = Path(path)
     if not path.exists():
@@ -81,10 +88,17 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
-        _check_header(path, reader.fieldnames)
-        # ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,
-        # 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
-        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
+        try:
+            # ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.
+            _check_header(path, reader.fieldnames)
+            # 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을
+            # 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
+            for item in enumerate(reader, start=config.CSV_DATA_START_LINE):
+                yield item
+        except csv.Error as exc:
+            raise AppError(
+                messages.ERR_CSV_PARSE.format(error=exc), hint=messages.HINT_CSV_PARSE
+            ) from exc
 
 
 def _check_header(path: Path, fieldnames: Iterable[str] | None) -> None:
@@ -134,18 +148,41 @@ def write_transactions(path: Path, txs: Iterable[Transaction], *, include_id: bo
     인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.
     반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은
     흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.
+
+    쓰기는 **임시 파일 + ``os.replace``** 다(JSONL 쓰기와 같은 규칙). 대상 경로를
+    곧바로 열면 쓰다가 실패했을 때 헤더만 남은 **반쪽 CSV** 가 그 자리에 남는다.
+    사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을
+    백업으로 믿고 쓰면 데이터가 조용히 사라진다. 지금은 준비가 끝난 뒤에만 이름이
+    바뀌므로 결과는 "완전한 새 파일" 또는 "손대지 않은 기존 파일" 둘 중 하나다.
     """
     path = Path(path)
+    if path.is_dir():
+        # 임시 파일 경로로 먼저 쓰기 때문에, 이 검사가 없으면 폴더를 준 실수가
+        # ``os.replace`` 단계에서야 드러나 오류 메시지에 사용자가 치지 않은
+        # ``.tmp`` 경로가 찍힌다. 읽기 쪽 ``read_rows`` 의 존재 검사와 같은 자리다.
+        raise IsADirectoryError(str(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(config.CSV_FIELDS if include_id else config.CSV_FIELDS_WITHOUT_ID)
 
+    tmp = path.with_name(path.name + config.TMP_SUFFIX)
     count = 0
-    with open(path, "w", encoding=config.CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for tx in txs:
-            writer.writerow(_to_row(tx, include_id))
-            count += 1
+    try:
+        with open(tmp, "w", encoding=config.CSV_ENCODING, newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for tx in txs:
+                writer.writerow(_to_row(tx, include_id))
+                count += 1
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        # 실패했으면 임시 파일을 남기지 않는다(정리 실패가 원인 예외를 가리면 안 된다).
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
     return count
 
 

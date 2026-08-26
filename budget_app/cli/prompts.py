@@ -110,14 +110,20 @@ def registered_category_validator(cat_service: CategoryService) -> Callable[[str
 
 
 def ask_transaction(cat_service: CategoryService) -> TransactionInput:
-    """거래 한 건에 필요한 값을 순서대로 받아 온다."""
+    """거래 한 건에 필요한 값을 순서대로 받아 온다.
+
+    메모·태그도 ``ask_until`` 을 지난다. 빈 값이 허용되는 필드라 예전에는 ``ask``
+    한 번으로 끝냈지만, 그 검증기들도 거부하는 값이 있다(UTF-8 로 쓸 수 없는 문자,
+    구분자를 품은 태그). 그때 재입력 기회 없이 명령이 끝나면 이 모듈이 선언한
+    "모든 대화형 입력은 ``ask_until`` 을 지난다"가 사실이 아니게 된다.
+    """
     return TransactionInput(
         date=ask_until(messages.PROMPT_DATE, validators.parse_date),
         type=ask_until(messages.PROMPT_TYPE, validators.parse_type),
         category=ask_until(messages.PROMPT_CATEGORY, registered_category_validator(cat_service)),
         amount=ask_until(messages.PROMPT_AMOUNT, validators.parse_amount),
-        memo=validators.parse_memo(ask(messages.PROMPT_MEMO)),
-        tags=validators.parse_tags(ask(messages.PROMPT_TAGS)),
+        memo=ask_until(messages.PROMPT_MEMO, validators.parse_memo),
+        tags=ask_until(messages.PROMPT_TAGS, validators.parse_tags),
     )
 
 

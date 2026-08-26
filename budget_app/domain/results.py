@@ -95,3 +95,6 @@ class ImportReport:
     duplicated: int = 0
     errors: tuple[RejectedRow, ...] = ()
     duplicates: tuple[DuplicateRow, ...] = ()
+    #: ``--auto-category`` 로 이번 가져오기가 **새로 등록한** 카테고리 이름.
+    #: 마스터 데이터가 늘어나는 것은 부수 효과이므로 결과에 남겨 화면에 알린다.
+    new_categories: tuple[str, ...] = ()

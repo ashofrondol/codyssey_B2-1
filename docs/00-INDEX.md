@@ -43,7 +43,7 @@
 | 05 | [설정·검증·모델](./05-config-and-models.md) | 🟢 초보 ~ 🟡 중급 | errors / config / messages / validators / entities — 어휘를 정의하는 다섯 모듈 |
 | 06 | [횡단 관심사와 예외 처리](./06-decorators.md) | 🟡 중급 | 데코레이터 3종이 **두 파일로 나뉜 이유**, except 11단 체인과 순서 정책, 종료 코드 경로 |
 | 07 | [저장소 계층](./07-repository.md) | 🟡 중급 ~ 🔴 고급 | **읽기 경로가 둘인 이유**, `JsonlStore` 제네릭, `IdAllocator`, 원자적 교체 + fsync, csv_io, **UnitOfWork** |
-| 08 | [서비스 계층](./08-services.md) | 🟡 중급 ~ 🔴 고급 | 검색·요약·카테고리 보호, import 준비→커밋 2단계, **실패 정책과 중복 정책 두 축** |
+| 08 | [서비스 계층](./08-services.md) | 🟡 중급 ~ 🔴 고급 | 검색·요약·카테고리 보호, import 준비→커밋 2단계, **실패 정책과 중복 정책 두 축**(+ `--auto-category` 옵트인) |
 | 09 | [CLI 계층](./09-cli.md) | 🟡 중급 | 여섯 모듈 분업, argparse 문자열 키 디스패치, 대화형 입력, 프레젠터, BrokenPipe 완전 스토리 |
 | 10 | [고급 설계 주제](./10-advanced-design.md) | 🔴 고급 | crash 시나리오 4종, **데이터 무결성 불변식 3가지**, 명령별 복잡도, 동시성 한계, 방어 인덱스 25항목 |
 | 11 | [설계 FAQ & 용어집](./11-faq-and-glossary.md) | 🟢 초보 | "왜 ~인가?" 30문답 + 용어 51개 사전 — 용어마다 **어디서 온 말인가**(PEP·책·연도) |

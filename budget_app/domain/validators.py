@@ -37,6 +37,29 @@ from . import config, messages
 _INTEGER = re.compile(r"^[+-]?[0-9]+$")
 
 
+def _require_utf8(text: str) -> str:
+    """UTF-8 로 저장할 수 있는 문자열인가 — 아니면 ``ValidationError``.
+
+    **왜 경계에서 막는가**: 파이썬은 비-UTF-8 바이트를 ``surrogateescape`` 로 읽으면
+    대리 문자(U+DC80~U+DCFF)로 들고 있는다. 그 값이 그대로 저장되면 파일은 더 이상
+    유효한 UTF-8 이 아니고, 나중에 엄격한 UTF-8 로 쓰는 경로(``export``)가
+    ``UnicodeEncodeError`` 로 죽는다. **저장은 성공했다고 안내받은 거래를 영원히
+    내보낼 수 없는 상태**가 된다(요구사항 F9).
+
+    막을 자리는 입력 시점이다. 대화형 입력은 ``ask_until`` 이 ``ValidationError`` 를
+    잡아 그 자리에서 다시 묻고, CSV 가져오기는 그 줄만 ``skipped`` 로 떨어진다.
+
+    검사는 ``encode`` 한 번으로 한다. 문자별로 대리 영역을 훑는 것보다 빠르고
+    (C 레벨), "우리가 실제로 쓸 코덱이 이 문자열을 받아 주는가"라는 질문 자체와
+    같은 검사라 규칙이 어긋날 여지가 없다.
+    """
+    try:
+        text.encode(config.TEXT_ENCODING)
+    except UnicodeEncodeError as exc:
+        raise ValidationError(messages.ERR_NOT_UTF8) from exc
+    return text
+
+
 def parse_amount(value: Any) -> int:
     """금액을 양의 정수로 검증·정규화한다.
 
@@ -117,12 +140,12 @@ def parse_category(value: Any) -> str:
     v = str(value or "").strip()
     if not v:
         raise ValidationError(messages.ERR_CATEGORY_EMPTY)
-    return v
+    return _require_utf8(v)
 
 
 def parse_memo(value: Any) -> str:
-    """메모는 빈 값이 허용된다 — 정규화만 한다."""
-    return str(value or "").strip()
+    """메모는 빈 값이 허용된다 — 정규화와 인코딩 검사만 한다."""
+    return _require_utf8(str(value or "").strip())
 
 
 def parse_tags(value: Any) -> list[str]:
@@ -145,6 +168,8 @@ def parse_tags(value: Any) -> list[str]:
     찍혀 ``["('a'", "'b')"]`` 같은 것이 된다. 기본값 ``()`` 도 마찬가지로
     ``["()"]`` 가 된다 — 오류 없이 데이터가 바뀌는 부류라 특히 위험하다.
     그래서 **문자열만 나누고, 나머지 순회 가능한 것은 그대로** 받는다.
+
+    **UTF-8 로 쓸 수 없는 태그도 거부한다** — 이유는 ``_require_utf8`` 참조.
     """
     if value is None:
         return []
@@ -164,6 +189,7 @@ def parse_tags(value: Any) -> list[str]:
             raise ValidationError(
                 messages.ERR_TAG_HAS_SEPARATOR.format(tag=tag, sep=config.TAG_SEPARATOR)
             )
+        _require_utf8(tag)
         if tag not in seen:
             seen.append(tag)
     return seen

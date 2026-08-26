@@ -253,7 +253,7 @@ class TransactionPatch:
 
 **설계 의도.** `TransactionPatch` 는 "이 필드들을 이 값으로 바꿔라"라는 **명령서**입니다. 명령서가 전달 도중에 바뀌면 CLI 가 만든 것과 저장소가 받는 것이 달라질 수 있습니다. `frozen=True` 는 그 가능성을 언어 차원에서 없앱니다.
 
-같은 이유로 결과 모델도 전부 frozen 입니다 — `MonthlySummary`(domain/results.py:22-55), `ImportReport`(domain/results.py:74-97), `RawLine`(storage/jsonl.py:95-111), `ParsedRow`(storage/csv_io.py:39-64), `TransactionInput`(cli/prompts.py:40-49). **"이미 계산이 끝난 값"과 "아직 확정되지 않은 값"을 타입 선언만으로 구분**할 수 있게 됩니다.
+같은 이유로 결과 모델도 전부 frozen 입니다 — `MonthlySummary`(domain/results.py:22-55), `ImportReport`(domain/results.py:74-97), `RawLine`(storage/jsonl.py:95-111), `ParsedRow`(storage/csv_io.py:40-65), `TransactionInput`(cli/prompts.py:40-49). **"이미 계산이 끝난 값"과 "아직 확정되지 않은 값"을 타입 선언만으로 구분**할 수 있게 됩니다.
 
 **엔티티도 지금은 frozen 입니다.** `Transaction`/`Budget`/`Category`, 그리고 값 객체 `TransactionId` 까지 전부 `@dataclass(frozen=True)` 이고(domain/entities.py:27, 157, 176 / domain/tx_id.py:52), `__post_init__` 은 대입 대신 `object.__setattr__` 로 정규화합니다(§1.4).
 
@@ -373,7 +373,7 @@ budget_app/domain/queries.py:80-82
 
 세 가지를 눈여겨보세요.
 
-1. **정규화는 명세의 생성자가 합니다.** `SearchFilter` 자신은 값을 손대지 않고 `_build_spec` 이 `specs.DateFrom(self.date_from)` 처럼 넘기는데, `DateFrom.__init__` 이 `validators.parse_date` 를 부릅니다(domain/specs.py:175-176). 그래서 잘못된 날짜를 주면 **`SearchFilter` 를 만드는 순간** `ValidationError` 가 나고, CLI 는 날짜를 미리 검증할 필요가 없습니다(cli/handlers.py:58-69 의 `cmd_search` 가 인자를 그대로 넘기기만 하는 이유).
+1. **정규화는 명세의 생성자가 합니다.** `SearchFilter` 자신은 값을 손대지 않고 `_build_spec` 이 `specs.DateFrom(self.date_from)` 처럼 넘기는데, `DateFrom.__init__` 이 `validators.parse_date` 를 부릅니다(domain/specs.py:175-176). 그래서 잘못된 날짜를 주면 **`SearchFilter` 를 만드는 순간** `ValidationError` 가 나고, CLI 는 날짜를 미리 검증할 필요가 없습니다(cli/handlers.py:62-73 의 `cmd_search` 가 인자를 그대로 넘기기만 하는 이유).
 2. **`for_month` 는 대체 생성자(classmethod)입니다.** "월 전체"라는 자주 쓰는 조건을 이름 있는 생성 방법으로 제공합니다. `summary` 와 `export` 가 이 하나를 공유하므로 "이 달에 속하는가"의 정의가 프로그램 전체에 하나뿐입니다.
 3. **명세는 거래마다 다시 만들지 않습니다.** `spec` 이 `field(init=False)` 인 파생 필드라 조립은 필터 생성 시 딱 한 번이고, 10만 건을 훑는 동안에는 이미 만들어진 객체 트리에 `is_satisfied_by` 만 반복해서 묻습니다.
 
@@ -420,7 +420,7 @@ class MonthlySummary:
 
 더 중요한 것은 **계산 규칙의 소속**입니다. 리팩터 전에는 서비스가 문자열 키 dict 를 만들어 `result["usage_pct"]` 를 채웠고, "예산이 없으면 N/A" 같은 해석을 CLI 가 했습니다. 지금은 서비스가 **원자료만** 담아 넘기고, 파생값은 모델이 계산하며, 프레젠터는 `None` 인지만 봅니다.
 
-budget_app/cli/presenter.py:81-88
+budget_app/cli/presenter.py:85-92
 
 ```python
 def _budget_lines(summary: MonthlySummary) -> Iterator[str]:
@@ -585,11 +585,11 @@ Transaction 객체 ──to_dict()──▶ dict ──json.dumps──▶ 파�
 
 **설계 의도.** `from_dict` 가 인스턴스 메서드일 수는 없습니다 — 객체를 **만들기 전**이니 `self` 가 없기 때문입니다. 모듈 함수로 둘 수도 있지만, classmethod 로 클래스에 붙이면 "Transaction 을 만드는 방법"이 클래스 안에 응집되고 `cls(...)` 호출이 `__post_init__` 검증까지 자동으로 태웁니다.
 
-필수 키(`data["id"]` 등)는 대괄호 하드 접근이라 누락 시 `KeyError` 가 나는데, 이는 버그가 아니라 **의도된 신호**입니다 — 저장소의 `_parse_line`(storage/jsonl.py:181-191)이 `_LINE_ERRORS` 튜플로 그 `KeyError` 를 "손상된 줄"로 잡기 때문입니다(storage/jsonl.py:38-40). 선택 키(`memo`, `tags`)는 `.get()` 으로 `None` 을 허용하고, `parse_memo(None) → ""`, `parse_tags(None) → []` 가 이를 정상값으로 정규화합니다.
+필수 키(`data["id"]` 등)는 대괄호 하드 접근이라 누락 시 `KeyError` 가 나는데, 이는 버그가 아니라 **의도된 신호**입니다 — 저장소의 `_parse_line`(storage/jsonl.py:201-213)이 `_LINE_ERRORS` 튜플로 그 `KeyError` 를 "손상된 줄"로 잡기 때문입니다(storage/jsonl.py:38-40). 선택 키(`memo`, `tags`)는 `.get()` 으로 `None` 을 허용하고, `parse_memo(None) → ""`, `parse_tags(None) → []` 가 이를 정상값으로 정규화합니다.
 
 **`cls` 라서 얻는 것 — 제네릭 저장소.** `JsonlStore` 는 어떤 엔티티를 다루는지 모른 채 한 줄을 세웁니다.
 
-budget_app/storage/jsonl.py:186-187
+budget_app/storage/jsonl.py:208-209
 
 ```python
         try:
@@ -624,18 +624,24 @@ budget_app/domain/validators.py:1-2 (모듈 docstring)
 
 **모듈 함수도 콜러블(괄호를 붙여 부를 수 있는 것)입니다.** staticmethod 가 제공하던 "인스턴스 없이 참조해서 넘길 수 있다"는 성질은 모듈 함수가 더 잘 만족합니다.
 
-budget_app/cli/prompts.py:112-121
+budget_app/cli/prompts.py:112-127
 
 ```python
 def ask_transaction(cat_service: CategoryService) -> TransactionInput:
-    """거래 한 건에 필요한 값을 순서대로 받아 온다."""
+    """거래 한 건에 필요한 값을 순서대로 받아 온다.
+
+    메모·태그도 ``ask_until`` 을 지난다. 빈 값이 허용되는 필드라 예전에는 ``ask``
+    한 번으로 끝냈지만, 그 검증기들도 거부하는 값이 있다(UTF-8 로 쓸 수 없는 문자,
+    구분자를 품은 태그). 그때 재입력 기회 없이 명령이 끝나면 이 모듈이 선언한
+    "모든 대화형 입력은 ``ask_until`` 을 지난다"가 사실이 아니게 된다.
+    """
     return TransactionInput(
         date=ask_until(messages.PROMPT_DATE, validators.parse_date),
         type=ask_until(messages.PROMPT_TYPE, validators.parse_type),
         category=ask_until(messages.PROMPT_CATEGORY, registered_category_validator(cat_service)),
         amount=ask_until(messages.PROMPT_AMOUNT, validators.parse_amount),
-        memo=validators.parse_memo(ask(messages.PROMPT_MEMO)),
-        tags=validators.parse_tags(ask(messages.PROMPT_TAGS)),
+        memo=ask_until(messages.PROMPT_MEMO, validators.parse_memo),
+        tags=ask_until(messages.PROMPT_TAGS, validators.parse_tags),
     )
 ```
 
@@ -671,7 +677,7 @@ budget_app/domain/queries.py:74-78
 2. **상태 보존**: `yield` 에서 멈출 때 지역 변수·파일 위치·루프 진행 상태가 그대로 얼어붙었다가, 다음 요청 때 그 지점부터 재개됩니다.
 3. **1회성 소진**: 한 번 끝까지 소비한 제너레이터는 재사용할 수 없습니다. 다시 순회하려면 제너레이터 함수를 다시 호출해 새 객체를 만들어야 합니다.
 
-> **💡 쉽게 말하면** — 책을 통째로 복사해 가방에 넣는 대신, 열람실에서 한 장씩 넘겨 보는 것입니다. 찾던 대목이 나오면 거기서 덮고 나오면 되고, 뒷장은 아예 펼치지도 않습니다. 그래서 거래가 10만 건이어도 `stream()` 이 한 번에 손에 들고 있는 것은 한 줄뿐입니다(전체 정렬이 필요한 `stream_sorted` 와 파일을 다시 쓰는 `rewrite` 는 예외라 모아 두는 부분이 있습니다 — §3.3·§3.5).
+> **💡 쉽게 말하면** — 책을 통째로 복사해 가방에 넣는 대신, 열람실에서 한 장씩 넘겨 보는 것입니다. 찾던 대목이 나오면 거기서 덮고 나오면 되고, 뒷장은 아예 펼치지도 않습니다. 그래서 거래가 10만 건이어도 `stream()` 이 한 번에 손에 들고 있는 것은 한 줄뿐입니다(한도 없는 정렬이 필요한 `stream_sorted` 와 파일을 다시 쓰는 `rewrite` 는 예외라 모아 두는 부분이 있습니다 — §3.3·§3.5).
 > 다만 이 비유는 책이라면 앞으로 되돌려 다시 볼 수 있다는 데서 깨집니다 — 제너레이터는 한 번 끝까지 넘기면 그것으로 끝이라, 다시 보려면 처음부터 새로 빌려 와야 합니다(위의 세 번째 성질).
 
 타입 표기 `Iterator[T]` 는 "T 를 하나씩 내놓는 반복자"라는 뜻으로, 제너레이터 함수의 반환 타입 표기로 관례처럼 쓰입니다.
@@ -697,7 +703,7 @@ budget_app/domain/queries.py:74-78
 
 지금은 둘로 나뉘어 있습니다.
 
-budget_app/storage/jsonl.py:162-179
+budget_app/storage/jsonl.py:162-182
 
 ```python
     def iter_raw(self) -> Iterator[RawLine]:
@@ -747,7 +753,7 @@ class RawLine:
 
 그 위에 얹힌 `stream()` 은 "유효한 것만" 걸러 내보내는 얇은 층입니다.
 
-budget_app/storage/jsonl.py:193-203
+budget_app/storage/jsonl.py:215-225
 
 ```python
     def stream(self) -> Iterator[T]:
@@ -777,18 +783,32 @@ budget_app/storage/jsonl.py:193-203
 
 ### 3.3 제너레이터 체인: stream → SearchFilter → 정렬 → yield
 
-budget_app/services/transactions.py:79-87
+budget_app/services/transactions.py:86-108
 
 ```python
-    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
-        """최신순 정렬된 거래를 yield 한다.
+    def stream_sorted(
+        self, flt: SearchFilter | None = None, *, limit: int | None = None
+    ) -> Iterator[Transaction]:
+        """최신순 정렬된 거래를 yield 한다 — ``limit`` 이 있으면 **상위 N 만** 들고 있는다.
 
-        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).
-        그러나 메모리 사용량은 '필터 통과 항목'으로 제한된다.
+        파일이 시간순으로 정렬돼 있지 않으므로 어느 쪽이든 전체를 한 번은 **훑어야**
+        한다. 문제는 훑는 것이 아니라 **모으는 것**이었다: 이전 구현은 필터 통과분
+        전체를 리스트로 적재한 뒤 정렬해서, ``list --limit 1`` 인데도 20만 행 파일이
+        통째로 메모리에 올라왔다(피크 RSS 146MB). 요구사항 G2 의 "파일 전체를 한 번에
+        로드하지 않고"가 여기서 깨졌다 — 하류 제너레이터의 ``break`` 는 **이미 만들어진
+        리스트**를 자를 뿐이라 아무것도 아끼지 못했다.
+
+        ``heapq.nlargest`` 는 크기 ``limit`` 짜리 힙 하나만 유지하며 스트림을 흘려
+        보낸다. 메모리 상한이 파일 크기가 아니라 **O(limit)** 이 되고, 결과 순서는
+        전체 정렬과 같다(키가 같은 항목이 없으므로 — id 는 유일하다).
+
+        ``limit`` 이 없으면(``search`` 경로) 전체 정렬이 필요하므로 예전과 같다.
         """
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
 데이터가 흐르는 전체 사슬을 그리면 다음과 같습니다.
@@ -803,10 +823,11 @@ JsonlStore.iter_raw()        ── 제너레이터: 줄 → RawLine (모든 줄
 JsonlStore.stream()          ── 제너레이터: 유효한 것만 통과, 나머지는 경고 로그
       │  한 건씩
       ▼
-SearchFilter.matches(tx)     ── 통과한 것만 items 리스트에 축적
-      │
+SearchFilter.matches(tx)     ── 통과한 것만 다음 단계로
+      │  한 건씩
       ▼
-items.sort(...)              ── (date, id) 역순 = 최신순 정렬
+heapq.nlargest(limit, ...)   ── limit 이 있으면(list): 크기 limit 힙만 유지
+sorted(..., reverse=True)    ── limit 이 없으면(search): 통과분 전체를 모아 정렬
       │  한 건씩 (yield from)
       ▼
 presenter.tx_table           ── limit 건수에 도달하면 break
@@ -815,16 +836,20 @@ presenter.tx_table           ── limit 건수에 도달하면 break
 output.out_lines             ── stdout 으로 출력
 ```
 
-**정렬은 본질적으로 전체를 봐야 하는 연산**이라 이 함수는 리스트를 한 번 만듭니다. 그러나 리스트에 들어가는 것은 "필터를 통과한 항목뿐"이므로, 조건이 좁은 검색일수록 메모리 사용이 줄어듭니다. 정렬이 끝난 뒤 다시 `yield from` 으로 내보내는 이유는 소비자가 `limit` 에 도달하면 `break` 할 수 있도록 **출구를 다시 스트림 형태로 유지**하기 위해서입니다.
+**정렬은 본질적으로 전체를 "훑어야" 하는 연산**입니다. 다만 훑는 것과 **모으는 것**은 다릅니다. `limit` 이 있으면 `heapq.nlargest` 가 크기 `limit` 짜리 힙 하나만 유지하며 스트림을 흘려보내므로 메모리 상한이 파일 크기가 아니라 `O(limit)` 이고, `limit` 이 없는 `search` 경로만 통과분 전체를 모읍니다(그때도 담기는 것은 "필터를 통과한 항목뿐"이라 조건이 좁을수록 줄어듭니다). 정렬이 끝난 뒤 다시 `yield from` 으로 내보내는 이유는 소비자가 `limit` 에 도달하면 `break` 할 수 있도록 **출구를 다시 스트림 형태로 유지**하기 위해서입니다.
 
-budget_app/cli/presenter.py:42-55
+budget_app/cli/presenter.py:42-59
 
 ```python
 def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
     """거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.
 
     제너레이터인 이유: 상류(``stream_sorted``)가 제너레이터이므로 여기서 리스트로
-    모으면 스트리밍이 끊긴다. ``limit`` 이 걸리면 그 지점에서 상류 소비도 멈춘다.
+    모으면 스트리밍이 끊긴다.
+
+    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
+    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
+    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
     """
     count = 0
     for tx in rows:
@@ -858,7 +883,7 @@ def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[
 
 리팩터 전에는 `append_many` 안에 중첩 제너레이터 함수 `_rows` 를 정의해 "기존 행 + 신규 행"을 이어 붙였습니다. 지금은 그 역할이 `rewrite(transform, *, extra=...)` 로 일반화되었습니다.
 
-budget_app/storage/jsonl.py:264-268
+budget_app/storage/jsonl.py:286-290
 
 ```python
     def plan_rewrite(
@@ -872,7 +897,7 @@ budget_app/storage/jsonl.py:264-268
 
 다만 `plan_rewrite` 본문은 `extra` 를 의도적으로 **리스트로 한 번에 펼칩니다.**
 
-budget_app/storage/jsonl.py:304-307
+budget_app/storage/jsonl.py:326-329
 
 ```python
         extra_lines = [self._encode(e) for e in extra]
@@ -900,7 +925,7 @@ budget_app/storage/repositories.py:226-235
         return self.append_all(Category(name=name) for name in config.DEFAULT_CATEGORIES)
 ```
 
-마지막 줄의 인자가 제너레이터 식입니다 — 함수 호출의 **유일한 인자**일 때는 소괄호를 생략할 수 있습니다. (`append_all` 자신은 첫 줄에서 `entities = list(entities)` 로 즉시 펼칩니다(storage/jsonl.py:213-218) — 여기서도 "비었는가"와 "몇 건인가"를 둘 다 알아야 하기 때문입니다.)
+마지막 줄의 인자가 제너레이터 식입니다 — 함수 호출의 **유일한 인자**일 때는 소괄호를 생략할 수 있습니다. (`append_all` 자신은 첫 줄에서 `entities = list(entities)` 로 즉시 펼칩니다(storage/jsonl.py:235-240) — 여기서도 "비었는가"와 "몇 건인가"를 둘 다 알아야 하기 때문입니다.)
 
 > **🔎 문법의 출처** — 제너레이터 식은 PEP 289 로 파이썬 2.4 에 들어왔습니다.
 > 리스트 컴프리헨션(PEP 202, 2.0)이 먼저 있었고, 그 대괄호를 소괄호로 바꾸면
@@ -937,7 +962,7 @@ budget_app/storage/jsonl.py:1-18 (모듈 docstring)
 
 - `monthly_summary`(services/budgets.py:30-66)처럼 합계만 누적하는 소비자는 끝까지 O(1)
 - `category_in_use`(storage/repositories.py:121-124)처럼 `any(tx.category == target for tx in self.stream())` 로 조기 종료하는 소비자는 지연 평가 덕분에 파일 뒷부분을 아예 읽지 않음
-- 전체 정렬이 필요한 `stream_sorted` 만 예외적으로 필터 통과분을 모음
+- 한도 없는 전체 정렬(`search` 경로의 `stream_sorted`)만 예외적으로 필터 통과분을 모음 — `list --limit N` 은 `heapq.nlargest` 로 상위 N 만 유지
 - `rewrite` 는 재작성이 목적이라 줄들을 모을 수밖에 없지만, **문자열 상태**로만 들고 있습니다(객체가 아니라)
 
 ---
@@ -985,7 +1010,7 @@ def log_call(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 ```
 
-`@` 문법은 순전히 설탕(syntactic sugar — 의미는 그대로 두고 표기만 짧고 읽기 좋게 만든 문법)입니다. `@log_call` 이 붙은 `TransactionService.add`(services/transactions.py:27-28)는 클래스 본문이 실행될 때 다음과 **완전히 동일**합니다.
+`@` 문법은 순전히 설탕(syntactic sugar — 의미는 그대로 두고 표기만 짧고 읽기 좋게 만든 문법)입니다. `@log_call` 이 붙은 `TransactionService.add`(services/transactions.py:34-35)는 클래스 본문이 실행될 때 다음과 **완전히 동일**합니다.
 
 ```python
 # 일반론 예시 — @ 없이 풀어 쓴 동등 코드
@@ -1008,7 +1033,7 @@ add = log_call(add)     # add 라는 이름이 이제 wrapper 를 가리킨다
 > 하나뿐인데, 그마저 `@dataclass` 가 먼저 돌아 `__eq__` 를 만들어야
 > `@functools.total_ordering` 이 나머지 비교 메서드를 채울 수 있으므로 **아래에서 위로**
 > 라는 규칙이 그대로 적용됩니다(§3.3). 커스텀 데코레이터 셋은 전부 단독 사용입니다 —
-> 서비스 메서드는 `@log_call` 셋(services/transactions.py:27, 52, 72)과 `@measure_time`
+> 서비스 메서드는 `@log_call` 셋(services/transactions.py:34, 52, 72)과 `@measure_time`
 > 하나(services/budgets.py:30)뿐이고, `@handle_errors` 도 `cli/app.py:61` 의
 > `_dispatch` 한 곳에만 붙습니다. 그래서 이 프로젝트에서는 **커스텀** 데코레이터끼리
 > 순서를 고민할 필요가 없는데, **그 자체가 설계 결과**입니다 — 관측과 오류 처리를 서로
@@ -1048,9 +1073,9 @@ add.__doc__       # wrapper 의 docstring (None)
 
 | 데코레이터 | 위치 | wrapper 가 하는 일 | 핵심 구문 | 붙는 곳 |
 |---|---|---|---|---|
-| `log_call` | decorators.py:37-47 | 호출 전/후 DEBUG 로그 | 순차 실행 | 서비스 3곳 (transactions.py:27, 52, 72) |
+| `log_call` | decorators.py:37-47 | 호출 전/후 DEBUG 로그 | 순차 실행 | 서비스 3곳 (transactions.py:34, 52, 72) |
 | `measure_time` | decorators.py:50-66 | 실행 시간 측정 로그 | `try/finally` | 서비스 1곳 (budgets.py:30) |
-| `handle_errors` | **cli/error_handler.py:20-121** | 예외 → 메시지 + 종료 코드 | 다단 `except` | CLI 진입점 1곳 (app.py:61 `_dispatch`) |
+| `handle_errors` | **cli/error_handler.py:20-128** | 예외 → 메시지 + 종료 코드 | 다단 `except` | CLI 진입점 1곳 (app.py:61 `_dispatch`) |
 
 **세 개가 한 파일에 있다가 두 파일로 나뉜 것이 리팩터의 핵심 중 하나입니다.**
 
@@ -1245,7 +1270,7 @@ def ask(prompt: str) -> str:
 
 날짜 파싱 실패(`ValueError`)를 검증 오류로 번역하는 `parse_date`:
 
-budget_app/domain/validators.py:80-99
+budget_app/domain/validators.py:103-122
 
 ```python
 def parse_date(value: Any) -> str:
@@ -1260,9 +1285,9 @@ def parse_date(value: Any) -> str:
     return dt.strftime(config.DATE_FORMAT)
 ```
 
-같은 패턴이 `parse_month`(domain/validators.py:112 — 역시 `strptime` 의 `ValueError` 를 번역)와 원자 모드 가져오기 실패(services/importexport.py:115-118 — `ValidationError`/`KeyError` 를 `AppError` 로 번역)에도 반복됩니다.
+같은 패턴이 `parse_month`(domain/validators.py:135 — 역시 `strptime` 의 `ValueError` 를 번역)와 원자 모드 가져오기 실패(services/importexport.py:122-125 — `ValidationError`/`KeyError` 를 `AppError` 로 번역)에도 반복됩니다.
 
-반면 `parse_amount` 는 `from` 을 쓰지 **않습니다** — 그 함수는 잡을 하부 예외가 애초에 없기 때문입니다. `int()` 에 맡기는 대신 정규식 `_INTEGER` 로 먼저 판정하고 스스로 `raise ValidationError(...)` 하므로(domain/validators.py:65-69), 연결할 원인 예외가 존재하지 않습니다. **`from` 은 "번역"할 때만 쓰는 것**이지 예외를 던질 때마다 붙이는 장식이 아니라는 대비가 여기서 보입니다.
+반면 `parse_amount` 는 `from` 을 쓰지 **않습니다** — 그 함수는 잡을 하부 예외가 애초에 없기 때문입니다. `int()` 에 맡기는 대신 정규식 `_INTEGER` 로 먼저 판정하고 스스로 `raise ValidationError(...)` 하므로(domain/validators.py:88-92), 연결할 원인 예외가 존재하지 않습니다. **`from` 은 "번역"할 때만 쓰는 것**이지 예외를 던질 때마다 붙이는 장식이 아니라는 대비가 여기서 보입니다.
 
 **설계 의도**: 바깥 계층은 `ValidationError`/`AppError` 라는 도메인 어휘만 다루면 되고, 디버깅할 때는 `__cause__` 사슬을 따라 "실제로는 strptime 이 실패했다"는 근본 원인까지 추적할 수 있습니다.
 
@@ -1301,7 +1326,8 @@ BaseException
     ├── ValueError
     │   ├── ValidationError          (errors.py 정의)
     │   └── UnicodeError
-    │       └── UnicodeDecodeError
+    │       ├── UnicodeDecodeError
+    │       └── UnicodeEncodeError
     ├── AppError                     (errors.py 정의)
     │   └── InputAborted             (prompts.py 정의)
     └── KeyError, TypeError, ...
@@ -1325,9 +1351,9 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
        ``ValidationError`` / ``AppError``
     3. **환경 상태** — 프로그램 밖(파일·권한·디스크·인코딩)의 상태 문제.
        ``FileNotFoundError`` / ``IsADirectoryError`` / ``NotADirectoryError`` /
-       ``PermissionError`` / ``UnicodeDecodeError`` / ``OSError``
+       ``PermissionError`` / ``UnicodeDecodeError`` / ``UnicodeEncodeError`` / ``OSError``
     4. **최후 방어선** — 위 어디에도 속하지 않는 버그.
-       ``Exception`` — 사용자에겐 스택트레이스를 감추고 로그에만 남긴다.
+       ``Exception`` — 사용자에겐 스택트레이스를 감추고, ``--debug`` 일 때만 로그에 남긴다.
 
     부류를 나눠도 지켜야 하는 상속 제약이 둘 있고, 지금 순서가 둘 다 만족한다:
 
@@ -1365,51 +1391,55 @@ budget_app/cli/error_handler.py:57-60
 > 이 코드가 그 셋 중 `KeyboardInterrupt` 만 따로 잡는 것은, 잡아서 무시하려는 것이 아니라
 > **종료 코드를 130 으로 정해 주기 위해서**입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
-### 5.4 `logger.exception` — 스택트레이스를 어디에 남길 것인가
+### 5.4 `exc_info` — 스택트레이스를 어디에 남길 것인가
 
-마지막 안전망에서 스택트레이스를 **버리는 것이 아니라 로그로 옮겨 둡니다**.
+마지막 안전망에서 스택트레이스를 **버리는 것도, 늘 뿌리는 것도 아니고 `--debug` 일 때만 로그에 싣습니다**.
 
-budget_app/cli/error_handler.py:106-119
+budget_app/cli/error_handler.py:113-126
 
 ```python
         except Exception as exc:  # noqa: BLE001 — 어떤 예외도 트레이스백으로 끝내지 않기 위함
             # 사용자용 한 줄 요약을 먼저 내고, 그다음에 원인 추적용 기록을 남긴다.
             output.err(messages.MSG_ERR_UNEXPECTED.format(error=exc))
             output.err(messages.HINT_UNEXPECTED)
-            # ERROR 인 이유: 이전에는 DEBUG 였고, 기본 로그 레벨이 WARNING 이라
-            # **기본 실행에서는 스택트레이스가 아무 데도 남지 않았다.** 여기까지 온
-            # 예외는 분류되지 않은 버그이고, 그 스택은 나중에 원인을 찾을 유일한
-            # 단서다. `--debug` 를 켜고 재현할 수 있는 상황이 아닐 수도 있다.
+            # **스택트레이스는 `--debug` 일 때만 붙인다.** 요구사항 Q2 가 "스택트레이스
+            # 대신 원인 + 해결 힌트"를 요구하고, 바로 위 힌트도 "`--debug` 를 붙이면
+            # 남는다"고 안내한다. 이전 코드는 `logger.exception` 이라 exc_info 가 항상
+            # 참이었고, 기본 로그 레벨(WARNING)이 ERROR 레코드를 통과시키므로
+            # **`--debug` 없이도 트레이스백이 화면에 뿌려졌다** — 안내와 동작이 모순이었다.
             #
-            # 트레이스백이 화면에 보이게 되는 것은 감수한다. 이 자리는 "프로그램이
-            # 예상하지 못한 상태"이고, 그때는 감추는 것보다 신고할 수 있게 하는 편이
-            # 낫다 — 앞선 세 부류(사용자가 고칠 수 있는 오류)는 여전히 한 줄로 끝난다.
-            logger.exception(messages.LOG_UNHANDLED)
+            # 레벨은 ERROR 로 남긴다. 기본 실행에서도 "분류되지 않은 오류가 났다"는
+            # 사실 한 줄은 남아야, 나중에 `--debug` 로 재현해 스택을 볼 단서가 된다.
+            logger.error(messages.LOG_UNHANDLED, exc_info=output.debug_enabled())
             return config.EXIT_ERROR
 ```
 
-`logger.exception(...)` 은 `logger.error(..., exc_info=True)` 의 축약으로, "현재 처리 중인 예외의 전체 트레이스백을 이 로그 레코드에 첨부하라"는 뜻입니다.
+`exc_info` 는 "현재 처리 중인 예외의 전체 트레이스백을 이 로그 레코드에 첨부하라"는 스위치입니다. 여기서는 그 자리에 `output.debug_enabled()` 를 넣어 **디버그일 때만 참**이 되게 했습니다.
 
-> **⚙️ 내부 동작** — `exc_info=True` 를 만나면 logging 은 `sys.exc_info()` 를 불러
+> **⚙️ 내부 동작** — `exc_info` 가 참이면 logging 은 `sys.exc_info()` 를 불러
 > **지금 처리 중인 예외 3종 세트**(타입/값/트레이스백)를 가져와 `LogRecord.exc_info` 에
 > 담습니다. 문자열 변환은 그때가 아니라 포매터가 `Formatter.formatException` 을 부를 때
 > (내부적으로 `traceback.print_exception`) 일어납니다. 두 가지가 따라옵니다 —
 > (1) `except` 블록 **밖**에서 부르면 `sys.exc_info()` 가 `(None, None, None)` 이라
 > 트레이스백이 안 붙고, (2) 이 로거가 그 레벨에서 꺼져 있으면 트레이스백 포매팅 비용
-> 자체가 발생하지 않습니다. → [12 §2-B](./12-syntax-and-stdlib.md)
+> 자체가 발생하지 않습니다. `logger.exception(msg)` 은 `exc_info=True` 를 고정한
+> 축약형이라 **끌 수가 없고**, 그래서 이 자리에서는 쓰지 않습니다.
+> → [12 §2-B](./12-syntax-and-stdlib.md)
 
-**레벨이 DEBUG 에서 ERROR 로 올라간 것이 이 자리의 리팩터입니다.** 이전에는 `logger.debug(..., exc_info=True)` 였는데, 기본 로그 레벨이 WARNING 이라 **평소 실행에서는 스택트레이스가 아무 데도 남지 않았습니다.** "감춘 것"이 아니라 "없앤 것"이었던 셈입니다.
+**`logger.exception` 을 `logger.error(..., exc_info=...)` 로 바꾼 것이 이 자리의 리팩터입니다.** 이전에는 `exc_info` 가 항상 참이었고, ERROR 레코드는 기본 로그 레벨(WARNING)을 그대로 통과하므로 **`--debug` 없이도 트레이스백이 화면에 뿌려졌습니다.** 바로 위에서 출력하는 힌트가 "`--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다"라고 안내하는데, 안내와 동작이 정반대였던 셈입니다.
 
-트레이스백이 화면에 보이게 되는 것은 감수합니다. 여기까지 온 예외는 앞의 세 부류 어디에도 속하지 않는 **분류되지 않은 버그**이고, 그때는 감추는 것보다 신고할 수 있게 하는 편이 낫습니다. 사용자가 고칠 수 있는 오류(값 오류·상황 오류·입출력 오류)는 여전히 한 줄로 끝납니다.
+레벨은 그대로 ERROR 입니다. 기본 실행에서도 `[ERROR] unhandled error` 한 줄은 남아야, 사용자가 "분류되지 않은 오류가 났다"는 사실을 알고 `--debug` 로 재현해 스택을 볼 수 있기 때문입니다. 화면에 나가는 것은 어느 부류든 원인 한 줄과 힌트뿐이라는 점에서 **정책이 부류마다 같아졌습니다**.
 
 ### 5.5 예외를 "값"으로 바꾸기 — 오류가 흐름 제어가 아닐 때
 
 예외가 항상 정답은 아닙니다. **한 줄이 깨졌다고 전체를 멈출 이유가 없을 때**는 예외 대신 값으로 표현하는 편이 낫습니다.
 
-budget_app/storage/jsonl.py:181-191
+budget_app/storage/jsonl.py:201-213
 
 ```python
     def _parse_line(self, lineno: int, line: str) -> RawLine:
+        if not self._is_utf8_text(line):
+            return RawLine(lineno=lineno, text=line, error=messages.ERR_LINE_NOT_UTF8)
         try:
             data = json.loads(line)
         except json.JSONDecodeError as exc:
@@ -1426,7 +1456,7 @@ budget_app/storage/jsonl.py:181-191
 
 **왜 이렇게 하는가**: 파일을 읽는 도중 예외가 올라오면 반복이 중단됩니다. 그런데 "손상된 줄 하나"는 나머지 줄을 못 읽을 이유가 되지 않습니다. 예외를 값으로 바꾸면 반복이 계속되면서도 정보(줄 번호, 원문, 오류 내용)를 잃지 않습니다.
 
-같은 판단이 `_resolve_id` 에도 있습니다(services/importexport.py:133-164) — 중복 id 는 정책에 따라 예외일 수도(`error`), 값(`None` = 건너뜀)일 수도 있습니다.
+같은 판단이 `_resolve_id` 에도 있습니다(services/importexport.py:187-218) — 중복 id 는 정책에 따라 예외일 수도(`error`), 값(`None` = 건너뜀)일 수도 있습니다.
 
 ---
 
@@ -1519,7 +1549,7 @@ class TransactionRepository(JsonlStore[Transaction]):
 **개념.** `__future__` 는 "미래 버전의 동작을 미리 켜는" 특수 모듈입니다. `from __future__ import annotations`(PEP 563)를 모듈 최상단에 쓰면, 그 모듈의 **모든 타입 어노테이션이 실행 시점에 평가되지 않고 문자열로만 저장**됩니다. 효과는 두 가지입니다.
 
 1. **전방 참조(forward reference) 허용**: 아직 정의가 끝나지 않은 이름을 어노테이션에 쓸 수 있습니다.
-2. **신 문법의 하위 호환**: `tuple[int, dict[str, str]]` 같은 내장 제네릭 표기(storage/csv_io.py:72)를 어노테이션 자리에 써도 런타임에 평가되지 않으므로 구버전 파이썬에서도 import 가 실패하지 않습니다.
+2. **신 문법의 하위 호환**: `tuple[int, dict[str, str]]` 같은 내장 제네릭 표기(storage/csv_io.py:73)를 어노테이션 자리에 써도 런타임에 평가되지 않으므로 구버전 파이썬에서도 import 가 실패하지 않습니다.
 
 **실제 코드.** 이 프로젝트의 모든 구현 모듈이 첫 import 로 이것을 둡니다.
 
@@ -1570,7 +1600,7 @@ budget_app/domain/entities.py:113
 
 거래 ID 형식은 config 에 정규식 문자열로 정의되어 있습니다.
 
-budget_app/domain/config.py:24-27
+budget_app/domain/config.py:28-31
 
 ```python
 # 거래 ID — 형식·검증·발굴 세 패턴이 값 객체(tx_id.TransactionId)와 짝을 이룬다
@@ -1664,7 +1694,7 @@ LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"
 
 | 로거 이름 | 상수 | `logging.getLogger(...)` 호출 위치 |
 |---|---|---|
-| `budget_app` | `config.LOGGER_NAME`(config.py:25) | `decorators.py:34`, `cli/error_handler.py:17` |
+| `budget_app` | `config.LOGGER_NAME`(config.py:29) | `decorators.py:34`, `cli/error_handler.py:17` |
 | `budget_app.storage` | `storage/config.py:11` | `storage/jsonl.py:33`, `storage/ids.py:23`, `storage/unit_of_work.py:62` |
 
 `domain/` 패키지에는 로거가 **하나도 없습니다** — 도메인은 화면도 파일도 로그도 모르는 순수 계층이라 `logging` 을 import 조차 하지 않습니다 — [04. 아키텍처](./04-architecture.md)의 계층 규칙이 코드로 지켜지는 자리입니다.
@@ -1697,7 +1727,7 @@ LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"
 
 **핸들러는 한 곳에서만 붙입니다.**
 
-budget_app/cli/output.py:79-100
+budget_app/cli/output.py:94-119
 
 ```python
 def setup_logging(debug: bool = False) -> bool:
@@ -1735,7 +1765,7 @@ def setup_logging(debug: bool = False) -> bool:
 
 `datetime.strptime(문자열, 형식)` 은 형식에 맞지 않으면 `ValueError` 를 던집니다. 이 프로젝트는 그 성질을 이용해 **파싱 성공 여부 자체를 검증으로** 씁니다.
 
-그런데 **검증만 하고 원문을 돌려주면 안 됩니다.** `parse_date`(domain/validators.py:80-99)의 마지막 줄이 `return dt.strftime(config.DATE_FORMAT)` 인 것 — 즉 파싱한 datetime 으로 **다시 찍어서** 돌려주는 것 — 이 이 함수의 핵심입니다.
+그런데 **검증만 하고 원문을 돌려주면 안 됩니다.** `parse_date`(domain/validators.py:103-122)의 마지막 줄이 `return dt.strftime(config.DATE_FORMAT)` 인 것 — 즉 파싱한 datetime 으로 **다시 찍어서** 돌려주는 것 — 이 이 함수의 핵심입니다.
 
 이유를 소스 docstring 이 직접 설명합니다. `strptime` 은 **검증기이지 정규화기가 아닙니다.** `%Y-%m-%d` 로 `"2024-1-5"` 를 오류 없이 받아 줍니다. 검증만 하고 원문을 그대로 저장하면 같은 날이 파일에 `"2024-1-5"` 와 `"2024-01-05"` 두 표기로 공존하게 되고, 이 프로그램은 날짜를 **문자열로 비교**하므로 그 순간 전제가 깨집니다.
 
@@ -1760,7 +1790,7 @@ def setup_logging(debug: bool = False) -> bool:
 
 형식 상수는 config 에 있습니다.
 
-budget_app/domain/config.py:21-22
+budget_app/domain/config.py:25-26
 
 ```python
 DATE_FORMAT = "%Y-%m-%d"
@@ -1797,7 +1827,7 @@ def month_range(month: str) -> tuple[str, str]:
 
 가져오기는 `DictReader` 로 각 행을 `{헤더명: 값}` dict 로 받고, 시작 전에 필수 컬럼 존재를 검사합니다.
 
-budget_app/storage/csv_io.py:72-87
+budget_app/storage/csv_io.py:73-101
 
 ```python
 def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
@@ -1805,6 +1835,12 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며
     ``id`` 는 요구하지 않는다.
+
+    ``csv.Error`` 를 ``AppError`` 로 바꾸는 이유: 파서가 던지는 이 예외는 **일반
+    사용자 조작만으로** 닿는다(한 필드가 128KB 를 넘거나, 따옴표가 닫히지 않아 파일
+    끝까지 한 필드로 읽히는 CSV). 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가
+    "예기치 못한 오류"로 표시된다 — 원인도 해결 방법도 알 수 있는 오류인데
+    분류되지 않은 버그처럼 보이는 것은 요구사항 Q2(원인 + 해결 힌트)에 어긋난다.
     """
     path = Path(path)
     if not path.exists():
@@ -1812,50 +1848,85 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
-        _check_header(path, reader.fieldnames)
-        # ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,
-        # 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
-        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
+        try:
+            # ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.
+            _check_header(path, reader.fieldnames)
+            # 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을
+            # 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
+            for item in enumerate(reader, start=config.CSV_DATA_START_LINE):
+                yield item
+        except csv.Error as exc:
+            raise AppError(
+                messages.ERR_CSV_PARSE.format(error=exc), hint=messages.HINT_CSV_PARSE
+            ) from exc
 ```
 
-인덱스(`row[3]`) 대신 이름(`row["amount"]`)으로 접근하므로 **컬럼 순서가 달라도 동작**하고, 그래서 `id` 컬럼을 **선택**으로 추가할 수 있었습니다. `_check_header`(storage/csv_io.py:90-104)의 `reader.fieldnames or []` 는 빈 파일(fieldnames 가 `None`)에서도 안전하게 검사하기 위한 방어 표현입니다.
+인덱스(`row[3]`) 대신 이름(`row["amount"]`)으로 접근하므로 **컬럼 순서가 달라도 동작**하고, 그래서 `id` 컬럼을 **선택**으로 추가할 수 있었습니다. `_check_header`(storage/csv_io.py:104-118)의 `reader.fieldnames or []` 는 빈 파일(fieldnames 가 `None`)에서도 안전하게 검사하기 위한 방어 표현입니다.
 
-> **⚙️ 내부 동작 — `yield from` 이 넘기는 것은 값만이 아닙니다** — `read_rows` 의 마지막 줄
-> `yield from enumerate(reader, ...)` 는 "그 반복자가 끝날 때까지 값을 그대로 통과시켜라"라는
-> **위임(delegation)** 입니다(PEP 380, 3.3). `for x in it: yield x` 와 값 흐름은 같지만,
-> 여기서 실제로 중요한 것은 **`with` 블록이 이 `yield from` 위에서 계속 살아 있다**는
-> 사실입니다. 제너레이터는 값을 하나 내놓을 때마다 멈춰 있고 프레임이 보존되므로,
-> `with open(...)` 의 `__exit__` 는 소비자가 마지막 행을 꺼내거나 제너레이터를 버릴 때까지
-> 실행되지 않습니다. **즉 파일의 수명이 호출자에게 넘어갑니다** — 소스 주석이 바로 그 말을
-> 하고 있고, 그래서 `read_rows` 의 결과를 저장해 두었다가 나중에 소비하면
-> 그동안 파일 핸들이 열려 있게 됩니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+**`csv.Error` 를 `AppError` 로 번역합니다.** 파서가 던지는 이 예외는 한 필드가 128KB(`csv.field_size_limit`)를 넘거나 따옴표가 닫히지 않아 파일 끝까지 한 필드로 읽힐 때 나오는데, 둘 다 평범한 사용자 조작만으로 만들어집니다. 그대로 흘려보내면 `handle_errors` 의 최후 방어선까지 올라가 "예기치 못한 오류"가 되므로, 여기서 원인 + 힌트가 붙은 `AppError` 로 바꿉니다.
+
+> **⚙️ 내부 동작 — 반복 위임과 파일 수명** — 이전에는 이 자리가
+> `yield from enumerate(reader, ...)` 한 줄이었습니다(위임, PEP 380, 3.3). 지금은
+> `csv.Error` 를 잡기 위해 그 반복을 `try` 안의 `for ... : yield item` 으로 풀어 썼는데,
+> 값 흐름은 같고 여기서 실제로 중요한 성질도 그대로입니다 — **`with` 블록이 이 `yield`
+> 위에서 계속 살아 있다**는 것입니다. 제너레이터는 값을 하나 내놓을 때마다 멈춰 있고
+> 프레임이 보존되므로, `with open(...)` 의 `__exit__` 는 소비자가 마지막 행을 꺼내거나
+> 제너레이터를 버릴 때까지 실행되지 않습니다. **즉 파일의 수명이 호출자에게 넘어갑니다**
+> — 소스 주석이 바로 그 말을 하고 있고, 그래서 `read_rows` 의 결과를 저장해 두었다가
+> 나중에 소비하면 그동안 파일 핸들이 열려 있게 됩니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
 내보내기는 `DictWriter` 로 필드명 순서를 config 상수에 고정합니다.
 
-budget_app/storage/csv_io.py:131-148
+budget_app/storage/csv_io.py:145-186
 
 ```python
 def write_transactions(path: Path, txs: Iterable[Transaction], *, include_id: bool = True) -> int:
     """거래를 CSV 로 저장하고 작성 건수를 반환한다.
 
-    인코딩은 BOM 없는 UTF-8 로 고정한다. BOM 을 넣으면 다시 ``import`` 할 때 헤더
-    첫 컬럼명이 ``﻿id`` 로 깨져 왕복이 실패한다(왕복 안전성 우선).
+    인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.
+    반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은
+    흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.
+
+    쓰기는 **임시 파일 + ``os.replace``** 다(JSONL 쓰기와 같은 규칙). 대상 경로를
+    곧바로 열면 쓰다가 실패했을 때 헤더만 남은 **반쪽 CSV** 가 그 자리에 남는다.
+    사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을
+    백업으로 믿고 쓰면 데이터가 조용히 사라진다. 지금은 준비가 끝난 뒤에만 이름이
+    바뀌므로 결과는 "완전한 새 파일" 또는 "손대지 않은 기존 파일" 둘 중 하나다.
     """
     path = Path(path)
+    if path.is_dir():
+        # 임시 파일 경로로 먼저 쓰기 때문에, 이 검사가 없으면 폴더를 준 실수가
+        # ``os.replace`` 단계에서야 드러나 오류 메시지에 사용자가 치지 않은
+        # ``.tmp`` 경로가 찍힌다. 읽기 쪽 ``read_rows`` 의 존재 검사와 같은 자리다.
+        raise IsADirectoryError(str(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(config.CSV_FIELDS if include_id else config.CSV_FIELDS_WITHOUT_ID)
 
+    tmp = path.with_name(path.name + config.TMP_SUFFIX)
     count = 0
-    with open(path, "w", encoding=config.CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for tx in txs:
-            writer.writerow(_to_row(tx, include_id))
-            count += 1
+    try:
+        with open(tmp, "w", encoding=config.CSV_ENCODING, newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for tx in txs:
+                writer.writerow(_to_row(tx, include_id))
+                count += 1
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        # 실패했으면 임시 파일을 남기지 않는다(정리 실패가 원인 예외를 가리면 안 된다).
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
     return count
 ```
 
-`include_id` 에 따라 필드 목록 자체를 바꿉니다 — `DictWriter` 는 `fieldnames` 에 없는 키를 dict 에 담아 넘기면 `ValueError` 를 내므로, `_to_row` 도 같은 플래그를 받아 `id` 키를 넣을지 결정합니다(storage/csv_io.py:151-163).
+`include_id` 에 따라 필드 목록 자체를 바꿉니다 — `DictWriter` 는 `fieldnames` 에 없는 키를 dict 에 담아 넘기면 `ValueError` 를 내므로, `_to_row` 도 같은 플래그를 받아 `id` 키를 넣을지 결정합니다(storage/csv_io.py:189-201).
+
+**쓰기 대상이 `path` 가 아니라 `tmp` 라는 점**도 눈여겨볼 자리입니다. 다 쓰고 `fsync` 한 뒤에야 `os.replace(tmp, path)` 로 이름을 바꾸므로, 내보내는 중에 실패해도 헤더만 남은 반쪽 CSV 가 생기지 않습니다 — 같은 규칙이 JSONL 쓰기에도 적용되어 있습니다(§8.7).
 
 > **⚙️ 내부 동작 — `newline=""` 이 왜 붙어 있나** — `csv` 모듈이 **직접 요구하는 규약**입니다.
 > `csv.writer` 는 줄 끝을 스스로 `\r\n` 으로 씁니다(RFC 4180). 그런데 텍스트 파일을
@@ -2193,7 +2264,7 @@ class UnitOfWork:
 
 **호출부.**
 
-budget_app/services/importexport.py:188-206
+budget_app/services/importexport.py:243-261
 
 ```python
     def _commit_atomic(self, batch: _Batch) -> int:

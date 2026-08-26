@@ -273,7 +273,7 @@ budget_app/storage/jsonl.py:142-158
 > **💡 쉽게 말하면** — 두꺼운 책을 통째로 복사해 가방에 넣어 오는 대신 열람실에서 한 장씩 넘겨 보는 방식입니다. 가방(메모리)에는 늘 한 장만 있고, 찾던 것이 앞쪽에서 나오면 나머지는 넘겨 보지도 않고 일어설 수 있습니다. 파이썬에서 이렇게 값을 하나씩 내주는 함수를 제너레이터라고 부릅니다.
 > 다만 이 비유는 "언제 자리를 뜨는가"에서 깨집니다 — 열람실 문(파일)은 읽는 쪽이 마지막 장을 넘기거나 도중에 그만둘 때까지 닫히지 않습니다. 닫히는 시점이 읽는 쪽에 달려 있다는 뜻이고, 아래 ⚙️ 노트가 그 이야기입니다.
 
-budget_app/storage/jsonl.py:162-179
+budget_app/storage/jsonl.py:162-182
 
 ```python
     def iter_raw(self) -> Iterator[RawLine]:
@@ -341,6 +341,25 @@ True                                # 바이트 단위로 원본과 동일
 
 이것이 `plan_rewrite` 의 "**원문 보존**"(`lines.append(raw.text)`)이 **바이트 수준에서** 성립하는 이유입니다. 정책이 한쪽만 `surrogateescape` 였다면 보존된 줄이 `U+FFFD`(대체 문자)로 뭉개지거나 `UnicodeEncodeError` 로 쓰기가 죽었을 것입니다.
 
+**무손실로 읽되, 조회 경로로는 내보내지 않습니다.** 대리 문자를 품은 줄이 **정상 거래로 통과하면** 엄격 UTF-8 로 쓰는 경로(`export`)가 나중에 `UnicodeEncodeError` 로 죽습니다 — JSON 이 깨진 줄은 격리하면서 바이트가 깨진 줄은 통과시키는, 같은 약속의 또 다른 구멍입니다. 그래서 `_parse_line` 의 **첫 검사**가 그것을 걸러 손상 줄로 격리합니다.
+
+budget_app/storage/jsonl.py:184-199
+
+```python
+    @staticmethod
+    def _is_utf8_text(line: str) -> bool:
+        """이 줄이 UTF-8 로 다시 쓸 수 있는 문자열인가.
+        ...
+        """
+        try:
+            line.encode(config.FILE_ENCODING)
+        except UnicodeEncodeError:
+            return False
+        return True
+```
+
+파일 원문은 그대로 보존되고(`plan_rewrite` 가 `text` 를 그대로 다시 씁니다), 조회 경로에는 나가지 않으므로 그런 줄 하나 때문에 `export` 전체가 실패하지 않습니다.
+
 **참고 — 정책이 아니었다면:**
 
 | `errors=` | 읽기 시 깨진 바이트 | 다시 쓸 때 |
@@ -349,17 +368,22 @@ True                                # 바이트 단위로 원본과 동일
 | `"replace"` | `U+FFFD` 로 치환 | 원문이 `?`/`�` 로 **영구 훼손** |
 | `"surrogateescape"` | `U+DCNN` 으로 보관 | **원래 바이트 복원** ✅ |
 
-**두 단계 `try` 의 의미.**
+**단계별 관문의 의미.**
 
 ```
-line ──json.loads──▶ ┬─ 실패: RawLine(text만)          ← JSON 조차 아님
-                     └─ 성공: data
-                          │
-                          ├─from_dict──▶ ┬─ 실패: RawLine(text, data)  ← 규칙 위반
-                          │              └─ 성공: RawLine(text, data, entity)
+line ──_is_utf8_text──▶ ┬─ 실패: RawLine(text만)       ← UTF-8 로 다시 쓸 수 없음
+                        └─ 성공
+                           │
+                           ├─json.loads──▶ ┬─ 실패: RawLine(text만)   ← JSON 조차 아님
+                           │               └─ 성공: data
+                           │                    │
+                           │                    ├─from_dict──▶ ┬─ 실패: RawLine(text, data)  ← 규칙 위반
+                           │                    │              └─ 성공: RawLine(text, data, entity)
 ```
 
-두 번째 실패 시 `data` 를 담아 두는 것이 **ID 스캔을 살립니다** — 값이 규칙에 안 맞아도 `data["id"]` 는 읽을 수 있기 때문입니다.
+(위 인용의 `try` 두 개 앞에 `_is_utf8_text` 검사가 한 단계 더 있어 실제로는 **세 관문**입니다.)
+
+마지막 실패 시 `data` 를 담아 두는 것이 **ID 스캔을 살립니다** — 값이 규칙에 안 맞아도 `data["id"]` 는 읽을 수 있기 때문입니다.
 
 `_LINE_ERRORS` 튜플이 잡는 네 가지:
 
@@ -380,7 +404,7 @@ _LINE_ERRORS = (json.JSONDecodeError, ValidationError, KeyError, TypeError)
 
 ### 3.4 `stream()` — 조회 전용, 유효한 것만
 
-budget_app/storage/jsonl.py:193-203
+budget_app/storage/jsonl.py:215-225
 
 ```python
     def stream(self) -> Iterator[T]:
@@ -404,7 +428,7 @@ budget_app/storage/jsonl.py:193-203
 
 ### 3.5 `rewrite()` — 손상 줄을 보존하는 재작성
 
-budget_app/storage/jsonl.py:264-268
+budget_app/storage/jsonl.py:286-290
 
 ```python
     def plan_rewrite(
@@ -499,7 +523,7 @@ def atomic_write_lines(path: Path, lines: Iterable[str]) -> None:
 `commit_staged` 가 교체만 하므로, 호출자가 "전부 준비 → replace 만 연달아"를
 구성할 수 있습니다(→ [07 §9](./07-repository.md)).
 
-파일 하나만 바꾸는 경로(`rewrite`, `jsonl.py:328`)는 여전히 `atomic_write_lines` 한 줄로 둘을
+파일 하나만 바꾸는 경로(`rewrite`, `jsonl.py:350`)는 여전히 `atomic_write_lines` 한 줄로 둘을
 연달아 부릅니다 — 기존 사용처는 아무것도 달라지지 않았습니다.
 
 **세 호출이 각각 다른 것을 보장합니다.**
@@ -584,7 +608,7 @@ fsync 가 없었다면 + 전원 차단:
 
 `rewrite` 가 파일 전체를 갈아 끼우는 경로라면, `append` 계열은 **파일 끝에 붙이는 O(1) 경로**입니다. O(1)은 파일이 아무리 커져도 걸리는 시간이 늘지 않는다는 뜻입니다. 여기에도 두 가지 방어가 들어 있습니다.
 
-budget_app/storage/jsonl.py:232-247
+budget_app/storage/jsonl.py:254-269
 
 ```python
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -607,7 +631,7 @@ budget_app/storage/jsonl.py:232-247
 
 "찢어진 꼬리"는 마지막 줄에 개행이 없는 파일입니다. 그냥 이어 쓰면 새 JSON 이 그 줄 뒤에 붙어 **한 줄**이 되고, 기존 줄과 방금 "저장 완료"라고 알린 레코드가 **동시에** 죽습니다. 그래서 마지막 바이트를 먼저 확인합니다.
 
-budget_app/storage/jsonl.py:249-262
+budget_app/storage/jsonl.py:271-284
 
 ```python
     def _has_torn_tail(self) -> bool:
@@ -730,7 +754,7 @@ budget_app/storage/repositories.py:39-51
         return TransactionId.scan(raw.text)
 ```
 
-> **⚙️ 내부 동작** — 정규식 두 개가 서로 다른 메서드를 씁니다. 검증용 `_EXACT`(`domain/tx_id.py:45`)는 `re.match` 로 **문자열 처음부터**만 맞춰 보고, 발굴용 `_SCAN`(`:48`)은 `re.search` 로 **줄 어디서든** 찾습니다. `re.compile` 로 미리 컴파일해 모듈 상수로 둔 것은, 컴파일 결과가 정규식 전용 바이트코드를 담은 `Pattern` 객체이고 그 컴파일이 한 번만 일어나면 되기 때문입니다(`re` 모듈에도 내부 캐시가 있지만 크기 제한이 있고, 상수로 두면 의도가 드러납니다). 패턴은 `TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'`(`domain/config.py:27`)라 **JSON 이 깨진 줄에서도 `"id": "TX-000010"` 조각만 있으면** 번호를 건집니다. → [12 §2-A](./12-syntax-and-stdlib.md)
+> **⚙️ 내부 동작** — 정규식 두 개가 서로 다른 메서드를 씁니다. 검증용 `_EXACT`(`domain/tx_id.py:45`)는 `re.match` 로 **문자열 처음부터**만 맞춰 보고, 발굴용 `_SCAN`(`:48`)은 `re.search` 로 **줄 어디서든** 찾습니다. `re.compile` 로 미리 컴파일해 모듈 상수로 둔 것은, 컴파일 결과가 정규식 전용 바이트코드를 담은 `Pattern` 객체이고 그 컴파일이 한 번만 일어나면 되기 때문입니다(`re` 모듈에도 내부 캐시가 있지만 크기 제한이 있고, 상수로 두면 의도가 드러납니다). 패턴은 `TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'`(`domain/config.py:31`)라 **JSON 이 깨진 줄에서도 `"id": "TX-000010"` 조각만 있으면** 번호를 건집니다. → [12 §2-A](./12-syntax-and-stdlib.md)
 
 **`_scan_id` 의 2단 전략**이 이 계층의 방어력을 결정합니다.
 
@@ -810,7 +834,7 @@ budget_app/storage/repositories.py:159-167
 
 그러면 "없는 id 를 지우려 했을 때 파일이 헛되이 다시 쓰이는 것"은 누가 막을까요? `rewrite` 입니다.
 
-budget_app/storage/jsonl.py:325-329
+budget_app/storage/jsonl.py:347-351
 
 ```python
         plan = self.plan_rewrite(transform, extra=extra)
@@ -1016,7 +1040,7 @@ $ python -m budget_app import --from rt.csv
 
 ### 8.3 `ParsedRow` — 정책과 어댑터의 경계
 
-budget_app/storage/csv_io.py:39-64
+budget_app/storage/csv_io.py:40-65
 
 ```python
 @dataclass(frozen=True)
@@ -1051,7 +1075,7 @@ class ParsedRow:
 
 ### 8.4 읽기 — 헤더 검증과 행 파싱
 
-budget_app/storage/csv_io.py:72-87
+budget_app/storage/csv_io.py:73-101
 
 ```python
 def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
@@ -1059,6 +1083,12 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며
     ``id`` 는 요구하지 않는다.
+
+    ``csv.Error`` 를 ``AppError`` 로 바꾸는 이유: 파서가 던지는 이 예외는 **일반
+    사용자 조작만으로** 닿는다(한 필드가 128KB 를 넘거나, 따옴표가 닫히지 않아 파일
+    끝까지 한 필드로 읽히는 CSV). 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가
+    "예기치 못한 오류"로 표시된다 — 원인도 해결 방법도 알 수 있는 오류인데
+    분류되지 않은 버그처럼 보이는 것은 요구사항 Q2(원인 + 해결 힌트)에 어긋난다.
     """
     path = Path(path)
     if not path.exists():
@@ -1066,17 +1096,26 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
-        _check_header(path, reader.fieldnames)
-        # ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,
-        # 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
-        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
+        try:
+            # ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.
+            _check_header(path, reader.fieldnames)
+            # 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을
+            # 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
+            for item in enumerate(reader, start=config.CSV_DATA_START_LINE):
+                yield item
+        except csv.Error as exc:
+            raise AppError(
+                messages.ERR_CSV_PARSE.format(error=exc), hint=messages.HINT_CSV_PARSE
+            ) from exc
 ```
 
 **빈 파일과 컬럼 누락을 구분**하는 것이 리팩터에서 추가됐습니다. 이전에는 빈 CSV 도 "필수 컬럼이 없습니다: ['date', 'type', ...]" 라고 안내했는데, 실제 문제는 "헤더 행 자체가 없다"입니다.
 
 > **⚙️ 내부 동작 — `reader.fieldnames` 는 그 순간 첫 행을 읽습니다.** `csv.DictReader.fieldnames` 는 평범한 속성이 아니라 **`@property` 로 구현된 지연 속성**입니다. 처음 접근할 때 내부 `csv.reader` 에서 한 행을 꺼내 `self._fieldnames` 에 캐시하고, 그 뒤로는 캐시를 돌려줍니다. 즉 `_check_header(path, reader.fieldnames)` 라고 쓴 이 한 줄이 **헤더 행을 실제로 소비하는 지점**이고, 그래서 뒤이은 `enumerate(reader, ...)` 는 자동으로 2행부터 시작합니다(`CSV_DATA_START_LINE = 2` 와 짝이 맞는 이유). 로컬 3.13.1 에서 스트림 위치로 확인했습니다 — `fieldnames` 접근 전 `tell()` 은 `0`, 접근 후에는 헤더 길이만큼 전진해 있었습니다. 파일이 완전히 비어 있으면 꺼낼 행이 없어 `fieldnames` 가 `None` 이 되고, `_check_header` 의 `list(fieldnames or [])` 가 그 경우를 "헤더 없음"으로 갈라냅니다. → [12 §2-A](./12-syntax-and-stdlib.md)
 
-> **🔎 문법의 출처** — `yield from` 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. `for x in it: yield x` 의 축약처럼 보이지만 그 이상으로, 하위 이터러블에 **`send`/`throw`/`close` 까지 그대로 위임**합니다. 여기서 중요한 것은 위임하는 동안 이 함수의 프레임이 **살아 있다**는 점입니다 — `with open(...)` 블록이 열린 채로 유지되고, 파일은 마지막 행을 꺼낸 뒤(또는 호출자가 중간에 그만둔 뒤)에야 닫힙니다. 소스 주석이 정확히 그 말을 합니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+**`csv.Error` 를 `AppError` 로 번역합니다.** 한 필드가 128KB(`csv.field_size_limit`)를 넘거나 따옴표가 닫히지 않아 파일 끝까지 한 필드로 읽히는 CSV 는 **평범한 사용자 조작만으로** 만들어집니다. 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가 "예기치 못한 오류"(종료 코드 1)로 표시되는데, 원인도 해결 방법도 아는 오류를 분류되지 않은 버그처럼 보이게 하는 셈이라 여기서 잡아 원인 + 힌트가 붙은 `AppError`(종료 코드 4)로 바꿉니다.
+
+> **🔎 문법의 출처 — `yield from` 이 아니라 `for` + `yield` 인 이유** — 이전에는 이 자리가 `yield from enumerate(reader, ...)` 였습니다. `yield from`(PEP 380, 파이썬 3.3)은 `for x in it: yield x` 의 축약처럼 보이지만 그 이상으로, 하위 이터러블에 **`send`/`throw`/`close` 까지 그대로 위임**합니다. 다만 위임하는 동안 파서가 던지는 `csv.Error` 를 잡으려면 그 문장 자체가 `try` 안에 들어가야 하고, 그러면 **`yield` 가 `try` 블록 안에서 일어나는지**가 한눈에 읽히지 않습니다. 지금처럼 `for` 로 풀어 쓰면 "행을 꺼내는 동안 발생한 `csv.Error` 만 잡는다"는 범위가 코드에 그대로 보입니다. 어느 쪽이든 이 함수의 프레임이 소비되는 동안 **살아 있다**는 성질은 같습니다 — `with open(...)` 블록이 열린 채로 유지되고, 파일은 마지막 행을 꺼낸 뒤(또는 호출자가 중간에 그만둔 뒤)에야 닫힙니다. 소스 주석이 정확히 그 말을 합니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
 > **⚙️ 내부 동작 — `newline=""` 는 CSV 에서 선택이 아니라 필수입니다.** `csv` 모듈은 **자기가 개행을 직접 다루는** 모듈이라, 파일 객체가 개행을 건드리지 않도록 요구합니다(`csv` 문서가 명시). 읽기에서 `newline=""` 를 빼면 범용 개행이 켜져 **따옴표로 감싼 필드 안의 줄바꿈**(메모에 여러 줄을 적은 경우)이 훼손될 수 있고, 쓰기에서 빼면 Windows 에서 `csv.writer` 가 내보낸 `\r\n` 의 `\n` 이 다시 `\r\n` 으로 변환돼 **`\r\r\n`** 이 됩니다. 로컬에서 확인한 결과입니다.
 >
@@ -1090,7 +1129,7 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 >
 > JSONL 은 반대로 **파이썬이 개행을 쓰므로** `newline="\n"` 으로 "변환하지 말고 LF 그대로"를 지시합니다(§3.6). 두 값이 다른 것은 **개행의 주인이 누구인가**가 다르기 때문입니다. → [12 §3](./12-syntax-and-stdlib.md)
 
-budget_app/storage/csv_io.py:107-123
+budget_app/storage/csv_io.py:121-137
 
 ```python
 def parse_row(row: dict[str, str]) -> ParsedRow:
@@ -1118,28 +1157,56 @@ def parse_row(row: dict[str, str]) -> ParsedRow:
 
 ### 8.5 쓰기 — `include_id` 플래그
 
-budget_app/storage/csv_io.py:131-148
+budget_app/storage/csv_io.py:145-186
 
 ```python
 def write_transactions(path: Path, txs: Iterable[Transaction], *, include_id: bool = True) -> int:
     """거래를 CSV 로 저장하고 작성 건수를 반환한다.
 
-    인코딩은 BOM 없는 UTF-8 로 고정한다. BOM 을 넣으면 다시 ``import`` 할 때 헤더
-    첫 컬럼명이 ``﻿id`` 로 깨져 왕복이 실패한다(왕복 안전성 우선).
+    인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.
+    반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은
+    흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.
+
+    쓰기는 **임시 파일 + ``os.replace``** 다(JSONL 쓰기와 같은 규칙). 대상 경로를
+    곧바로 열면 쓰다가 실패했을 때 헤더만 남은 **반쪽 CSV** 가 그 자리에 남는다.
+    사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을
+    백업으로 믿고 쓰면 데이터가 조용히 사라진다. 지금은 준비가 끝난 뒤에만 이름이
+    바뀌므로 결과는 "완전한 새 파일" 또는 "손대지 않은 기존 파일" 둘 중 하나다.
     """
     path = Path(path)
+    if path.is_dir():
+        # 임시 파일 경로로 먼저 쓰기 때문에, 이 검사가 없으면 폴더를 준 실수가
+        # ``os.replace`` 단계에서야 드러나 오류 메시지에 사용자가 치지 않은
+        # ``.tmp`` 경로가 찍힌다. 읽기 쪽 ``read_rows`` 의 존재 검사와 같은 자리다.
+        raise IsADirectoryError(str(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(config.CSV_FIELDS if include_id else config.CSV_FIELDS_WITHOUT_ID)
 
+    tmp = path.with_name(path.name + config.TMP_SUFFIX)
     count = 0
-    with open(path, "w", encoding=config.CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for tx in txs:
-            writer.writerow(_to_row(tx, include_id))
-            count += 1
+    try:
+        with open(tmp, "w", encoding=config.CSV_ENCODING, newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for tx in txs:
+                writer.writerow(_to_row(tx, include_id))
+                count += 1
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        # 실패했으면 임시 파일을 남기지 않는다(정리 실패가 원인 예외를 가리면 안 된다).
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
     return count
 ```
+
+**쓰기가 원자적입니다** — JSONL 쪽(§3.4)과 같은 규칙입니다. 대상 경로를 곧바로 열면 쓰다가 실패했을 때(디스크 가득 참, `UnicodeEncodeError`) **헤더만 남은 반쪽 CSV** 가 그 자리에 남습니다. 사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을 백업으로 믿고 쓰면 데이터가 조용히 사라집니다. 지금은 `.tmp` 에 다 쓰고 `fsync` 한 뒤에만 `os.replace` 로 이름을 바꾸므로 결과는 **"완전한 새 파일" 또는 "손대지 않은 기존 파일"** 둘 중 하나입니다. 실패 시 `except BaseException` 이 임시 파일을 지우는 것도 같은 이유입니다 — 사용자가 만든 적 없는 `.tmp` 가 남지 않아야 합니다.
+
+**`path.is_dir()` 검사가 앞에 있는 이유**도 임시 파일 때문입니다. 이 검사가 없으면 `--out` 에 폴더를 준 실수가 `os.replace` 단계에서야 드러나고, 오류 메시지에는 사용자가 치지 않은 `.tmp` 경로가 찍힙니다. 읽기 쪽 `read_rows` 의 존재 검사와 같은 자리입니다.
 
 **`include_id` 가 두 함수에 다 전달되는 이유**: `DictWriter` 는 `fieldnames` 에 없는 키가 dict 에 있으면 `ValueError` 를 냅니다. 헤더와 행 내용이 반드시 일치해야 합니다.
 

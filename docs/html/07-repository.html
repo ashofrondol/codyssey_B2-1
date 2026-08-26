@@ -81,7 +81,7 @@
 <h2 id="1-이-계층의-계약">1. 이 계층의 계약</h2>
 <p>이 절이 보는 것은 "이 폴더가 무엇을 하기로 약속했는가"입니다. 약속은 두 줄로 줄어듭니다. 파일을 여는 코드는 이 폴더 밖에 두지 않는다, 그리고 이 폴더 안에서는 무엇이 옳은 값인지 판단하지 않는다. 판단은 도메인과 서비스가 하고, 이 계층은 완성된 것을 받아 적고 다시 꺼내 줄 뿐입니다.</p>
 <p>budget_app/storage/<strong>init</strong>.py:1-17</p>
-<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;저장소 계층 — 파일을 읽고 쓰는 코드가 전부 여기 있다.</span>
+<div class="codehilite"><pre><span></span><code><span class="sd">"""저장소 계층 — 파일을 읽고 쓰는 코드가 전부 여기 있다.</span>
 
 <span class="sd">- ``jsonl``        : JSONL 포맷 공통 처리 (JsonlStore / RawLine / 원자적 쓰기)</span>
 <span class="sd">- ``ids``          : 거래 ID 발급기 (파일 상태에 의존하는 부분)</span>
@@ -93,11 +93,11 @@
 <span class="sd">지금은 ``open()`` 이 이 패키지 밖에 없다(서비스 계층에는 0개).</span>
 
 <span class="sd">이 계층은 **도메인 판단을 하지 않는다.** 완성된 객체를 받아 쓰고 저장된 객체를</span>
-<span class="sd">돌려줄 뿐이며, &quot;무엇으로 바꿀지&quot;는 서비스와 도메인이 정한다.</span>
+<span class="sd">돌려줄 뿐이며, "무엇으로 바꿀지"는 서비스와 도메인이 정한다.</span>
 
 <span class="sd">**재수출하지 않는다** — ``from ..storage.repositories import CategoryStore`` 처럼</span>
-<span class="sd">소유 모듈을 명시해 &quot;어느 파일이 무엇을 정의하는가&quot;가 import 문에서 보이게 한다.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">소유 모듈을 명시해 "어느 파일이 무엇을 정의하는가"가 import 문에서 보이게 한다.</span>
+<span class="sd">"""</span>
 </code></pre></div>
 
 <blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 이 프로그램이 쓰는 저장 형식(JSONL)은 공책 장부와 같습니다. 한 줄에 기록 한 건을 적고, 새 기록이 생기면 그다음 줄에 이어 적습니다. 파일 전체를 읽지 않아도 줄 하나만 보면 그 한 건을 알 수 있고, 사람이 열어 봐도 그냥 읽힙니다. 거래도 카테고리도 예산도 각각 이 형식으로 자기 파일에 쌓입니다.
@@ -201,7 +201,7 @@
 <h2 id="2-이-문서의-핵심-읽기-경로가-왜-둘인가">2. 이 문서의 핵심 — 읽기 경로가 왜 둘인가</h2>
 <p>프로그램이 이 파일을 읽는 방법은 두 가지입니다. 하나면 될 것 같은데 왜 둘인가 — 이 절의 주제가 그것입니다. 답은 간단합니다. 하나로 두었더니 사고가 두 건 났기 때문입니다. 리팩터 이전과 이후를 먼저 대조합니다. 이 하나가 이 문서 내용의 절반입니다.</p>
 <p>budget_app/storage/jsonl.py:9-18 (모듈 docstring 이어서)</p>
-<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;...</span>
+<div class="codehilite"><pre><span></span><code><span class="sd">"""...</span>
 <span class="sd">## 읽기 경로가 둘인 이유</span>
 
 <span class="sd">이전에는 읽기 진입점이 ``stream()`` 하나였고 그것이 파싱 실패 줄을 **건너뛰었다**.</span>
@@ -211,7 +211,7 @@
 
 <span class="sd">- ``iter_raw()`` — 모든 줄을 원문과 함께 준다. 재작성 경로와 ID 스캔이 쓴다.</span>
 <span class="sd">- ``stream()``   — 검증을 통과한 도메인 객체만 준다. 조회 경로가 쓴다.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 </code></pre></div>
 
 <p>두 가지가 이 문단에 함께 적혀 있는 것이 중요합니다. <strong>손상 줄 유실</strong>과 <strong>ID 재발급</strong>은
@@ -221,27 +221,27 @@
 <h3 id="21-버그-재현-손상-줄-영구-삭제">2.1 버그 재현 — 손상 줄 영구 삭제</h3>
 <p>리팩터 전 코드로 실제로 재현했던 시나리오입니다.</p>
 <div class="codehilite"><pre><span></span><code>$ cat data/transactions.jsonl
-{&quot;id&quot;:&quot;TX-000001&quot;, ... &quot;amount&quot;:1000 ...}
+{"id":"TX-000001", ... "amount":1000 ...}
 { BROKEN LINE }                              ← JSON 이 아닌 줄
-{&quot;id&quot;:&quot;TX-000002&quot;, ... &quot;amount&quot;:2000 ...}
+{"id":"TX-000002", ... "amount":2000 ...}
 
 $ python -m budget_app delete --id TX-000001     ← TX-000001 만 지우려 했는데
 [WARNING] transactions.jsonl:2 손상된 줄을 건너뜁니다: ...
 [삭제 완료] id=TX-000001
 
 $ cat data/transactions.jsonl
-{&quot;id&quot;: &quot;TX-000002&quot;, ... }                    ← 손상 줄까지 사라짐!
+{"id": "TX-000002", ... }                    ← 손상 줄까지 사라짐!
 </code></pre></div>
 
 <p><strong>경고 로그가 오해를 부릅니다.</strong> "건너뜁니다"는 읽기에 대한 말이었는데, 사용자는 그것이 파일에서 지워졌다는 뜻인 줄 모릅니다.</p>
 <h3 id="22-버그-재현-id-발급-충돌">2.2 버그 재현 — ID 발급 충돌</h3>
 <div class="codehilite"><pre><span></span><code>$ cat data/transactions.jsonl
-{&quot;id&quot;:&quot;TX-000009&quot;, &quot;amount&quot;:0, ...}          ← amount=0 → 검증 실패
-{&quot;id&quot;:&quot;TX-000010&quot;, &quot;date&quot;:&quot;2024-13-99&quot;, ...} ← 날짜 불량 → 검증 실패
+{"id":"TX-000009", "amount":0, ...}          ← amount=0 → 검증 실패
+{"id":"TX-000010", "date":"2024-13-99", ...} ← 날짜 불량 → 검증 실패
 
 $ python -m budget_app import --from new.csv
 $ tail -1 data/transactions.jsonl
-{&quot;id&quot;: &quot;TX-000001&quot;, ...}                     ← TX-000009/10 을 못 봐서 1번부터 재발급
+{"id": "TX-000001", ...}                     ← TX-000009/10 을 못 봐서 1번부터 재발급
 </code></pre></div>
 
 <p><code>stream()</code> 이 두 줄을 건너뛰므로 <code>max_id_num()</code> 이 0 을 반환하고, 다음 번호가 1이 됩니다. 파일에 이미 있는 번호와 언제든 충돌할 수 있는 상태가 됩니다.</p>
@@ -276,11 +276,11 @@ $ tail -1 data/transactions.jsonl
 <p>budget_app/storage/jsonl.py:95-111</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">RawLine</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;파일의 한 줄 — 원문과 해석 결과를 함께 들고 다닌다.</span>
+<span class="w">    </span><span class="sd">"""파일의 한 줄 — 원문과 해석 결과를 함께 들고 다닌다.</span>
 
 <span class="sd">    상태가 셋이다: 원문만 있음(JSON 아님) / dict 까지 됨(도메인 규칙 위반) /</span>
 <span class="sd">    도메인 객체까지 됨(정상). 재작성 시 앞의 둘은 ``text`` 를 그대로 다시 쓴다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>
@@ -341,12 +341,12 @@ $ tail -1 data/transactions.jsonl
 <h3 id="31-왜-공통-클래스로-올렸나">3.1 왜 공통 클래스로 올렸나</h3>
 <p>budget_app/storage/jsonl.py:131-140</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JsonlStore</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;JSONL 파일 하나를 다루는 공통 동작.</span>
+<span class="w">    </span><span class="sd">"""JSONL 파일 하나를 다루는 공통 동작.</span>
 
 <span class="sd">    세 저장소가 열기/스트리밍/원자적 재작성 코드를 각자 복사해 갖고 있었다.</span>
-<span class="sd">    &quot;파일 포맷을 다루는 법&quot;은 여기 한 번만 두고, 하위 클래스는 **엔티티별 규칙**</span>
+<span class="sd">    "파일 포맷을 다루는 법"은 여기 한 번만 두고, 하위 클래스는 **엔티티별 규칙**</span>
 <span class="sd">    (어떤 dataclass 인가, 무엇이 유일 키인가)만 갖는다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="c1">#: 하위 클래스가 지정 — 줄 하나를 세울 dataclass</span>
     <span class="n">entity_cls</span><span class="p">:</span> <span class="nb">type</span>
@@ -368,7 +368,7 @@ $ tail -1 data/transactions.jsonl
     <span class="c1"># ---------- 준비 ----------</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">ensure_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;파일이 없으면 만든다 — 명시적으로 호출될 때만 디스크를 건드린다.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""파일이 없으면 만든다 — 명시적으로 호출될 때만 디스크를 건드린다."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">touch</span><span class="p">()</span>
@@ -388,11 +388,11 @@ $ tail -1 data/transactions.jsonl
 <blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 두꺼운 책을 통째로 복사해 가방에 넣어 오는 대신 열람실에서 한 장씩 넘겨 보는 방식입니다. 가방(메모리)에는 늘 한 장만 있고, 찾던 것이 앞쪽에서 나오면 나머지는 넘겨 보지도 않고 일어설 수 있습니다. 파이썬에서 이렇게 값을 하나씩 내주는 함수를 제너레이터라고 부릅니다.
 다만 이 비유는 "언제 자리를 뜨는가"에서 깨집니다 — 열람실 문(파일)은 읽는 쪽이 마지막 장을 넘기거나 도중에 그만둘 때까지 닫히지 않습니다. 닫히는 시점이 읽는 쪽에 달려 있다는 뜻이고, 아래 ⚙️ 노트가 그 이야기입니다.</p>
 </blockquote>
-<p>budget_app/storage/jsonl.py:162-179</p>
+<p>budget_app/storage/jsonl.py:162-182</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">iter_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">RawLine</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.</span>
+<span class="w">        </span><span class="sd">"""모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ENCODING</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ERRORS</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -413,7 +413,7 @@ $ tail -1 data/transactions.jsonl
 다만 이 비유는 "임시 번호를 누가 알아보는가"에서 깨집니다 — 되돌려 적는 쪽이 같은 규칙을 쓸 때만 성립합니다. 읽기와 쓰기 중 한쪽만 이 정책이면 보존한 줄이 뭉개지거나 쓰기가 아예 실패합니다(아래 표).</p>
 </blockquote>
 <p>budget_app/storage/jsonl.py:167-170</p>
-<div class="codehilite"><pre><span></span><code>        <span class="err">``</span><span class="n">errors</span><span class="o">=</span><span class="n">surrogateescape</span><span class="err">``</span> <span class="n">가</span> <span class="s2">&quot;손상 줄 격리&quot;</span> <span class="n">약속을</span> <span class="o">**</span><span class="n">인코딩</span> <span class="n">층까지</span><span class="o">**</span> <span class="n">넓힌다</span><span class="o">.</span>
+<div class="codehilite"><pre><span></span><code>        <span class="err">``</span><span class="n">errors</span><span class="o">=</span><span class="n">surrogateescape</span><span class="err">``</span> <span class="n">가</span> <span class="s2">"손상 줄 격리"</span> <span class="n">약속을</span> <span class="o">**</span><span class="n">인코딩</span> <span class="n">층까지</span><span class="o">**</span> <span class="n">넓힌다</span><span class="o">.</span>
         <span class="n">이전에는</span> <span class="n">엄격</span> <span class="n">디코딩이라</span> <span class="n">UTF</span><span class="o">-</span><span class="mi">8</span> <span class="n">이</span> <span class="n">아닌</span> <span class="n">바이트</span> <span class="n">한</span> <span class="n">줄이</span> <span class="err">``</span><span class="ne">UnicodeDecodeError</span><span class="err">``</span>
         <span class="n">로</span> <span class="o">**</span><span class="n">파일</span> <span class="n">전체</span> <span class="n">읽기를</span> <span class="n">죽였다</span><span class="o">**</span> <span class="err">—</span> <span class="n">JSON</span> <span class="n">이</span> <span class="n">깨진</span> <span class="n">줄은</span> <span class="n">격리하면서</span> <span class="n">바이트가</span> <span class="n">깨진</span>
         <span class="n">줄은</span> <span class="n">격리하지</span> <span class="n">못하는</span><span class="p">,</span> <span class="n">같은</span> <span class="n">약속의</span> <span class="n">구멍이었다</span><span class="o">.</span>
@@ -421,27 +421,42 @@ $ tail -1 data/transactions.jsonl
 
 <p><code>FILE_ERRORS</code> 는 상수 하나로 읽기와 쓰기 양쪽에 같이 걸립니다.</p>
 <p>budget_app/storage/config.py:22-26</p>
-<div class="codehilite"><pre><span></span><code><span class="n">FILE_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
+<div class="codehilite"><pre><span></span><code><span class="n">FILE_ENCODING</span> <span class="o">=</span> <span class="s2">"utf-8"</span>
 <span class="c1">#: 디코딩 불가 바이트를 예외 대신 대리 문자로 받아 **무손실 왕복**시킨다.</span>
 <span class="c1">#: 읽기와 쓰기가 같은 정책을 쓰므로 손상된 줄이 원문 바이트 그대로 보존된다.</span>
-<span class="n">FILE_ERRORS</span> <span class="o">=</span> <span class="s2">&quot;surrogateescape&quot;</span>
-<span class="n">LINE_TERMINATOR</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+<span class="n">FILE_ERRORS</span> <span class="o">=</span> <span class="s2">"surrogateescape"</span>
+<span class="n">LINE_TERMINATOR</span> <span class="o">=</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
 </code></pre></div>
 
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>surrogateescape</code> 오류 핸들러는 PEP 383 으로 파이썬 3.1 에 들어왔습니다. 원래 목적은 "OS 가 주는 파일 이름 바이트가 선언된 인코딩을 어길 때 프로그램이 죽지 않게" 하는 것이었습니다. 규칙은 단순합니다 — <strong>디코딩할 수 없는 바이트 <code>0xNN</code>(0x80~0xFF) 하나를 코드포인트 <code>U+DCNN</code> 하나에 실어 둔다.</strong> U+DC80..U+DCFF 는 유니코드의 "하위 서로게이트" 구역이라 정상 텍스트에는 절대 나타나지 않으므로 충돌하지 않습니다. 인코딩할 때 같은 핸들러를 쓰면 그 구간의 문자를 <strong>원래 바이트로 되돌려</strong> 씁니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong>실행으로 확인한 왕복(로컬 CPython 3.13.1).</strong> UTF-8 이 아닌 바이트가 섞인 파일을 이 정책으로 읽고 같은 정책으로 다시 쓰면 바이트가 <strong>완전히 동일</strong>하게 복원됩니다.</p>
-<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;se.jsonl&quot;</span><span class="p">,</span><span class="s2">&quot;wb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;{&quot;id&quot;:&quot;TX-000001&quot;}</span><span class="se">\n\xff\xfe</span><span class="s1"> not utf-8</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="n">l</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;se.jsonl&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;surrogateescape&quot;</span><span class="p">)]</span>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"se.jsonl"</span><span class="p">,</span><span class="s2">"wb"</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s1">'{"id":"TX-000001"}</span><span class="se">\n\xff\xfe</span><span class="s1"> not utf-8</span><span class="se">\n</span><span class="s1">'</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="n">l</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"se.jsonl"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"surrogateescape"</span><span class="p">)]</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="nb">repr</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-<span class="s2">&quot;&#39;</span><span class="se">\\</span><span class="s2">udcff</span><span class="se">\\</span><span class="s2">udcfe not utf-8&#39;&quot;</span>        <span class="c1"># 0xff → U+DCFF, 0xfe → U+DCFE</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;out.jsonl&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span><span class="n">errors</span><span class="o">=</span><span class="s2">&quot;surrogateescape&quot;</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-<span class="o">...</span>     <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">l</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;se.jsonl&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span> <span class="o">==</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;out.jsonl&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="s2">"'</span><span class="se">\\</span><span class="s2">udcff</span><span class="se">\\</span><span class="s2">udcfe not utf-8'"</span>        <span class="c1"># 0xff → U+DCFF, 0xfe → U+DCFE</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"out.jsonl"</span><span class="p">,</span><span class="s2">"w"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span><span class="n">errors</span><span class="o">=</span><span class="s2">"surrogateescape"</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="o">...</span>     <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">l</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"se.jsonl"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span> <span class="o">==</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"out.jsonl"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
 <span class="kc">True</span>                                <span class="c1"># 바이트 단위로 원본과 동일</span>
 </code></pre></div>
 
 <p>이것이 <code>plan_rewrite</code> 의 "<strong>원문 보존</strong>"(<code>lines.append(raw.text)</code>)이 <strong>바이트 수준에서</strong> 성립하는 이유입니다. 정책이 한쪽만 <code>surrogateescape</code> 였다면 보존된 줄이 <code>U+FFFD</code>(대체 문자)로 뭉개지거나 <code>UnicodeEncodeError</code> 로 쓰기가 죽었을 것입니다.</p>
+<p><strong>무손실로 읽되, 조회 경로로는 내보내지 않습니다.</strong> 대리 문자를 품은 줄이 <strong>정상 거래로 통과하면</strong> 엄격 UTF-8 로 쓰는 경로(<code>export</code>)가 나중에 <code>UnicodeEncodeError</code> 로 죽습니다 — JSON 이 깨진 줄은 격리하면서 바이트가 깨진 줄은 통과시키는, 같은 약속의 또 다른 구멍입니다. 그래서 <code>_parse_line</code> 의 <strong>첫 검사</strong>가 그것을 걸러 손상 줄로 격리합니다.</p>
+<p>budget_app/storage/jsonl.py:184-199</p>
+<div class="codehilite"><pre><span></span><code>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_utf8_text</span><span class="p">(</span><span class="n">line</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""이 줄이 UTF-8 로 다시 쓸 수 있는 문자열인가.</span>
+<span class="sd">        ...</span>
+<span class="sd">        """</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">line</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ENCODING</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">UnicodeEncodeError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="kc">True</span>
+</code></pre></div>
+
+<p>파일 원문은 그대로 보존되고(<code>plan_rewrite</code> 가 <code>text</code> 를 그대로 다시 씁니다), 조회 경로에는 나가지 않으므로 그런 줄 하나 때문에 <code>export</code> 전체가 실패하지 않습니다.</p>
 <p><strong>참고 — 정책이 아니었다면:</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -469,15 +484,19 @@ $ tail -1 data/transactions.jsonl
 </tr>
 </tbody>
 </table></div>
-<p><strong>두 단계 <code>try</code> 의 의미.</strong></p>
-<div class="codehilite"><pre><span></span><code>line ──json.loads──▶ ┬─ 실패: RawLine(text만)          ← JSON 조차 아님
-                     └─ 성공: data
-                          │
-                          ├─from_dict──▶ ┬─ 실패: RawLine(text, data)  ← 규칙 위반
-                          │              └─ 성공: RawLine(text, data, entity)
+<p><strong>단계별 관문의 의미.</strong></p>
+<div class="codehilite"><pre><span></span><code>line ──_is_utf8_text──▶ ┬─ 실패: RawLine(text만)       ← UTF-8 로 다시 쓸 수 없음
+                        └─ 성공
+                           │
+                           ├─json.loads──▶ ┬─ 실패: RawLine(text만)   ← JSON 조차 아님
+                           │               └─ 성공: data
+                           │                    │
+                           │                    ├─from_dict──▶ ┬─ 실패: RawLine(text, data)  ← 규칙 위반
+                           │                    │              └─ 성공: RawLine(text, data, entity)
 </code></pre></div>
 
-<p>두 번째 실패 시 <code>data</code> 를 담아 두는 것이 <strong>ID 스캔을 살립니다</strong> — 값이 규칙에 안 맞아도 <code>data["id"]</code> 는 읽을 수 있기 때문입니다.</p>
+<p>(위 인용의 <code>try</code> 두 개 앞에 <code>_is_utf8_text</code> 검사가 한 단계 더 있어 실제로는 <strong>세 관문</strong>입니다.)</p>
+<p>마지막 실패 시 <code>data</code> 를 담아 두는 것이 <strong>ID 스캔을 살립니다</strong> — 값이 규칙에 안 맞아도 <code>data["id"]</code> 는 읽을 수 있기 때문입니다.</p>
 <p><code>_LINE_ERRORS</code> 튜플이 잡는 네 가지:</p>
 <p>budget_app/storage/jsonl.py:37-40</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 한 줄을 도메인 객체로 세우다 실패할 수 있는 경우들.</span>
@@ -491,13 +510,13 @@ $ tail -1 data/transactions.jsonl
 </blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>json.JSONDecodeError</code> 는 <code>ValueError</code> 의 하위 클래스입니다(로컬 확인: MRO 가 <code>JSONDecodeError → ValueError → Exception → BaseException</code>). <code>json.loads</code> 는 C 로 짜인 스캐너(<code>_json</code> 확장 모듈)로 파싱하고, 실패하면 <strong>그 스캐너가</strong> 위치·줄·열 정보를 붙인 <code>JSONDecodeError</code> 를 직접 던집니다(값 자체가 없는 경우만 <code>json/decoder.py</code> 의 <code>raw_decode</code> 가 스캐너의 <code>StopIteration</code> 을 받아 같은 예외로 바꿉니다). <code>str(exc)</code> 는 <code>"Expecting value: line 1 column 3 (char 2)"</code> 같은 사람이 읽을 문자열이 됩니다. 그 문자열이 그대로 <code>RawLine.error</code> 에 담겨 나중에 경고 로그로 나갑니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <h3 id="34-stream-조회-전용-유효한-것만">3.4 <code>stream()</code> — 조회 전용, 유효한 것만</h3>
-<p>budget_app/storage/jsonl.py:193-203</p>
+<p>budget_app/storage/jsonl.py:215-225</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">T</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;검증을 통과한 도메인 객체만 yield 한다 — 조회 전용 경로.</span>
+<span class="w">        </span><span class="sd">"""검증을 통과한 도메인 객체만 yield 한다 — 조회 전용 경로.</span>
 
 <span class="sd">        손상된 줄은 건너뛰되 조용히 버리지 않고 경고 로그로 남긴다(사용자가</span>
 <span class="sd">        데이터 이상을 인지할 수 있도록). 파일 자체는 손대지 않는다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_raw</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">raw</span><span class="o">.</span><span class="n">is_valid</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">raw</span><span class="o">.</span><span class="n">entity</span>
@@ -510,7 +529,7 @@ $ tail -1 data/transactions.jsonl
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>logger.warning(messages.LOG_CORRUPT_LINE, self.path.name, raw.lineno, raw.error)</code> 에서 f-string 이 아니라 <strong><code>%s</code> 서식과 인자를 따로</strong> 넘기는 것은 취향이 아닙니다. <code>logging</code> 은 인자를 <code>LogRecord.args</code> 에 그대로 보관해 두었다가, 그 레벨이 실제로 출력될 때 핸들러가 <code>record.getMessage()</code> 안에서 <code>msg % args</code> 를 수행합니다. 즉 <strong>필터링으로 버려질 로그는 문자열 조립 비용이 0</strong> 입니다. f-string 은 호출 전에 이미 만들어지므로 이 최적화가 사라집니다. 이 프로젝트의 로거는 <code>budget_app.storage</code>(<code>storage/config.py:11</code> 의 <code>LOGGER_NAME = f"{app_config.LOGGER_NAME}.storage"</code>)이고, 점(<code>.</code>)으로 이어진 이름이 곧 <strong>부모-자식 트리</strong>라 레코드는 <code>budget_app</code> 루트까지 전파(propagate)됩니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="35-rewrite-손상-줄을-보존하는-재작성">3.5 <code>rewrite()</code> — 손상 줄을 보존하는 재작성</h3>
-<p>budget_app/storage/jsonl.py:264-268</p>
+<p>budget_app/storage/jsonl.py:286-290</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">plan_rewrite</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">transform</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">T</span><span class="p">],</span> <span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span>
@@ -561,8 +580,8 @@ $ tail -1 data/transactions.jsonl
 </blockquote>
 <p><strong>보존 로그가 별도인 것도 의도적입니다.</strong></p>
 <p>budget_app/storage/messages.py:8-9</p>
-<div class="codehilite"><pre><span></span><code><span class="n">LOG_CORRUPT_LINE</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">:</span><span class="si">%d</span><span class="s2"> 손상된 줄을 건너뜁니다: </span><span class="si">%s</span><span class="s2">&quot;</span>
-<span class="n">LOG_CORRUPT_PRESERVED</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: 손상된 줄 </span><span class="si">%d</span><span class="s2">개를 해석하지 않고 원문 그대로 보존했습니다.&quot;</span>
+<div class="codehilite"><pre><span></span><code><span class="n">LOG_CORRUPT_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">:</span><span class="si">%d</span><span class="s2"> 손상된 줄을 건너뜁니다: </span><span class="si">%s</span><span class="s2">"</span>
+<span class="n">LOG_CORRUPT_PRESERVED</span> <span class="o">=</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">: 손상된 줄 </span><span class="si">%d</span><span class="s2">개를 해석하지 않고 원문 그대로 보존했습니다."</span>
 </code></pre></div>
 
 <p>읽을 때(<code>stream</code>)는 "건너뜁니다", 쓸 때(<code>rewrite</code>)는 "보존했습니다" — 두 상황에서 사용자가 알아야 할 것이 다릅니다.</p>
@@ -573,14 +592,14 @@ $ tail -1 data/transactions.jsonl
 </blockquote>
 <p>budget_app/storage/jsonl.py:48-72</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stage_lines</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">lines</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;임시 파일에 전부 쓰고 디스크에 내린 뒤, 그 임시 경로를 돌려준다.</span>
+<span class="w">    </span><span class="sd">"""임시 파일에 전부 쓰고 디스크에 내린 뒤, 그 임시 경로를 돌려준다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">tmp</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">suffix</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">TMP_SUFFIX</span><span class="p">)</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span>
         <span class="n">tmp</span><span class="p">,</span>
-        <span class="s2">&quot;w&quot;</span><span class="p">,</span>
+        <span class="s2">"w"</span><span class="p">,</span>
         <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ENCODING</span><span class="p">,</span>
         <span class="n">errors</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ERRORS</span><span class="p">,</span>
         <span class="n">newline</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">LINE_TERMINATOR</span><span class="p">,</span>
@@ -595,17 +614,17 @@ $ tail -1 data/transactions.jsonl
 <p>교체를 담당하는 나머지 둘은 이렇게 짧습니다.</p>
 <p>budget_app/storage/jsonl.py:75-87</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">commit_staged</span><span class="p">(</span><span class="n">tmp</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;준비된 임시 파일을 대상 이름으로 교체한다 — 같은 파일시스템에서 원자적.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""준비된 임시 파일을 대상 이름으로 교체한다 — 같은 파일시스템에서 원자적."""</span>
     <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">atomic_write_lines</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">lines</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;파일 하나를 원자적으로 교체한다 — 준비와 커밋을 연달아 수행.</span>
+<span class="w">    </span><span class="sd">"""파일 하나를 원자적으로 교체한다 — 준비와 커밋을 연달아 수행.</span>
 
 <span class="sd">    이름에 밑줄이 없는 이유: 같은 계층의 ``ids.IdWatermark`` 도 이 함수를 쓴다.</span>
-<span class="sd">    &quot;JSONL 파일을 다루는 법&quot;이 아니라 &quot;파일 하나를 안전하게 갈아 끼우는 법&quot;이라</span>
+<span class="sd">    "JSONL 파일을 다루는 법"이 아니라 "파일 하나를 안전하게 갈아 끼우는 법"이라</span>
 <span class="sd">    저장소 계층의 공용 도구다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">commit_staged</span><span class="p">(</span><span class="n">stage_lines</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">lines</span><span class="p">),</span> <span class="n">path</span><span class="p">)</span>
 </code></pre></div>
 
@@ -615,7 +634,7 @@ $ tail -1 data/transactions.jsonl
 <strong>여러 파일을 함께 커밋할 수 없습니다.</strong> 지금은 <code>stage_lines</code> 가 준비만 하고
 <code>commit_staged</code> 가 교체만 하므로, 호출자가 "전부 준비 → replace 만 연달아"를
 구성할 수 있습니다(→ <a href="07-repository.html">07 §9</a>).</p>
-<p>파일 하나만 바꾸는 경로(<code>rewrite</code>, <code>jsonl.py:328</code>)는 여전히 <code>atomic_write_lines</code> 한 줄로 둘을
+<p>파일 하나만 바꾸는 경로(<code>rewrite</code>, <code>jsonl.py:350</code>)는 여전히 <code>atomic_write_lines</code> 한 줄로 둘을
 연달아 부릅니다 — 기존 사용처는 아무것도 달라지지 않았습니다.</p>
 <p><strong>세 호출이 각각 다른 것을 보장합니다.</strong></p>
 <div class="table-wrap"><table>
@@ -684,12 +703,12 @@ f.buffer.raw = &lt;_io.FileIO&gt;          ← 실제 파일 디스크립터. wr
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>newline=</code> 은 파이썬 3 의 새 I/O 스택(PEP 3116)이 <code>TextIOWrapper</code> 에 도입한 인자입니다. 쓰기 모드에서 <code>None</code>(기본)이면 문자열 안의 <code>"\n"</code> 을 <strong><code>os.linesep</code> 으로 치환</strong>하고, <code>""</code> 또는 <code>"\n"</code> 이면 아무 변환도 하지 않습니다. 읽기 모드에서 <code>None</code> 이면 <code>\n</code>/<code>\r\n</code>/<code>\r</code> 을 모두 <code>"\n"</code> 으로 바꿔 주는 <strong>범용 개행(universal newlines)</strong> 이 켜집니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p>로컬 Windows(<code>os.linesep == "\r\n"</code>)에서 실행한 결과입니다.</p>
-<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.txt&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;a</span><span class="se">\n</span><span class="s2">b</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>                 <span class="c1"># 기본값</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.txt&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-<span class="sa">b</span><span class="s1">&#39;a</span><span class="se">\r\n</span><span class="s1">b</span><span class="se">\r\n</span><span class="s1">&#39;</span>                       <span class="c1"># ← \n 이 \r\n 으로 바뀌었다</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;b.txt&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;a</span><span class="se">\n</span><span class="s2">b</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>    <span class="c1"># 지금 코드</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;b.txt&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-<span class="sa">b</span><span class="s1">&#39;a</span><span class="se">\n</span><span class="s1">b</span><span class="se">\n</span><span class="s1">&#39;</span>                           <span class="c1"># ← 그대로</span>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"a.txt"</span><span class="p">,</span><span class="s2">"w"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"a</span><span class="se">\n</span><span class="s2">b</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>                 <span class="c1"># 기본값</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"a.txt"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">'a</span><span class="se">\r\n</span><span class="s1">b</span><span class="se">\r\n</span><span class="s1">'</span>                       <span class="c1"># ← \n 이 \r\n 으로 바뀌었다</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"b.txt"</span><span class="p">,</span><span class="s2">"w"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"a</span><span class="se">\n</span><span class="s2">b</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>    <span class="c1"># 지금 코드</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"b.txt"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">'a</span><span class="se">\n</span><span class="s1">b</span><span class="se">\n</span><span class="s1">'</span>                           <span class="c1"># ← 그대로</span>
 </code></pre></div>
 
 <p>이 차이가 왜 치명적인가 하면, <code>_has_torn_tail</code>(§3.7)이 마지막 <strong>바이트</strong>를 <code>"\n".encode("utf-8")</code> = <code>b"\n"</code> 과 비교하기 때문입니다. 기본값으로 열어 <code>\r\n</code> 이 쓰였다면 마지막 바이트는 <code>b"\n"</code> 이 맞아 통과하지만, 파일 안에는 JSONL 표준이 아닌 <code>\r</code> 이 섞이고 플랫폼마다 파일 내용이 달라집니다. <strong>데이터 파일 포맷을 OS 에 맡기지 않겠다</strong>는 선언이 <code>newline="\n"</code> 한 줄입니다.</p>
@@ -707,7 +726,7 @@ f.buffer.raw = &lt;_io.FileIO&gt;          ← 실제 파일 디스크립터. wr
 쓰기 중 죽음:  임시 파일 일부 작성 → 프로세스 종료
            ✅ 원본 무사, .tmp 찌꺼기만 남음
 
-replace 중 전원 차단:  원자적이므로 &quot;이전&quot; 또는 &quot;이후&quot;만 존재
+replace 중 전원 차단:  원자적이므로 "이전" 또는 "이후"만 존재
            ✅ 원본 또는 새 내용 (중간 상태 없음)
 
 fsync 가 없었다면 + 전원 차단:
@@ -717,12 +736,12 @@ fsync 가 없었다면 + 전원 차단:
 <p>자세한 crash 시나리오 분석은 <a href="10-advanced-design.html">10. 고급 설계 주제</a>에 있습니다 — 요약하면 <strong>"원본은 <code>os.replace</code> 가 성공하는 그 순간까지 한 번도 수정되지 않는다"</strong> 가 위 네 시나리오를 모두 설명하는 한 문장입니다.</p>
 <h3 id="37-이어-쓰기-_append_lines-와-_has_torn_tail">3.7 이어 쓰기 — <code>_append_lines</code> 와 <code>_has_torn_tail</code></h3>
 <p><code>rewrite</code> 가 파일 전체를 갈아 끼우는 경로라면, <code>append</code> 계열은 <strong>파일 끝에 붙이는 O(1) 경로</strong>입니다. O(1)은 파일이 아무리 커져도 걸리는 시간이 늘지 않는다는 뜻입니다. 여기에도 두 가지 방어가 들어 있습니다.</p>
-<p>budget_app/storage/jsonl.py:232-247</p>
+<p>budget_app/storage/jsonl.py:254-269</p>
 <div class="codehilite"><pre><span></span><code>        <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">needs_newline</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_torn_tail</span><span class="p">()</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span>
-            <span class="s2">&quot;a&quot;</span><span class="p">,</span>
+            <span class="s2">"a"</span><span class="p">,</span>
             <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ENCODING</span><span class="p">,</span>
             <span class="n">errors</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ERRORS</span><span class="p">,</span>
             <span class="n">newline</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">LINE_TERMINATOR</span><span class="p">,</span>
@@ -737,17 +756,17 @@ fsync 가 없었다면 + 전원 차단:
 </code></pre></div>
 
 <p>"찢어진 꼬리"는 마지막 줄에 개행이 없는 파일입니다. 그냥 이어 쓰면 새 JSON 이 그 줄 뒤에 붙어 <strong>한 줄</strong>이 되고, 기존 줄과 방금 "저장 완료"라고 알린 레코드가 <strong>동시에</strong> 죽습니다. 그래서 마지막 바이트를 먼저 확인합니다.</p>
-<p>budget_app/storage/jsonl.py:249-262</p>
+<p>budget_app/storage/jsonl.py:271-284</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_has_torn_tail</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;마지막 바이트가 개행이 아닌가 — 바이트로 직접 확인한다.</span>
+<span class="w">        </span><span class="sd">"""마지막 바이트가 개행이 아닌가 — 바이트로 직접 확인한다.</span>
 
 <span class="sd">        텍스트 모드로 끝을 보려면 파일을 통째로 읽어야 한다. ``rb`` + ``seek`` 이면</span>
 <span class="sd">        1바이트만 읽으면 되고, 인코딩이 깨진 파일에서도 안전하다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="k">return</span> <span class="kc">False</span>
-            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
                 <span class="n">f</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_END</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="n">config</span><span class="o">.</span><span class="n">LINE_TERMINATOR</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ENCODING</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
@@ -755,8 +774,8 @@ fsync 가 없었다면 + 전원 차단:
 </code></pre></div>
 
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 왜 <code>'rb'</code> 여야만 하는가.</strong> 텍스트 모드(<code>TextIOWrapper</code>)에서는 <strong>음수 오프셋 seek 이 아예 금지</strong>돼 있습니다. 디코딩과 개행 변환 때문에 "문자 위치"와 "바이트 위치"가 일치하지 않아, 파일 끝에서 1을 뺀 지점이 어느 문자인지 계산할 수 없기 때문입니다. 로컬 3.13.1 에서 실제로 확인했습니다.</p>
-<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;x.txt&quot;</span><span class="p">,</span><span class="s2">&quot;r&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_END</span><span class="p">)</span>
-<span class="n">io</span><span class="o">.</span><span class="n">UnsupportedOperation</span><span class="p">:</span> <span class="n">can</span><span class="s1">&#39;t do nonzero end-relative seeks</span>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"x.txt"</span><span class="p">,</span><span class="s2">"r"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_END</span><span class="p">)</span>
+<span class="n">io</span><span class="o">.</span><span class="n">UnsupportedOperation</span><span class="p">:</span> <span class="n">can</span><span class="s1">'t do nonzero end-relative seeks</span>
 </code></pre></div>
 
 <p>바이너리 모드는 <code>BufferedReader</code> → <code>FileIO</code> 두 겹뿐이고 <code>seek</code> 이 그대로 <code>lseek(2)</code> 로 내려가므로 <strong>파일 크기와 무관하게 1바이트만</strong> 읽습니다. 텍스트 모드로 같은 일을 하려면 파일 전체를 디코딩해야 하고, 애초에 인코딩이 깨진 파일에서는 그 디코딩이 실패합니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
@@ -784,9 +803,9 @@ fsync 가 없었다면 + 전원 차단:
 <h3 id="42-발급기를-객체로">4.2 발급기를 객체로</h3>
 <p>budget_app/storage/ids.py:81-111</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">IdAllocator</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 ID 발급기 — 이미 쓰인 번호를 건너뛰며 순차 발급한다.</span>
+<span class="w">    </span><span class="sd">"""거래 ID 발급기 — 이미 쓰인 번호를 건너뛰며 순차 발급한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">taken</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">TransactionId</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_counter</span> <span class="o">=</span> <span class="n">start</span>
@@ -796,16 +815,16 @@ fsync 가 없었다면 + 전원 차단:
         <span class="k">return</span> <span class="n">tx_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taken</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">reserve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="n">TransactionId</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;외부에서 지정한 id 를 점유 처리한다(CSV 가 실어 온 id 등).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""외부에서 지정한 id 를 점유 처리한다(CSV 가 실어 온 id 등)."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_taken</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">tx_id</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_counter</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_counter</span><span class="p">,</span> <span class="n">tx_id</span><span class="o">.</span><span class="n">number</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionId</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;아직 쓰이지 않은 다음 번호를 발급한다.</span>
+<span class="w">        </span><span class="sd">"""아직 쓰이지 않은 다음 번호를 발급한다.</span>
 
 <span class="sd">        ``while`` 인 이유: CSV 가 큰 번호를 먼저 실어 오면 ``reserve`` 가 카운터를</span>
 <span class="sd">        끌어올리지만, 순서가 뒤죽박죽이면 이미 점유된 번호에 부딪칠 수 있다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
 </code></pre></div>
 
@@ -825,28 +844,28 @@ CSV 행 3: id 없음     → next() → counter=8 → TX-000008 ✅  (7 과 충�
 <p>budget_app/storage/repositories.py:39-51</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_scan_id</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="n">RawLine</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionId</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;한 줄에서 거래 id 를 최대한 건져낸다.</span>
+<span class="w">        </span><span class="sd">"""한 줄에서 거래 id 를 최대한 건져낸다.</span>
 
 <span class="sd">        검증에 실패한 줄에도 id 는 들어 있을 수 있고, 그 번호는 **이미 쓰인 번호**다.</span>
 <span class="sd">        놓치면 재발급으로 중복 id 가 생긴다. dict 까지 해석된 줄은 키에서, JSON 조차</span>
 <span class="sd">        아닌 줄은 원문 정규식으로 찾는다(``TransactionId.scan``).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">raw</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">candidate</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+            <span class="n">candidate</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"id"</span><span class="p">)</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">tx_id_module</span><span class="o">.</span><span class="n">is_valid</span><span class="p">(</span><span class="n">candidate</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">TransactionId</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">TransactionId</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">raw</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
 </code></pre></div>
 
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 정규식 두 개가 서로 다른 메서드를 씁니다. 검증용 <code>_EXACT</code>(<code>domain/tx_id.py:45</code>)는 <code>re.match</code> 로 <strong>문자열 처음부터</strong>만 맞춰 보고, 발굴용 <code>_SCAN</code>(<code>:48</code>)은 <code>re.search</code> 로 <strong>줄 어디서든</strong> 찾습니다. <code>re.compile</code> 로 미리 컴파일해 모듈 상수로 둔 것은, 컴파일 결과가 정규식 전용 바이트코드를 담은 <code>Pattern</code> 객체이고 그 컴파일이 한 번만 일어나면 되기 때문입니다(<code>re</code> 모듈에도 내부 캐시가 있지만 크기 제한이 있고, 상수로 두면 의도가 드러납니다). 패턴은 <code>TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'</code>(<code>domain/config.py:27</code>)라 <strong>JSON 이 깨진 줄에서도 <code>"id": "TX-000010"</code> 조각만 있으면</strong> 번호를 건집니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — 정규식 두 개가 서로 다른 메서드를 씁니다. 검증용 <code>_EXACT</code>(<code>domain/tx_id.py:45</code>)는 <code>re.match</code> 로 <strong>문자열 처음부터</strong>만 맞춰 보고, 발굴용 <code>_SCAN</code>(<code>:48</code>)은 <code>re.search</code> 로 <strong>줄 어디서든</strong> 찾습니다. <code>re.compile</code> 로 미리 컴파일해 모듈 상수로 둔 것은, 컴파일 결과가 정규식 전용 바이트코드를 담은 <code>Pattern</code> 객체이고 그 컴파일이 한 번만 일어나면 되기 때문입니다(<code>re</code> 모듈에도 내부 캐시가 있지만 크기 제한이 있고, 상수로 두면 의도가 드러납니다). 패턴은 <code>TX_ID_SCAN_PATTERN = r'"id"\s*:\s*"(TX-\d+)"'</code>(<code>domain/config.py:31</code>)라 <strong>JSON 이 깨진 줄에서도 <code>"id": "TX-000010"</code> 조각만 있으면</strong> 번호를 건집니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <p><strong><code>_scan_id</code> 의 2단 전략</strong>이 이 계층의 방어력을 결정합니다.</p>
 <div class="codehilite"><pre><span></span><code>줄 상태                          경로                       결과
 ────────────────────────────────────────────────────────────────
-정상                             raw.data[&quot;id&quot;]             TX-000001
-amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-000009  ← 건짐!
-{&quot;id&quot;:&quot;TX-000010&quot;, 뒤가 깨짐      정규식 search              TX-000010  ← 건짐!
-완전히 다른 텍스트                 정규식 실패 → &quot;&quot;           건너뜀
+정상                             raw.data["id"]             TX-000001
+amount=0 (검증 실패)              raw.data["id"]             TX-000009  ← 건짐!
+{"id":"TX-000010", 뒤가 깨짐      정규식 search              TX-000010  ← 건짐!
+완전히 다른 텍스트                 정규식 실패 → None         건너뜀
 </code></pre></div>
 
 <p><code>id_state()</code> 가 <strong>최대 번호와 사용 중 집합을 한 번의 순회로</strong> 구하는 것도 눈여겨보세요. 두 값을 따로 구하면 파일을 두 번 읽어야 합니다.</p>
@@ -890,15 +909,15 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <h3 id="51-쓰기-연산-넷">5.1 쓰기 연산 넷</h3>
 <p>budget_app/storage/repositories.py:138-148</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">append_many</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">txs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;여러 거래를 파일 끝에 이어 쓰고 추가된 건수를 반환한다 — O(1) 경로.</span>
+<span class="w">        </span><span class="sd">"""여러 거래를 파일 끝에 이어 쓰고 추가된 건수를 반환한다 — O(1) 경로.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">txs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">txs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">remember_ids</span><span class="p">(</span><span class="n">txs</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">append_all</span><span class="p">(</span><span class="n">txs</span><span class="p">)</span>
 </code></pre></div>
 
-<p>원자 모드는 <code>rewrite(lambda tx: tx, extra=txs)</code> 한 줄입니다 — "모든 기존 항목은 그대로 두고, 뒤에 신규를 붙인 파일을 원자적으로 만들어라".</p>
+<p>원자 모드는 <code>UnitOfWork</code> 가 <code>plan_rewrite(_keep, extra=txs)</code> 로 최종 내용을 <code>.tmp</code> 에 준비한 뒤 <code>os.replace</code> 로 커밋합니다(§9) — "모든 기존 항목은 그대로 두고, 뒤에 신규를 붙인 파일을 원자적으로 만들어라". <code>append_many</code> 에 있던 <code>atomic=True</code> 분기는 UoW 도입과 함께 제거됐습니다.</p>
 <p>budget_app/storage/repositories.py:159-167</p>
 <div class="codehilite"><pre><span></span><code>        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>
@@ -913,7 +932,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 
 <p><strong><code>delete</code> 는 파일을 한 번만 읽습니다.</strong> 이전에는 <code>exists()</code> 로 먼저 확인하고 재작성하며 또 훑었는데, 더 나쁜 것은 두 스캔의 <strong>판정 기준이 서로 달랐다</strong>는 점입니다 — <code>exists()</code> 는 손상 줄에서 건져낸 id 까지 "있다"고 했지만, 재작성은 해석된 엔티티만 훑으므로 정작 그 줄은 지울 수 없었습니다. 지금은 훑으면서 만나는 것이 곧 판정(<code>found</code>)이라 어긋날 수가 없습니다.</p>
 <p>그러면 "없는 id 를 지우려 했을 때 파일이 헛되이 다시 쓰이는 것"은 누가 막을까요? <code>rewrite</code> 입니다.</p>
-<p>budget_app/storage/jsonl.py:325-329</p>
+<p>budget_app/storage/jsonl.py:347-351</p>
 <div class="codehilite"><pre><span></span><code>        <span class="n">plan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_rewrite</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="n">extra</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">plan</span><span class="o">.</span><span class="n">changed</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>
@@ -927,11 +946,11 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 </blockquote>
 <p>budget_app/storage/repositories.py:194-214</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">reassign_category</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;old → new 카테고리 일괄 재지정. 변경된 건수 반환.</span>
+<span class="w">        </span><span class="sd">"""old → new 카테고리 일괄 재지정. 변경된 건수 반환.</span>
 
 <span class="sd">        두 이름 모두 정규화한다. ``old`` 는 비교 대상이라(저장된 값은 정규형),</span>
-<span class="sd">        ``new`` 는 &quot;바뀐 게 없는데 바뀌었다고 세는&quot; 일을 막기 위해서다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        ``new`` 는 "바뀐 게 없는데 바뀌었다고 세는" 일을 막기 위해서다.</span>
+<span class="sd">        """</span>
         <span class="n">source</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
         <span class="n">destination</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
         <span class="n">changed</span> <span class="o">=</span> <span class="mi">0</span>
@@ -976,12 +995,12 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <p>카테고리 파일에 들어 있는 것은 이름 목록입니다. 여기서 신경 쓸 일은 둘뿐입니다. 같은 이름이 두 번 들어가지 않게 하는 것, 그리고 파일이 비어 있는 첫 실행 때 기본 이름 몇 개를 넣어 주는 것(시딩)입니다.</p>
 <p>budget_app/storage/repositories.py:226-235</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">seed_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;비어 있을 때만 기본 카테고리를 심는다. 심은 개수를 반환.</span>
+<span class="w">        </span><span class="sd">"""비어 있을 때만 기본 카테고리를 심는다. 심은 개수를 반환.</span>
 
-<span class="sd">        &quot;파일을 만드는 일&quot;(``ensure_ready``)과 &quot;초기 데이터를 넣는 일&quot;은 다른 작업이라</span>
+<span class="sd">        "파일을 만드는 일"(``ensure_ready``)과 "초기 데이터를 넣는 일"은 다른 작업이라</span>
 <span class="sd">        메서드를 나눴다. 둘 다 생성자가 아니라 명시적 호출인 이유는 부트스트랩이</span>
 <span class="sd">        *한 번* 일어나야 하는 일이지 객체를 만들 때마다 일어날 일이 아니기 때문이다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
             <span class="k">return</span> <span class="mi">0</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">append_all</span><span class="p">(</span><span class="n">Category</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_CATEGORIES</span><span class="p">)</span>
@@ -1045,7 +1064,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <p>CSV 는 엑셀 같은 다른 프로그램과 주고받는 표 형식 파일입니다. 이 프로그램이 평소에 쓰는 형식과 다르니 번역이 필요합니다. 그 번역만 맡는 얇은 층이 <code>csv_io.py</code> 이고, "경계 어댑터"라는 이름이 그 자리를 가리킵니다. 번역만 하고, 무엇을 받아들이고 무엇을 버릴지는 정하지 않습니다.</p>
 <h3 id="81-왜-서비스에서-떼어냈나">8.1 왜 서비스에서 떼어냈나</h3>
 <p>budget_app/storage/csv_io.py:1-2</p>
-<div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;CSV 경계 어댑터 — 외부 교환 포맷과 도메인 사이의 번역만 담당한다.</span>
+<div class="codehilite"><pre><span></span><code><span class="s2">"""CSV 경계 어댑터 — 외부 교환 포맷과 도메인 사이의 번역만 담당한다.</span>
 </code></pre></div>
 
 <h3 id="82-id-컬럼-왕복-중복을-막는-열쇠">8.2 <code>id</code> 컬럼 — 왕복 중복을 막는 열쇠</h3>
@@ -1062,7 +1081,7 @@ amount=0 (검증 실패)              raw.data[&quot;id&quot;]             TX-00
 <span class="o">-</span> <span class="err">``</span><span class="n">import</span><span class="err">``</span> <span class="n">는</span> <span class="n">있으면</span> <span class="n">쓰고</span><span class="p">,</span> <span class="n">없거나</span> <span class="n">비어</span> <span class="n">있으면</span> <span class="n">새로</span> <span class="n">발급한다</span> <span class="err">→</span> <span class="n">필수</span> <span class="n">컬럼만</span> <span class="n">갖춘</span>
   <span class="n">외부</span> <span class="n">CSV</span><span class="p">(</span><span class="n">엑셀·타</span> <span class="n">가계부</span><span class="p">)</span><span class="n">는</span> <span class="n">예전</span> <span class="n">그대로</span> <span class="n">들어온다</span><span class="o">.</span>
 <span class="o">-</span> <span class="n">외부</span> <span class="n">도구에</span> <span class="n">넘길</span> <span class="n">때</span> <span class="nb">id</span> <span class="n">가</span> <span class="n">거슬리면</span> <span class="err">``</span><span class="n">export</span> <span class="o">--</span><span class="n">no</span><span class="o">-</span><span class="nb">id</span><span class="err">``</span> <span class="n">로</span> <span class="n">뺄</span> <span class="n">수</span> <span class="n">있다</span><span class="o">.</span>
-<span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">"""</span>
 </code></pre></div>
 
 <p><strong>버그 재현:</strong></p>
@@ -1077,8 +1096,8 @@ $ python -m budget_app import --from rt.csv   ← 방금 내보낸 파일을 그
 [완료] mode=부분 성공, imported=1, skipped=0
 
 $ cat data/transactions.jsonl
-{&quot;id&quot;:&quot;TX-000001&quot;, ... &quot;amount&quot;:1000 ...}    ← 원본
-{&quot;id&quot;:&quot;TX-000002&quot;, ... &quot;amount&quot;:1000 ...}    ← 같은 거래가 복제됨!
+{"id":"TX-000001", ... "amount":1000 ...}    ← 원본
+{"id":"TX-000002", ... "amount":1000 ...}    ← 같은 거래가 복제됨!
 </code></pre></div>
 
 <p><strong>수정 후:</strong></p>
@@ -1091,14 +1110,14 @@ $ python -m budget_app import --from rt.csv
 </code></pre></div>
 
 <h3 id="83-parsedrow-정책과-어댑터의-경계">8.3 <code>ParsedRow</code> — 정책과 어댑터의 경계</h3>
-<p>budget_app/storage/csv_io.py:39-64</p>
+<p>budget_app/storage/csv_io.py:40-65</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ParsedRow</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;검증을 마친 CSV 한 행 — 아직 ``Transaction`` 은 아니다.</span>
+<span class="w">    </span><span class="sd">"""검증을 마친 CSV 한 행 — 아직 ``Transaction`` 은 아니다.</span>
 
 <span class="sd">    id 가 아직 정해지지 않았을 수 있어서(빈 컬럼 → 발급 대상) 완성된 엔티티로</span>
 <span class="sd">    만들 수 없다. 그 마지막 한 조각을 채우는 것은 중복 정책을 아는 서비스의 몫이다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tx_id</span><span class="p">:</span> <span class="n">TransactionId</span> <span class="o">|</span> <span class="kc">None</span>
     <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span>
@@ -1122,112 +1141,153 @@ $ python -m budget_app import --from rt.csv
 
 <p><strong>"거의 다 됐지만 한 조각이 비어 있는 값"을 타입으로 표현</strong>한 것이 이 설계의 핵심입니다. 어댑터는 여기까지, 정책은 여기부터 — 경계가 타입 하나로 그어집니다.</p>
 <h3 id="84-읽기-헤더-검증과-행-파싱">8.4 읽기 — 헤더 검증과 행 파싱</h3>
-<p>budget_app/storage/csv_io.py:72-87</p>
+<p>budget_app/storage/csv_io.py:73-101</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_rows</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;CSV 를 읽어 ``(줄번호, 원시 dict)`` 를 yield 한다.</span>
+<span class="w">    </span><span class="sd">"""CSV 를 읽어 ``(줄번호, 원시 dict)`` 를 yield 한다.</span>
 
 <span class="sd">    헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며</span>
 <span class="sd">    ``id`` 는 요구하지 않는다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+
+<span class="sd">    ``csv.Error`` 를 ``AppError`` 로 바꾸는 이유: 파서가 던지는 이 예외는 **일반</span>
+<span class="sd">    사용자 조작만으로** 닿는다(한 필드가 128KB 를 넘거나, 따옴표가 닫히지 않아 파일</span>
+<span class="sd">    끝까지 한 필드로 읽히는 CSV). 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가</span>
+<span class="sd">    "예기치 못한 오류"로 표시된다 — 원인도 해결 방법도 알 수 있는 오류인데</span>
+<span class="sd">    분류되지 않은 버그처럼 보이는 것은 요구사항 Q2(원인 + 해결 힌트)에 어긋난다.</span>
+<span class="sd">    """</span>
     <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
         <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
 
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_READ_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_READ_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-        <span class="n">_check_header</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">fieldnames</span><span class="p">)</span>
-        <span class="c1"># ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,</span>
-        <span class="c1"># 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).</span>
-        <span class="k">yield from</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_DATA_START_LINE</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.</span>
+            <span class="n">_check_header</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">fieldnames</span><span class="p">)</span>
+            <span class="c1"># 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을</span>
+            <span class="c1"># 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_DATA_START_LINE</span><span class="p">):</span>
+                <span class="k">yield</span> <span class="n">item</span>
+        <span class="k">except</span> <span class="n">csv</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">ERR_CSV_PARSE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="n">exc</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_CSV_PARSE</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
 </code></pre></div>
 
 <p><strong>빈 파일과 컬럼 누락을 구분</strong>하는 것이 리팩터에서 추가됐습니다. 이전에는 빈 CSV 도 "필수 컬럼이 없습니다: ['date', 'type', ...]" 라고 안내했는데, 실제 문제는 "헤더 행 자체가 없다"입니다.</p>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>reader.fieldnames</code> 는 그 순간 첫 행을 읽습니다.</strong> <code>csv.DictReader.fieldnames</code> 는 평범한 속성이 아니라 <strong><code>@property</code> 로 구현된 지연 속성</strong>입니다. 처음 접근할 때 내부 <code>csv.reader</code> 에서 한 행을 꺼내 <code>self._fieldnames</code> 에 캐시하고, 그 뒤로는 캐시를 돌려줍니다. 즉 <code>_check_header(path, reader.fieldnames)</code> 라고 쓴 이 한 줄이 <strong>헤더 행을 실제로 소비하는 지점</strong>이고, 그래서 뒤이은 <code>enumerate(reader, ...)</code> 는 자동으로 2행부터 시작합니다(<code>CSV_DATA_START_LINE = 2</code> 와 짝이 맞는 이유). 로컬 3.13.1 에서 스트림 위치로 확인했습니다 — <code>fieldnames</code> 접근 전 <code>tell()</code> 은 <code>0</code>, 접근 후에는 헤더 길이만큼 전진해 있었습니다. 파일이 완전히 비어 있으면 꺼낼 행이 없어 <code>fieldnames</code> 가 <code>None</code> 이 되고, <code>_check_header</code> 의 <code>list(fieldnames or [])</code> 가 그 경우를 "헤더 없음"으로 갈라냅니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
-</blockquote><blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>yield from</code> 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. <code>for x in it: yield x</code> 의 축약처럼 보이지만 그 이상으로, 하위 이터러블에 <strong><code>send</code>/<code>throw</code>/<code>close</code> 까지 그대로 위임</strong>합니다. 여기서 중요한 것은 위임하는 동안 이 함수의 프레임이 <strong>살아 있다</strong>는 점입니다 — <code>with open(...)</code> 블록이 열린 채로 유지되고, 파일은 마지막 행을 꺼낸 뒤(또는 호출자가 중간에 그만둔 뒤)에야 닫힙니다. 소스 주석이 정확히 그 말을 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+</blockquote>
+<p><strong><code>csv.Error</code> 를 <code>AppError</code> 로 번역합니다.</strong> 한 필드가 128KB(<code>csv.field_size_limit</code>)를 넘거나 따옴표가 닫히지 않아 파일 끝까지 한 필드로 읽히는 CSV 는 <strong>평범한 사용자 조작만으로</strong> 만들어집니다. 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가 "예기치 못한 오류"(종료 코드 1)로 표시되는데, 원인도 해결 방법도 아는 오류를 분류되지 않은 버그처럼 보이게 하는 셈이라 여기서 잡아 원인 + 힌트가 붙은 <code>AppError</code>(종료 코드 4)로 바꿉니다.</p>
+<blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>yield from</code> 이 아니라 <code>for</code> + <code>yield</code> 인 이유</strong> — 이전에는 이 자리가 <code>yield from enumerate(reader, ...)</code> 였습니다. <code>yield from</code>(PEP 380, 파이썬 3.3)은 <code>for x in it: yield x</code> 의 축약처럼 보이지만 그 이상으로, 하위 이터러블에 <strong><code>send</code>/<code>throw</code>/<code>close</code> 까지 그대로 위임</strong>합니다. 다만 위임하는 동안 파서가 던지는 <code>csv.Error</code> 를 잡으려면 그 문장 자체가 <code>try</code> 안에 들어가야 하고, 그러면 <strong><code>yield</code> 가 <code>try</code> 블록 안에서 일어나는지</strong>가 한눈에 읽히지 않습니다. 지금처럼 <code>for</code> 로 풀어 쓰면 "행을 꺼내는 동안 발생한 <code>csv.Error</code> 만 잡는다"는 범위가 코드에 그대로 보입니다. 어느 쪽이든 이 함수의 프레임이 소비되는 동안 <strong>살아 있다</strong>는 성질은 같습니다 — <code>with open(...)</code> 블록이 열린 채로 유지되고, 파일은 마지막 행을 꺼낸 뒤(또는 호출자가 중간에 그만둔 뒤)에야 닫힙니다. 소스 주석이 정확히 그 말을 합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>newline=""</code> 는 CSV 에서 선택이 아니라 필수입니다.</strong> <code>csv</code> 모듈은 <strong>자기가 개행을 직접 다루는</strong> 모듈이라, 파일 객체가 개행을 건드리지 않도록 요구합니다(<code>csv</code> 문서가 명시). 읽기에서 <code>newline=""</code> 를 빼면 범용 개행이 켜져 <strong>따옴표로 감싼 필드 안의 줄바꿈</strong>(메모에 여러 줄을 적은 경우)이 훼손될 수 있고, 쓰기에서 빼면 Windows 에서 <code>csv.writer</code> 가 내보낸 <code>\r\n</code> 의 <code>\n</code> 이 다시 <code>\r\n</code> 으로 변환돼 <strong><code>\r\r\n</code></strong> 이 됩니다. 로컬에서 확인한 결과입니다.</p>
-<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.csv&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="s2">&quot;b&quot;</span><span class="p">])</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;a.csv&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-<span class="sa">b</span><span class="s1">&#39;a,b</span><span class="se">\r\r\n</span><span class="s1">&#39;</span>                       <span class="c1"># ← 빈 줄이 하나씩 끼어 보이는 그 증상</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;b.csv&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">&quot;a&quot;</span><span class="p">,</span><span class="s2">&quot;b&quot;</span><span class="p">])</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;b.csv&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-<span class="sa">b</span><span class="s1">&#39;a,b</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"a.csv"</span><span class="p">,</span><span class="s2">"w"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">"a"</span><span class="p">,</span><span class="s2">"b"</span><span class="p">])</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"a.csv"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">'a,b</span><span class="se">\r\r\n</span><span class="s1">'</span>                       <span class="c1"># ← 빈 줄이 하나씩 끼어 보이는 그 증상</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"b.csv"</span><span class="p">,</span><span class="s2">"w"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span><span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">))</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">"a"</span><span class="p">,</span><span class="s2">"b"</span><span class="p">])</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"b.csv"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">'a,b</span><span class="se">\r\n</span><span class="s1">'</span>
 </code></pre></div>
 
 <p>JSONL 은 반대로 <strong>파이썬이 개행을 쓰므로</strong> <code>newline="\n"</code> 으로 "변환하지 말고 LF 그대로"를 지시합니다(§3.6). 두 값이 다른 것은 <strong>개행의 주인이 누구인가</strong>가 다르기 때문입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
-<p>budget_app/storage/csv_io.py:107-123</p>
+<p>budget_app/storage/csv_io.py:121-137</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parse_row</span><span class="p">(</span><span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ParsedRow</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;원시 CSV 행을 검증한다 — 실패 시 ``ValidationError``.</span>
+<span class="w">    </span><span class="sd">"""원시 CSV 행을 검증한다 — 실패 시 ``ValidationError``.</span>
 
 <span class="sd">    필드 규칙은 ``validators`` 를 그대로 쓴다. CSV 경로라고 해서 별도의 검증 코드를</span>
 <span class="sd">    두지 않는 것이 핵심이다(규칙은 한 곳에만 있어야 한다).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">raw_id</span> <span class="o">=</span> <span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_ID_COLUMN</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<span class="sd">    """</span>
+    <span class="n">raw_id</span> <span class="o">=</span> <span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_ID_COLUMN</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">ParsedRow</span><span class="p">(</span>
-        <span class="c1"># 빈 id 는 &quot;발급해 달라&quot;는 뜻이므로 오류가 아니다. 값이 있으면 형식을 강제한다.</span>
+        <span class="c1"># 빈 id 는 "발급해 달라"는 뜻이므로 오류가 아니다. 값이 있으면 형식을 강제한다.</span>
         <span class="n">tx_id</span><span class="o">=</span><span class="n">TransactionId</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">raw_id</span><span class="p">)</span> <span class="k">if</span> <span class="n">raw_id</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_type</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]),</span>
-        <span class="n">date</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_date</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">]),</span>
-        <span class="n">amount</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;amount&quot;</span><span class="p">]),</span>
-        <span class="n">category</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;category&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
-        <span class="n">memo</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memo&quot;</span><span class="p">)),</span>
-        <span class="n">tags</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tags&quot;</span><span class="p">)),</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_type</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]),</span>
+        <span class="n">date</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_date</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"date"</span><span class="p">]),</span>
+        <span class="n">amount</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"amount"</span><span class="p">]),</span>
+        <span class="n">category</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"category"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">),</span>
+        <span class="n">memo</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"memo"</span><span class="p">)),</span>
+        <span class="n">tags</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tags"</span><span class="p">)),</span>
     <span class="p">)</span>
 </code></pre></div>
 
 <p><strong>필수 컬럼은 <code>row["type"]</code>(대괄호), 선택 컬럼은 <code>row.get(...)</code></strong> 로 접근하는 구분이 일관됩니다. 헤더 검증이 필수 컬럼의 존재를 이미 보장하므로 대괄호가 안전합니다.</p>
 <p><strong>빈 <code>id</code> 셀의 의미</strong>가 이 함수의 정책 표현입니다 — 오류가 아니라 "발급해 달라". <code>id</code> 값이 있으면 형식을 강제합니다.</p>
 <h3 id="85-쓰기-include_id-플래그">8.5 쓰기 — <code>include_id</code> 플래그</h3>
-<p>budget_app/storage/csv_io.py:131-148</p>
+<p>budget_app/storage/csv_io.py:145-186</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_transactions</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">txs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">include_id</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
+<span class="w">    </span><span class="sd">"""거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
 
-<span class="sd">    인코딩은 BOM 없는 UTF-8 로 고정한다. BOM 을 넣으면 다시 ``import`` 할 때 헤더</span>
-<span class="sd">    첫 컬럼명이 ``﻿id`` 로 깨져 왕복이 실패한다(왕복 안전성 우선).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.</span>
+<span class="sd">    반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은</span>
+<span class="sd">    흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.</span>
+
+<span class="sd">    쓰기는 **임시 파일 + ``os.replace``** 다(JSONL 쓰기와 같은 규칙). 대상 경로를</span>
+<span class="sd">    곧바로 열면 쓰다가 실패했을 때 헤더만 남은 **반쪽 CSV** 가 그 자리에 남는다.</span>
+<span class="sd">    사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을</span>
+<span class="sd">    백업으로 믿고 쓰면 데이터가 조용히 사라진다. 지금은 준비가 끝난 뒤에만 이름이</span>
+<span class="sd">    바뀌므로 결과는 "완전한 새 파일" 또는 "손대지 않은 기존 파일" 둘 중 하나다.</span>
+<span class="sd">    """</span>
     <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="c1"># 임시 파일 경로로 먼저 쓰기 때문에, 이 검사가 없으면 폴더를 준 실수가</span>
+        <span class="c1"># ``os.replace`` 단계에서야 드러나 오류 메시지에 사용자가 치지 않은</span>
+        <span class="c1"># ``.tmp`` 경로가 찍힌다. 읽기 쪽 ``read_rows`` 의 존재 검사와 같은 자리다.</span>
+        <span class="k">raise</span> <span class="ne">IsADirectoryError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
     <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">fieldnames</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_FIELDS</span> <span class="k">if</span> <span class="n">include_id</span> <span class="k">else</span> <span class="n">config</span><span class="o">.</span><span class="n">CSV_FIELDS_WITHOUT_ID</span><span class="p">)</span>
 
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">with_name</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">TMP_SUFFIX</span><span class="p">)</span>
     <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictWriter</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">fieldnames</span><span class="o">=</span><span class="n">fieldnames</span><span class="p">)</span>
-        <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">txs</span><span class="p">:</span>
-            <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">_to_row</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">include_id</span><span class="p">))</span>
-            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictWriter</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">fieldnames</span><span class="o">=</span><span class="n">fieldnames</span><span class="p">)</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">txs</span><span class="p">:</span>
+                <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">_to_row</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">include_id</span><span class="p">))</span>
+                <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">fsync</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">fileno</span><span class="p">())</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+        <span class="c1"># 실패했으면 임시 파일을 남기지 않는다(정리 실패가 원인 예외를 가리면 안 된다).</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">tmp</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">raise</span>
     <span class="k">return</span> <span class="n">count</span>
 </code></pre></div>
 
+<p><strong>쓰기가 원자적입니다</strong> — JSONL 쪽(§3.4)과 같은 규칙입니다. 대상 경로를 곧바로 열면 쓰다가 실패했을 때(디스크 가득 참, <code>UnicodeEncodeError</code>) <strong>헤더만 남은 반쪽 CSV</strong> 가 그 자리에 남습니다. 사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을 백업으로 믿고 쓰면 데이터가 조용히 사라집니다. 지금은 <code>.tmp</code> 에 다 쓰고 <code>fsync</code> 한 뒤에만 <code>os.replace</code> 로 이름을 바꾸므로 결과는 <strong>"완전한 새 파일" 또는 "손대지 않은 기존 파일"</strong> 둘 중 하나입니다. 실패 시 <code>except BaseException</code> 이 임시 파일을 지우는 것도 같은 이유입니다 — 사용자가 만든 적 없는 <code>.tmp</code> 가 남지 않아야 합니다.</p>
+<p><strong><code>path.is_dir()</code> 검사가 앞에 있는 이유</strong>도 임시 파일 때문입니다. 이 검사가 없으면 <code>--out</code> 에 폴더를 준 실수가 <code>os.replace</code> 단계에서야 드러나고, 오류 메시지에는 사용자가 치지 않은 <code>.tmp</code> 경로가 찍힙니다. 읽기 쪽 <code>read_rows</code> 의 존재 검사와 같은 자리입니다.</p>
 <p><strong><code>include_id</code> 가 두 함수에 다 전달되는 이유</strong>: <code>DictWriter</code> 는 <code>fieldnames</code> 에 없는 키가 dict 에 있으면 <code>ValueError</code> 를 냅니다. 헤더와 행 내용이 반드시 일치해야 합니다.</p>
 <p><strong>BOM 방침이 docstring 에 명시된 이유</strong>는 실제로 겪을 수 있는 함정이기 때문입니다. BOM 은 파일 맨 앞에 붙는, 화면에는 보이지 않는 표식입니다. Excel 호환을 위해 <code>utf-8-sig</code> 로 바꾸면 헤더 첫 컬럼명이 <code>﻿id</code> 가 되어 자기 파일을 다시 읽지 못합니다.</p>
 <p><strong>읽기와 쓰기의 인코딩이 일부러 다릅니다.</strong></p>
 <p>budget_app/storage/config.py:39-40</p>
-<div class="codehilite"><pre><span></span><code><span class="n">CSV_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
-<span class="n">CSV_READ_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;utf-8-sig&quot;</span>
+<div class="codehilite"><pre><span></span><code><span class="n">CSV_ENCODING</span> <span class="o">=</span> <span class="s2">"utf-8"</span>
+<span class="n">CSV_READ_ENCODING</span> <span class="o">=</span> <span class="s2">"utf-8-sig"</span>
 </code></pre></div>
 
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>utf-8-sig</code> 는 <code>utf-8</code> 과 다른 코덱입니다.</strong> BOM(Byte Order Mark)은 UTF-8 로 인코딩된 U+FEFF, 즉 바이트 <code>EF BB BF</code> 입니다. <code>utf-8</code> 코덱은 그것을 <strong>평범한 문자 하나</strong>로 디코딩해 문자열 맨 앞에 <code>﻿</code> 를 남기고, <code>utf-8-sig</code> 코덱은 <strong>읽을 때 앞의 BOM 을 먹어 치우고</strong>(없으면 그냥 넘어감) 쓸 때는 <strong>BOM 을 앞에 붙입니다.</strong> 이 비대칭 정책이 막는 것이 정확히 무엇인지 로컬에서 확인했습니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="c1"># 엑셀이 저장한 CSV (BOM 있음)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;bom.csv&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span>
-<span class="p">{</span><span class="s1">&#39;﻿id&#39;</span><span class="p">:</span> <span class="s1">&#39;TX-000001&#39;</span><span class="p">,</span> <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="s1">&#39;2024-01-05&#39;</span><span class="p">}</span>     <span class="c1"># ← 컬럼명이 &#39;id&#39; 가 아니다!</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;bom.csv&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8-sig&quot;</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span>
-<span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="s1">&#39;TX-000001&#39;</span><span class="p">,</span> <span class="s1">&#39;date&#39;</span><span class="p">:</span> <span class="s1">&#39;2024-01-05&#39;</span><span class="p">}</span>           <span class="c1"># ← 정상</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;out.csv&quot;</span><span class="p">,</span><span class="s2">&quot;w&quot;</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8-sig&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;id,date</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;out.csv&quot;</span><span class="p">,</span><span class="s2">&quot;rb&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-<span class="sa">b</span><span class="s1">&#39;</span><span class="se">\xef\xbb\xbf</span><span class="s1">id,date</span><span class="se">\n</span><span class="s1">&#39;</span>                            <span class="c1"># ← 쓰면 BOM 이 붙는다</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"bom.csv"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span>
+<span class="p">{</span><span class="s1">'﻿id'</span><span class="p">:</span> <span class="s1">'TX-000001'</span><span class="p">,</span> <span class="s1">'date'</span><span class="p">:</span> <span class="s1">'2024-01-05'</span><span class="p">}</span>     <span class="c1"># ← 컬럼명이 'id' 가 아니다!</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"bom.csv"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8-sig"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)))[</span><span class="mi">0</span><span class="p">]</span>
+<span class="p">{</span><span class="s1">'id'</span><span class="p">:</span> <span class="s1">'TX-000001'</span><span class="p">,</span> <span class="s1">'date'</span><span class="p">:</span> <span class="s1">'2024-01-05'</span><span class="p">}</span>           <span class="c1"># ← 정상</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"out.csv"</span><span class="p">,</span><span class="s2">"w"</span><span class="p">,</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8-sig"</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"id,date</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"out.csv"</span><span class="p">,</span><span class="s2">"rb"</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+<span class="sa">b</span><span class="s1">'</span><span class="se">\xef\xbb\xbf</span><span class="s1">id,date</span><span class="se">\n</span><span class="s1">'</span>                            <span class="c1"># ← 쓰면 BOM 이 붙는다</span>
 </code></pre></div>
 
-<p>헤더 검증(<code>_check_header</code>)은 <code>"id" in names</code> 같은 <strong>문자열 일치</strong>로 판정하므로, 컬럼명 하나가 <code>'﻿id'</code> 가 되는 순간 <code>id</code> 컬럼이 "없는" 것이 됩니다. 그래서 <strong>읽기는 <code>utf-8-sig</code> 로 관대하게</strong>(엑셀 CSV 를 받아 주고), <strong>쓰기는 <code>utf-8</code> 로 엄격하게</strong>(우리가 만든 파일에는 BOM 을 넣지 않아 왕복이 항상 성립하게) — 방향마다 다른 정책이 정답입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<p>BOM 이 붙으면 첫 컬럼명이 <code>'﻿id'</code> 가 되고, <code>parse_row</code> 의 <code>row.get("id")</code> 가 <code>None</code> 을 돌려줘 그 행이 <strong>새 id 를 발급받습니다</strong> — 왕복이 깨지는 자리는 헤더 검증이 아니라 여기입니다. (엑셀이 저장한 외부 CSV 처럼 첫 컬럼이 <code>date</code> 인 경우에는 <code>_check_header</code> 의 필수 컬럼 검사가 실패합니다.) 그래서 <strong>읽기는 <code>utf-8-sig</code> 로 관대하게</strong>(엑셀 CSV 를 받아 주고), <strong>쓰기는 <code>utf-8</code> 로 엄격하게</strong>(우리가 만든 파일에는 BOM 을 넣지 않아 왕복이 항상 성립하게) — 방향마다 다른 정책이 정답입니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><strong><code>txs</code> 가 제너레이터여도 동작합니다.</strong> 서비스가 이렇게 넘깁니다.</p>
 <p>budget_app/services/importexport.py:77-84</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">export_csv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">flt</span><span class="p">:</span> <span class="n">SearchFilter</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">include_id</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;필터를 통과한 거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
+<span class="w">        </span><span class="sd">"""필터를 통과한 거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
 
 <span class="sd">        ``include_id=True`` 가 기본인 이유는 **왕복 안전성**이다. id 가 없으면 내보낸</span>
 <span class="sd">        파일을 다시 가져올 때 같은 거래가 새 id 로 한 번 더 저장된다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">rows</span> <span class="o">=</span> <span class="p">(</span><span class="n">tx</span> <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">()</span> <span class="k">if</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">csv_io</span><span class="o">.</span><span class="n">write_transactions</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">include_id</span><span class="o">=</span><span class="n">include_id</span><span class="p">)</span>
 </code></pre></div>
@@ -1238,14 +1298,14 @@ $ python -m budget_app import --from rt.csv
 <p>백업은 데이터 폴더의 파일들을 시각이 찍힌 새 폴더로 복사하는 일입니다. 내용을 해석하지 않고 바이트를 그대로 옮기므로 도메인 판단이 한 줄도 없습니다. 그래서 서비스가 아니라 이 계층에 있습니다.</p>
 <p>budget_app/storage/backup.py:17-33</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">backup_data_dir</span><span class="p">(</span><span class="n">data_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;data 폴더의 모든 ``*.jsonl`` 을 타임스탬프 폴더로 복사한다.</span>
+<span class="w">    </span><span class="sd">"""data 폴더의 모든 ``*.jsonl`` 을 타임스탬프 폴더로 복사한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">src</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">src</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
         <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="p">))</span>
     <span class="n">ts</span> <span class="o">=</span> <span class="p">(</span><span class="n">now</span> <span class="ow">or</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">())</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">BACKUP_TS_FORMAT</span><span class="p">)</span>
-    <span class="n">dest</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">BACKUP_DIR_PREFIX</span><span class="si">}{</span><span class="n">ts</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">dest</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">BACKUP_DIR_PREFIX</span><span class="si">}{</span><span class="n">ts</span><span class="si">}</span><span class="s2">"</span>
     <span class="n">dest</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">_files_to_copy</span><span class="p">(</span><span class="n">src</span><span class="p">):</span>
         <span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">write_bytes</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">())</span>
@@ -1292,9 +1352,9 @@ $ python -m budget_app import --from rt.csv
 
 <p>budget_app/storage/unit_of_work.py:73-181</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnitOfWork</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;여러 저장소의 재작성을 모아 두었다가 한꺼번에 커밋한다.</span>
+<span class="w">    </span><span class="sd">"""여러 저장소의 재작성을 모아 두었다가 한꺼번에 커밋한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Path</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -1308,9 +1368,9 @@ $ python -m budget_app import --from rt.csv
         <span class="o">*</span><span class="p">,</span>
         <span class="n">extra</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;한 저장소의 최종 내용을 ``.tmp`` 로 준비한다 — 아직 반영하지 않는다.</span>
+<span class="w">        </span><span class="sd">"""한 저장소의 최종 내용을 ``.tmp`` 로 준비한다 — 아직 반영하지 않는다.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">plan</span><span class="p">:</span> <span class="n">RewritePlan</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">plan_rewrite</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="n">extra</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">plan</span><span class="o">.</span><span class="n">changed</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># 바꿀 것이 없으면 임시 파일도 만들지 않는다</span>
@@ -1321,9 +1381,9 @@ $ python -m budget_app import --from rt.csv
     <span class="c1"># ---------- 마무리 ----------</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;준비된 것을 전부 반영한다 — rename 만 연달아 실행.</span>
+<span class="w">        </span><span class="sd">"""준비된 것을 전부 반영한다 — rename 만 연달아 실행.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">done</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">:</span>
@@ -1333,12 +1393,12 @@ $ python -m budget_app import --from rt.csv
                 <span class="n">done</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
             <span class="n">pending</span> <span class="o">=</span> <span class="p">[</span><span class="n">target</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">target</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">]</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UOW_PARTIAL</span><span class="p">,</span> <span class="n">done</span> <span class="ow">or</span> <span class="s2">&quot;없음&quot;</span><span class="p">,</span> <span class="n">pending</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UOW_PARTIAL</span><span class="p">,</span> <span class="n">done</span> <span class="ow">or</span> <span class="s2">"없음"</span><span class="p">,</span> <span class="n">pending</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
             <span class="k">raise</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;준비한 ``.tmp`` 를 지운다 — 원본은 손대지 않았으므로 이것으로 끝이다.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""준비한 ``.tmp`` 를 지운다 — 원본은 손대지 않았으므로 이것으로 끝이다."""</span>
         <span class="k">for</span> <span class="n">tmp</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">tmp</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -1434,7 +1494,7 @@ $ python -m budget_app import --from bad.csv --atomic --data-dir ./d
 <hr>
 <p><strong>다음 문서</strong>: <a href="08-services.html">08. 서비스 계층</a> — 이 저장소들을 조합해 정책을 구현하는 곳.</p>
 <div class="pager"><span><a href="06-decorators.html">← 06. 횡단 관심사와 예외 처리 — decorators / error_handler</a></span><span><a href="08-services.html">08. 서비스 계층 — `services/` 패키지 →</a></span></div>
-<footer>docs/07-repository.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/07-repository.md 에서 자동 생성됨 (2026-08-26 08:39) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

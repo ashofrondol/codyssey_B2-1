@@ -95,6 +95,7 @@ MSG_IMPORT_DONE = (
 MSG_IMPORT_ERROR_HEADER = "[오류 라인 일부]"
 FMT_IMPORT_ERROR_ITEM = "  - line {lineno}: {reason}"
 FMT_IMPORT_DUPLICATE_ITEM = "  - line {lineno}: 중복 id {tx_id} — 건너뜀"
+MSG_IMPORT_NEW_CATEGORIES = "[안내] 새 카테고리 {count}개를 등록했습니다: {names}"
 MSG_IMPORT_DUPLICATE_HINT = (
     "[힌트] 중복은 이미 저장된 거래입니다. 다시 넣으려면 `--on-duplicate new-id` 를 쓰세요."
 )
@@ -114,6 +115,10 @@ MSG_ERR_PERMISSION = "[오류] 파일 접근 권한이 없습니다: {name}"
 HINT_PERMISSION = "[힌트] 읽기/쓰기 권한, 또는 다른 프로그램이 파일을 열고 있는지 확인해 주세요."
 MSG_ERR_ENCODING = "[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다)."
 HINT_ENCODING = "[힌트] CSV 를 UTF-8 로 다시 저장하세요 (엑셀: '다른 이름으로 저장 > CSV UTF-8')."
+MSG_ERR_ENCODING_WRITE = "[오류] UTF-8 로 저장할 수 없는 문자가 있습니다 (손상된 바이트가 섞였습니다)."
+HINT_ENCODING_WRITE = (
+    "[힌트] 해당 값을 UTF-8 로 다시 입력해 주세요 (터미널·입력 파일 인코딩을 UTF-8 로 맞추세요)."
+)
 MSG_INTERRUPTED = "\n[중단] 사용자에 의해 종료되었습니다."
 MSG_ERR_IO = "[오류] 입출력 오류가 발생했습니다: {error}"
 HINT_IO = "[힌트] 디스크 여유 공간과 파일 경로/권한을 확인해 주세요."

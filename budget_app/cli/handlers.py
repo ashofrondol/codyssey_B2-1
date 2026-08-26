@@ -51,7 +51,11 @@ def cmd_add(ctx: AppContext, args: argparse.Namespace) -> int:
 
 
 def cmd_list(ctx: AppContext, args: argparse.Namespace) -> int:
-    output.out_lines(presenter.tx_table(ctx.tx_service.stream_sorted(), limit=args.limit))
+    # ``limit`` 을 서비스까지 내려보내는 것이 핵심이다. 프레젠터에만 주면 이미
+    # 만들어진 결과를 자르는 것이라 메모리는 파일 크기를 따라간다(G2 위반).
+    # 서비스가 알면 상위 N 만 힙에 유지하며 스트림을 흘려보낸다.
+    rows = ctx.tx_service.stream_sorted(limit=args.limit)
+    output.out_lines(presenter.tx_table(rows, limit=args.limit))
     return config.EXIT_OK
 
 
@@ -176,7 +180,10 @@ def _export_filter(args: argparse.Namespace) -> SearchFilter:
 def cmd_import(ctx: AppContext, args: argparse.Namespace) -> int:
     mode = messages.MODE_ATOMIC if args.atomic else messages.MODE_PARTIAL
     report = ctx.io_service.import_csv(
-        Path(args.from_), atomic=args.atomic, on_duplicate=args.on_duplicate
+        Path(args.from_),
+        atomic=args.atomic,
+        on_duplicate=args.on_duplicate,
+        auto_category=args.auto_category,
     )
     # 요약 한 줄은 결과(stdout), 건너뛴 줄의 사유는 진단(stderr)이다.
     output.out(presenter.import_result_line(report, mode))

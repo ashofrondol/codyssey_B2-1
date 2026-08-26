@@ -233,6 +233,15 @@ def _add_import(sub) -> None:
             "new-id=새 id 로 추가, error=오류로 중단"
         ),
     )
+    p.add_argument(
+        "--auto-category",
+        dest="auto_category",
+        action="store_true",
+        help=(
+            "CSV 의 미등록 카테고리를 자동 등록한다 "
+            "(기본: 미등록 카테고리 행은 건너뛰고 skipped 로 집계)"
+        ),
+    )
     p.set_defaults(handler="import")
 
 

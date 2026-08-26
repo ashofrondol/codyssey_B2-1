@@ -426,7 +426,7 @@ budget_app/cli/presenter.py:1-2 (docstring 발췌)
 
 그 결과 핸들러가 이렇게 짧아집니다.
 
-budget_app/cli/handlers.py:72-75
+budget_app/cli/handlers.py:76-79
 
 ```python
 def cmd_summary(ctx: AppContext, args: argparse.Namespace) -> int:
@@ -468,7 +468,7 @@ import 문이 곧 "이 모듈이 어느 유스케이스를 쓰는가"의 목록�
 
 부모 클래스 `JsonlStore.append` 는 "받은 엔티티를 한 줄로 인코딩해 파일 끝에 붙인다"가 전부입니다.
 
-budget_app/storage/jsonl.py:210-211
+budget_app/storage/jsonl.py:232-233
 
 ```python
     def append(self, entity: T) -> None:
@@ -522,7 +522,7 @@ budget_app/storage/repositories.py:184-189
 
 CSV 어댑터는 "행을 읽고 검증한다"까지만 하고, **중복 id 를 어떻게 처리할지는 모릅니다.** 그래서 `parse_row` 는 완성된 `Transaction` 이 아니라 `ParsedRow` 를 돌려줍니다.
 
-budget_app/storage/csv_io.py:39-64
+budget_app/storage/csv_io.py:40-65
 
 ```python
 @dataclass(frozen=True)
@@ -641,8 +641,8 @@ budget_app/cli/app.py:84-94
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:
@@ -662,7 +662,7 @@ def _add_add(sub) -> None:
     p.set_defaults(handler="add")
 ```
 
-> **⚙️ 내부 동작** — `set_defaults(handler="add")` 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 `Namespace` 에 **그냥 꽂아 넣을 값**을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 `_defaults` 를 상위 `Namespace` 에 합칩니다. 그래서 `args.handler` 는 사용자가 입력한 적 없는데도 값이 들어 있고, `--data-dir` 처럼 실제 옵션이 아니라서 `--help` 에도 나오지 않습니다. `needs_storage` 도 같은 통로로 들어옵니다 — 최상위에서 `set_defaults(needs_storage=True)`, `backup` 하위 파서만 `False` 로 덮습니다(`cli/parser.py:91`, `cli/parser.py:243`). → [12 §2-B](./12-syntax-and-stdlib.md)
+> **⚙️ 내부 동작** — `set_defaults(handler="add")` 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 `Namespace` 에 **그냥 꽂아 넣을 값**을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 `_defaults` 를 상위 `Namespace` 에 합칩니다. 그래서 `args.handler` 는 사용자가 입력한 적 없는데도 값이 들어 있고, `--data-dir` 처럼 실제 옵션이 아니라서 `--help` 에도 나오지 않습니다. `needs_storage` 도 같은 통로로 들어옵니다 — 최상위에서 `set_defaults(needs_storage=True)`, `backup` 하위 파서만 `False` 로 덮습니다(`cli/parser.py:91`, `cli/parser.py:252`). → [12 §2-B](./12-syntax-and-stdlib.md)
 
 **3단계 — 컨텍스트 조립과 핸들러 실행.** `@handle_errors` 는 개별 핸들러가 아니라 **`_dispatch` 한 곳에만** 붙습니다.
 
@@ -721,18 +721,24 @@ def cmd_add(ctx: AppContext, args: argparse.Namespace) -> int:
 
 **4단계 — 입력 수집.** `prompts` 가 순서와 검증기를 알고 있습니다.
 
-budget_app/cli/prompts.py:112-121
+budget_app/cli/prompts.py:112-127
 
 ```python
 def ask_transaction(cat_service: CategoryService) -> TransactionInput:
-    """거래 한 건에 필요한 값을 순서대로 받아 온다."""
+    """거래 한 건에 필요한 값을 순서대로 받아 온다.
+
+    메모·태그도 ``ask_until`` 을 지난다. 빈 값이 허용되는 필드라 예전에는 ``ask``
+    한 번으로 끝냈지만, 그 검증기들도 거부하는 값이 있다(UTF-8 로 쓸 수 없는 문자,
+    구분자를 품은 태그). 그때 재입력 기회 없이 명령이 끝나면 이 모듈이 선언한
+    "모든 대화형 입력은 ``ask_until`` 을 지난다"가 사실이 아니게 된다.
+    """
     return TransactionInput(
         date=ask_until(messages.PROMPT_DATE, validators.parse_date),
         type=ask_until(messages.PROMPT_TYPE, validators.parse_type),
         category=ask_until(messages.PROMPT_CATEGORY, registered_category_validator(cat_service)),
         amount=ask_until(messages.PROMPT_AMOUNT, validators.parse_amount),
-        memo=validators.parse_memo(ask(messages.PROMPT_MEMO)),
-        tags=validators.parse_tags(ask(messages.PROMPT_TAGS)),
+        memo=ask_until(messages.PROMPT_MEMO, validators.parse_memo),
+        tags=ask_until(messages.PROMPT_TAGS, validators.parse_tags),
     )
 ```
 
@@ -744,7 +750,7 @@ def ask_transaction(cat_service: CategoryService) -> TransactionInput:
 
 **5단계 — 서비스의 도메인 규칙.**
 
-budget_app/services/transactions.py:27-35
+budget_app/services/transactions.py:34-42
 
 ```python
     @log_call
@@ -760,7 +766,7 @@ budget_app/services/transactions.py:27-35
 
 서비스가 판단하는 것은 **"카테고리가 등록되어 있는가"** 하나입니다. 이것은 필드 규칙이 아니라 **저장된 상태를 봐야 아는 규칙**이라 `validators` 가 아니라 서비스에 있습니다. 이 구분이 `ValidationError`(값) vs `AppError`(상황)의 구분과 정확히 대응합니다.
 
-budget_app/services/transactions.py:89-91
+budget_app/services/transactions.py:110-112
 
 ```python
     def _require_registered_category(self, name: str, *, hint: str) -> None:
@@ -871,7 +877,7 @@ budget_app/services/budgets.py:30-66
 
 프레젠터는 그 결과를 읽기만 합니다.
 
-budget_app/cli/presenter.py:63-88
+budget_app/cli/presenter.py:67-92
 
 ```python
 def summary_lines(summary: MonthlySummary) -> Iterator[str]:
@@ -908,7 +914,7 @@ def _budget_lines(summary: MonthlySummary) -> Iterator[str]:
 
 ## 5. 실행 흐름 완전 추적 3 — 가장 복잡한 경로 (`import`)
 
-`import` 는 이 프로그램에서 계층이 가장 많이 관여하는 명령입니다. 정책이 셋(실패/중복/카테고리 자동 등록) 얽혀 있고, 준비와 커밋이 나뉘어 있습니다.
+`import` 는 이 프로그램에서 계층이 가장 많이 관여하는 명령입니다. 정책이 셋(실패/중복/카테고리) 얽혀 있고, 준비와 커밋이 나뉘어 있습니다.
 
 > **💡 쉽게 말하면** — 장을 볼 때 물건을 하나 집을 때마다 계산하지는 않습니다. 카트에 다 담은 뒤 계산대에서 한 번에 셈하지요. 담는 동안에는 아직 아무것도 내 것이 아니라, 도중에 마음이 바뀌면 카트째 두고 나오면 그만입니다. 여기서도 준비 단계는 CSV 를 전부 읽어 검증하고 판정만 할 뿐 파일은 한 글자도 건드리지 않고, 파일이 실제로 바뀌는 것은 커밋 단계에 가서입니다.
 > 다만 이 비유는 계산대가 하나라는 데서 깨집니다 — 여기서는 거래 파일과 카테고리 파일 **두 개**를 바꿔야 하는데, 계산대가 하나로 합쳐지는 것은 `--atomic` 일 때뿐입니다. 그때는 `UnitOfWork` 가 둘을 한 단위로 묶어 하나만 바뀐 중간 상태를 막습니다. 기본 모드는 두 파일을 따로 이어쓰므로 그 사이에 죽으면 카테고리만 남을 수 있고, "가능한 만큼 최대한 넣는다"는 이 모드의 정책이 그 위험을 감수하는 쪽을 택한 것입니다.
@@ -924,6 +930,9 @@ python -m budget_app import --from data.csv --atomic --on-duplicate skip
           └─ for (lineno, row) in csv_io.read_rows(path):     ← CSV 어댑터
                  ├─ csv_io.parse_row()              필드 검증 (validators 사용)
                  │     실패 → atomic? AppError 발생 : batch.note_error()
+                 ├─ _check_category()               카테고리 판정 (id 발급보다 먼저)
+                 │     미등록 + auto_category 없음 → atomic? AppError : note_error(), 이 행 버림
+                 │     미등록 + --auto-category    → batch.new_categories 에 이름만 모음
                  ├─ _resolve_id()                   id 결정 (중복 정책)
                  │     중복 + skip → batch.note_duplicate(), 이 행 버림
                  └─ batch.transactions.append(ParsedRow.to_transaction(tx_id))
@@ -933,6 +942,7 @@ python -m budget_app import --from data.csv --atomic --on-duplicate skip
                  ├─ TransactionRepository.remember_ids(txs)   워터마크 먼저
                  └─ with UnitOfWork() as uow:                 두 파일 = 한 단위
                         ├─ uow.stage(cats, extra=새 카테고리)  → categories.jsonl.tmp
+                        │     (--auto-category 로 모인 것이 있을 때만)
                         ├─ uow.stage(txs,  extra=거래들)       → transactions.jsonl.tmp
                         └─ __exit__ → commit() → os.replace 두 번 연달아
            (--atomic 없이 부분 성공 모드면 _commit_appending:
@@ -941,7 +951,7 @@ python -m budget_app import --from data.csv --atomic --on-duplicate skip
       → presenter.import_problem_lines(report)       사유들 (stderr)
 ```
 
-budget_app/services/importexport.py:88-104
+budget_app/services/importexport.py:88-109
 
 ```python
     def import_csv(
@@ -950,16 +960,21 @@ budget_app/services/importexport.py:88-104
         *,
         atomic: bool = False,
         on_duplicate: str = config.DEFAULT_ON_DUPLICATE,
+        auto_category: bool = False,
     ) -> ImportReport:
         """CSV 거래 일괄 등록.
 
         준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다. **ID 발급은
         준비 단계에서 끝난다** — ``_resolve_id`` 가 행마다 번호를 확정해 완성된
         ``Transaction`` 을 batch 에 담는다. 커밋 단계가 하는 일은 파일 반영뿐이고
-        (카테고리 자동 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
+        (카테고리 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
         중단되면 카테고리·거래 어느 쪽도 남지 않는다.
+
+        ``auto_category`` 는 **옵트인**이다. 이유는 ``_check_category`` 참조.
         """
-        batch = self._prepare(Path(in_path), atomic=atomic, on_duplicate=on_duplicate)
+        batch = self._prepare(
+            Path(in_path), atomic=atomic, on_duplicate=on_duplicate, auto_category=auto_category
+        )
         return self._commit(batch, atomic=atomic)
 ```
 
@@ -970,7 +985,7 @@ budget_app/services/importexport.py:88-104
 | 계층 | 이 명령에서 아는 것 | 모르는 것 |
 |---|---|---|
 | `cli/handlers.py` | 인자 이름, 모드 표시 문구, 두 출력 채널 | 검증 규칙, 중복 판정 |
-| `services/importexport.py` | 실패 정책, 중복 정책, 카테고리 자동 등록 | CSV 파일 형식, JSONL 쓰기 방법 |
+| `services/importexport.py` | 실패 정책, 중복 정책, 카테고리 정책(거부 vs `--auto-category`) | CSV 파일 형식, JSONL 쓰기 방법 |
 | `storage/csv_io.py` | CSV 헤더/컬럼/인코딩, 필드 검증 | 중복이 무엇인지, 원자성이 무엇인지 |
 | `storage/ids.py` | 어떤 번호가 이미 쓰였는지, 다음 번호 | 그 번호가 CSV 에서 왔는지 |
 | `storage/unit_of_work.py` | 여러 파일을 한 단위로 바꾸는 법 | 무엇을 왜 쓰는지 |
@@ -981,7 +996,7 @@ budget_app/services/importexport.py:88-104
 
 > **🔎 문법의 출처** — `with UnitOfWork() as uow:` 는 PEP 343 으로 파이썬 2.5 에 들어온 `with` 문입니다. 파이썬은 이것을 "`__enter__()` 를 불러 그 반환값을 `uow` 에 대입하고, 블록이 어떻게 끝나든 — 정상 종료든 예외든 — `__exit__(예외타입, 예외값, 트레이스백)` 을 반드시 부른다"로 풀어냅니다. `UnitOfWork.__exit__` 은 예외 인자가 `None` 인지 보고 `commit()` 할지 `rollback()` 할지 정합니다(`storage/unit_of_work.py:172-181`). "준비 중 죽으면 아무것도 남지 않는다"는 약속이 `try/finally` 를 손으로 쓰지 않고도 지켜지는 이유입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
-정책 3축(실패 축 × 중복 축 × 카테고리 자동 등록)의 조합이 어떻게 결정되는지는 [08. 서비스 계층](./08-services.md)에서 다룹니다 — 요지는 `--atomic` 이 "준비 중 한 줄이라도 실패하면 즉시 `AppError` 로 중단(파일 무접촉)", 기본 모드는 "실패한 줄만 기록하고 나머지는 넣는다"이고, `--on-duplicate` 는 그와 **독립적으로** id 충돌만 다룬다는 것입니다.
+정책 3축(실패 축 × 중복 축 × 카테고리 축)의 조합이 어떻게 결정되는지는 [08. 서비스 계층](./08-services.md)에서 다룹니다 — 요지는 `--atomic` 이 "준비 중 한 줄이라도 실패하면 즉시 `AppError` 로 중단(파일 무접촉)", 기본 모드는 "실패한 줄만 기록하고 나머지는 넣는다"이고, `--on-duplicate` 는 그와 **독립적으로** id 충돌만 다룬다는 것입니다. 카테고리 축은 실패 축에 얹힙니다 — 미등록 카테고리 행은 기본적으로 **거부**되어 다른 검증 실패와 똑같이 처리되고, `--auto-category` 를 주었을 때만 등록하고 받아들입니다.
 
 ---
 
@@ -989,7 +1004,7 @@ budget_app/services/importexport.py:88-104
 
 **개념.** 의존성 주입이란 "객체가 필요한 협력자를 스스로 만들지 않고 **밖에서 받는** 것"입니다.
 
-budget_app/services/transactions.py:23-25
+budget_app/services/transactions.py:30-32
 
 ```python
     def __init__(self, txs: TransactionRepository, cats: CategoryStore):
@@ -1092,7 +1107,7 @@ def test_app_context_does_not_expose_repositories():
 
 그리고 진입점(`cli/app.py:78-80` 의 `_dispatch`)이 **한 번만** `prepare()` 를 호출하되, 필요 없는 명령은 건너뜁니다. 건너뛸지 여부는 파서가 남긴 `needs_storage` 플래그가 정합니다.
 
-budget_app/cli/parser.py:239-243
+budget_app/cli/parser.py:248-252
 
 ```python
 def _add_backup(sub) -> None:
@@ -1152,7 +1167,7 @@ storage.jsonl.iter_raw()     ── FileNotFoundError ┤
 storage.csv_io.read_rows()   ── AppError ─────────┤
 context._require_usable_...  ── NotADirectoryError┤
                                                   ▼
-                        @handle_errors  (cli/error_handler.py:20-121)
+                        @handle_errors  (cli/error_handler.py:20-128)
                                     ↑ 붙는 자리는 cli/app.py:61 의 _dispatch 하나
                                                   │
                      ┌────────────────────────────┼────────────────────────┐
@@ -1211,13 +1226,16 @@ python -m budget_app import --from nope.csv 1>/dev/null     # 결과만 버림 �
 
 `import` 는 한 명령이 두 채널을 모두 쓰는 예입니다.
 
-budget_app/cli/handlers.py:176-184
+budget_app/cli/handlers.py:180-191
 
 ```python
 def cmd_import(ctx: AppContext, args: argparse.Namespace) -> int:
     mode = messages.MODE_ATOMIC if args.atomic else messages.MODE_PARTIAL
     report = ctx.io_service.import_csv(
-        Path(args.from_), atomic=args.atomic, on_duplicate=args.on_duplicate
+        Path(args.from_),
+        atomic=args.atomic,
+        on_duplicate=args.on_duplicate,
+        auto_category=args.auto_category,
     )
     # 요약 한 줄은 결과(stdout), 건너뛴 줄의 사유는 진단(stderr)이다.
     output.out(presenter.import_result_line(report, mode))
@@ -1281,7 +1299,7 @@ domain/queries.py :: SearchFilter.for_month()
 | 계약 | 표현 | 적힌 자리 |
 |---|---|---|
 | 검증기 | `Callable[[str], T]` — 문자열 받아 T 반환, 실패는 ValidationError | `cli/prompts.py:60` |
-| 재작성 콜백 | `Callable[[T], T \| None]` — 바꾼 것 / 그대로 / 삭제(None) | `storage/jsonl.py:266`, `315` |
+| 재작성 콜백 | `Callable[[T], T \| None]` — 바꾼 것 / 그대로 / 삭제(None) | `storage/jsonl.py:288`, `315` |
 | 명령 핸들러 | `Callable[[AppContext, Namespace], int]` — 컨텍스트+인자 → 종료 코드 | `cli/app.py:26` (`Handler` 별칭) |
 | 수정 요청 | `TransactionPatch` — 필드가 선언돼 있어 오타가 TypeError | `domain/entities.py:127-154` |
 | 계산 결과 | `MonthlySummary` / `ImportReport` — 문자열 키 dict 대체 | `domain/results.py` |
@@ -1292,7 +1310,7 @@ domain/queries.py :: SearchFilter.for_month()
 
 ### 8.5 의존성 역전은 아닐까? (구분해 두기)
 
-이 프로젝트는 의존성 **주입**(DI)은 쓰지만 의존성 **역전**(DIP, 추상 인터페이스에 의존)은 쓰지 않습니다. `TransactionService` 는 `TransactionRepository` **구체 클래스**를 타입 힌트로 받습니다(`services/transactions.py:23`).
+이 프로젝트는 의존성 **주입**(DI)은 쓰지만 의존성 **역전**(DIP, 추상 인터페이스에 의존)은 쓰지 않습니다. `TransactionService` 는 `TransactionRepository` **구체 클래스**를 타입 힌트로 받습니다(`services/transactions.py:30`).
 
 규모상 추상화 계층(`ABC`/`Protocol`)을 도입할 실익이 없기 때문이며, 필요해지면(예: SQLite 저장소 추가) 그때 인터페이스를 뽑으면 됩니다. **지금 없는 것과 못 하는 것을 구분해서 말할 수 있어야** 합니다.
 

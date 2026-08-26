@@ -4,7 +4,7 @@
 
 1. 실패 정책   — 부분 성공(기본) vs 원자적 전수 롤백(``--atomic``)
 2. 중복 정책   — 이미 있는 id 를 만나면 건너뛸까/새로 발급할까/막을까
-3. 부수 효과   — 처음 보는 카테고리는 자동 등록한다
+3. 카테고리    — 미등록 카테고리 행은 거부(기본), ``--auto-category`` 면 등록하고 받는다
 
 두 정책 축은 **독립**이다. ``--atomic`` 은 데이터가 *잘못된* 줄을, ``--on-duplicate``
 는 이미 *저장된* 거래를 다룬다.
@@ -65,7 +65,7 @@ class ImportExportService:
 
     1. 실패 정책   — 부분 성공(기본) vs 원자적 전수 롤백(``--atomic``)
     2. 중복 정책   — 이미 있는 id 를 만나면 건너뛸까/새로 발급할까/막을까
-    3. 부수 효과   — 처음 보는 카테고리는 자동 등록한다
+    3. 카테고리    — 미등록 카테고리 행은 거부(기본), ``--auto-category`` 면 등록하고 받는다
     """
 
     def __init__(self, txs: TransactionRepository, cats: CategoryStore):
@@ -91,19 +91,26 @@ class ImportExportService:
         *,
         atomic: bool = False,
         on_duplicate: str = config.DEFAULT_ON_DUPLICATE,
+        auto_category: bool = False,
     ) -> ImportReport:
         """CSV 거래 일괄 등록.
 
         준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다. **ID 발급은
         준비 단계에서 끝난다** — ``_resolve_id`` 가 행마다 번호를 확정해 완성된
         ``Transaction`` 을 batch 에 담는다. 커밋 단계가 하는 일은 파일 반영뿐이고
-        (카테고리 자동 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
+        (카테고리 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
         중단되면 카테고리·거래 어느 쪽도 남지 않는다.
+
+        ``auto_category`` 는 **옵트인**이다. 이유는 ``_check_category`` 참조.
         """
-        batch = self._prepare(Path(in_path), atomic=atomic, on_duplicate=on_duplicate)
+        batch = self._prepare(
+            Path(in_path), atomic=atomic, on_duplicate=on_duplicate, auto_category=auto_category
+        )
         return self._commit(batch, atomic=atomic)
 
-    def _prepare(self, in_path: Path, *, atomic: bool, on_duplicate: str) -> _Batch:
+    def _prepare(
+        self, in_path: Path, *, atomic: bool, on_duplicate: str, auto_category: bool
+    ) -> _Batch:
         batch = _Batch()
         allocator = self.txs.id_allocator()
         known_categories = self.cats.name_set()
@@ -121,16 +128,61 @@ class ImportExportService:
                 batch.note_error(lineno, exc)
                 continue
 
+            # 카테고리 판정을 **id 발급보다 먼저** 한다. 순서가 반대면 거부될 행이
+            # 번호를 한 개 먹고 사라져 id 에 구멍이 남는다.
+            if not self._check_category(
+                parsed.category,
+                lineno,
+                known_categories,
+                batch,
+                atomic=atomic,
+                auto_category=auto_category,
+            ):
+                continue
+
             tx_id = self._resolve_id(parsed.tx_id, lineno, allocator, on_duplicate, batch)
             if tx_id is None:
                 continue  # 중복 — 건너뛰기 정책
 
             batch.transactions.append(parsed.to_transaction(tx_id))
-            if parsed.category not in known_categories:
-                known_categories.add(parsed.category)
-                batch.new_categories.append(parsed.category)
 
         return batch
+
+    def _check_category(
+        self,
+        name: str,
+        lineno: int,
+        known_categories: set[str],
+        batch: _Batch,
+        *,
+        atomic: bool,
+        auto_category: bool,
+    ) -> bool:
+        """이 행의 카테고리를 받아들일지 판정한다 — ``False`` 면 이 행은 저장하지 않는다.
+
+        **기본은 거부다.** 요구사항 G13 이 CSV 의 ``category`` 를 "등록된 카테고리"로
+        규정하고, 같은 프로그램의 ``add``/``update`` 도 미등록이면 거부한다. 예전에는
+        가져오기만 규칙이 정반대여서 오타 하나(``fod``)가 경고 한 줄 없이 카테고리
+        마스터에 영구 등록됐다 — 그 뒤로는 요약·검색이 두 이름으로 갈린다.
+
+        자동 등록이 쓸모없다는 뜻은 아니다(외부 가계부에서 옮겨 올 때가 그렇다).
+        그래서 **없앤 것이 아니라 ``--auto-category`` 옵트인으로 옮겼다.** 부수 효과가
+        기본값이면 사고가 조용하지만, 플래그로 요청하면 의도가 된다.
+        """
+        if name in known_categories:
+            return True
+        if not auto_category:
+            reason = messages.ERR_IMPORT_CATEGORY_NOT_REGISTERED.format(name=name)
+            if atomic:
+                raise AppError(
+                    messages.ERR_ATOMIC_IMPORT_FAILED.format(lineno=lineno, reason=reason),
+                    hint=messages.HINT_IMPORT_CATEGORY,
+                )
+            batch.note_error(lineno, reason)
+            return False
+        known_categories.add(name)
+        batch.new_categories.append(name)
+        return True
 
     def _resolve_id(
         self,
@@ -176,6 +228,7 @@ class ImportExportService:
             duplicated=batch.duplicated,
             errors=tuple(batch.errors),
             duplicates=tuple(batch.duplicates),
+            new_categories=tuple(batch.new_categories),
         )
 
     def _commit_appending(self, batch: _Batch) -> int:

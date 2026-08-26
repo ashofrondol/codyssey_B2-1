@@ -247,7 +247,7 @@ EXIT_INTERRUPT = 130
 
 상속 위치가 왜 중요한지는 이 프로젝트의 오류 방패가 보여 줍니다.
 
-budget_app/cli/error_handler.py:105-106
+budget_app/cli/error_handler.py:112-113
 ```python
         # ---------- (4) 최후 방어선 — 분류 밖의 버그 ----------
         except Exception as exc:  # noqa: BLE001 — 어떤 예외도 트레이스백으로 끝내지 않기 위함
@@ -397,7 +397,7 @@ __all__ = ["main"]
 **이 소스에서** — 이 프로젝트에서 `*` 뒤로 넘어간 인자는 예외 없이 **bool 플래그이거나
 동작을 바꾸는 옵션**입니다. 호출부만 봐도 뜻이 읽히게 만드는 것이 목적입니다.
 
-budget_app/storage/jsonl.py:264-269
+budget_app/storage/jsonl.py:286-291
 ```python
     def plan_rewrite(
         self,
@@ -407,7 +407,7 @@ budget_app/storage/jsonl.py:264-269
     ) -> RewritePlan:
 ```
 
-budget_app/services/importexport.py:88-94
+budget_app/services/importexport.py:88-95
 ```python
     def import_csv(
         self,
@@ -418,12 +418,12 @@ budget_app/services/importexport.py:88-94
     ) -> ImportReport:
 ```
 
-budget_app/storage/csv_io.py:131-131
+budget_app/storage/csv_io.py:145-145
 ```python
 def write_transactions(path: Path, txs: Iterable[Transaction], *, include_id: bool = True) -> int:
 ```
 
-budget_app/services/transactions.py:89-91
+budget_app/services/transactions.py:110-112
 ```python
     def _require_registered_category(self, name: str, *, hint: str) -> None:
         if not self.cats.exists(name):
@@ -432,7 +432,7 @@ budget_app/services/transactions.py:89-91
 
 마지막 것은 bool 이 아닌데도 키워드 전용입니다. 이 메서드는 호출처가 둘인데 각각 다른
 힌트 문구를 넘깁니다 — `add` 는 `HINT_CATEGORY_ADD_OR_LIST`, `update` 는
-`HINT_CATEGORY_ADD` 입니다(transactions.py:37, 60). 두 문자열 인자(`name`, `hint`)가
+`HINT_CATEGORY_ADD` 입니다(transactions.py:44, 60). 두 문자열 인자(`name`, `hint`)가
 나란히 위치 인자로 서 있으면 순서를 바꿔 써도 타입 오류가 나지 않고 **엉뚱한 문구가
 사용자에게 나갑니다**. `*` 가 그 실수를 문법 차원에서 없앱니다.
 
@@ -485,7 +485,7 @@ budget_app/domain/queries.py:75-79
 
 **없으면 어떻게 되나** — `wrapper(*args, **kwargs)` 대신 구체적 시그니처를 적으면
 데코레이터가 특정 모양의 함수에만 붙습니다. `@log_call` 은 인자 개수가 서로 다른
-`TransactionService.add`/`update`/`delete` 셋에 붙어 있으므로(transactions.py:27, 52,
+`TransactionService.add`/`update`/`delete` 셋에 붙어 있으므로(transactions.py:34, 52,
 72) 곧바로 깨집니다.
 
 #### `**{**a, **b}` — 언패킹 일반화와 "뒤가 이긴다"
@@ -585,7 +585,7 @@ budget_app/domain/entities.py:144-150
 
 첫째, **`None` 을 센티널로 쓰고 안에서 만듭니다.**
 
-budget_app/services/transactions.py:27-36
+budget_app/services/transactions.py:34-43
 ```python
     @log_call
     def add(
@@ -602,7 +602,7 @@ budget_app/services/transactions.py:27-36
 여기서 `tags=None` 은 `Transaction.__post_init__` → `validators.parse_tags` 로 흘러가고,
 그 함수의 첫 줄이 `None` 을 빈 리스트로 바꿉니다.
 
-budget_app/domain/validators.py:149-150
+budget_app/domain/validators.py:174-175
 ```python
     if value is None:
         return []
@@ -613,7 +613,7 @@ budget_app/domain/validators.py:149-150
 
 둘째, **불변 기본값을 씁니다.**
 
-budget_app/storage/jsonl.py:264-269
+budget_app/storage/jsonl.py:286-291
 ```python
     def plan_rewrite(
         self,
@@ -623,12 +623,12 @@ budget_app/storage/jsonl.py:264-269
     ) -> RewritePlan:
 ```
 
-같은 형태가 `JsonlStore.rewrite`(jsonl.py:313-318)와
+같은 형태가 `JsonlStore.rewrite`(jsonl.py:335-340)와
 `UnitOfWork.stage`(storage/unit_of_work.py:92-98)에도 있습니다. 빈 튜플 `()` 은
 불변이라 **공유되어도 안전**합니다. 게다가 CPython 은 빈 튜플을 싱글턴으로 캐시하므로
 비용도 0 입니다. 실제로 `extra` 는 읽기만 됩니다.
 
-budget_app/storage/jsonl.py:304-307
+budget_app/storage/jsonl.py:326-329
 ```python
         extra_lines = [self._encode(e) for e in extra]
         if extra_lines:
@@ -759,7 +759,7 @@ LOG_UNHANDLED = "unhandled error"
 
 즉 템플릿과 인자를 **따로** 넘기면, 레벨이 꺼져 있을 때 `LogRecord` 조차 만들어지지
 않고 `%` 연산도 일어나지 않습니다. 이 프로젝트의 로그는 기본이 WARNING 이므로
-(cli/output.py:94-99) **`@log_call` 과 `@measure_time` 의 DEBUG 로그는 평상시 문자열
+(cli/output.py:113-118) **`@log_call` 과 `@measure_time` 의 DEBUG 로그는 평상시 문자열
 포매팅을 단 한 번도 수행하지 않습니다.**
 
 budget_app/decorators.py:40-45
@@ -806,7 +806,7 @@ class C:  __str__ → 'STR',  __repr__ → 'REPR'
 
 **`{:06d}`** — `0` 은 "부호를 인식하는 0 채움", `6` 은 최소 폭, `d` 는 10진 정수입니다.
 
-budget_app/domain/config.py:24-27
+budget_app/domain/config.py:28-31
 ```python
 # 거래 ID — 형식·검증·발굴 세 패턴이 값 객체(tx_id.TransactionId)와 짝을 이룬다
 TX_ID_PATTERN = r"^TX-(\d+)$"
@@ -913,13 +913,13 @@ budget_app/domain/tx_id.py:126-127
 
 **`strip()` — 정규화의 첫 동작.** `validators` 의 모든 파서가 같은 첫 줄로 시작합니다.
 
-budget_app/domain/validators.py:116-120
+budget_app/domain/validators.py:139-143
 ```python
 def parse_category(value: Any) -> str:
     v = str(value or "").strip()
     if not v:
         raise ValidationError(messages.ERR_CATEGORY_EMPTY)
-    return v
+    return _require_utf8(v)
 ```
 
 `str(value or "")` 라는 관용구도 함께 봐야 합니다. `value` 가 `None` 이면 `or` 가 빈
@@ -928,7 +928,7 @@ def parse_category(value: Any) -> str:
 
 **`lower()` — 대소문자 무시가 정책인 자리에만.** 소스 전체에서 두 곳뿐입니다.
 
-budget_app/domain/validators.py:73-77
+budget_app/domain/validators.py:96-100
 ```python
 def parse_type(value: Any) -> str:
     v = str(value or "").strip().lower()
@@ -951,13 +951,13 @@ def _env_debug() -> bool:
 
 **`split()` / `join()` — 태그 한 칸의 왕복.** 둘은 정확히 역연산 관계로 쓰입니다.
 
-budget_app/domain/validators.py:151-152
+budget_app/domain/validators.py:176-177
 ```python
     if isinstance(value, str):
         items: Iterable[Any] = value.split(config.TAG_SEPARATOR)
 ```
 
-budget_app/storage/csv_io.py:157-158
+budget_app/storage/csv_io.py:195-196
 ```python
         "memo": tx.memo,
         "tags": domain_config.TAG_SEPARATOR.join(tx.tags),
@@ -995,7 +995,7 @@ budget_app/cli/prompts.py:104-107
 
 **이 소스에서** — raw 문자열로 쓰인 정규식은 셋입니다. 아래 블록의 `TX_ID_PATTERN` 과 `TX_ID_SCAN_PATTERN`, 그리고 `domain/validators.py:37` 의 `_INTEGER` 입니다. 가운데 낀 `TX_ID_FORMAT` 은 raw 도 정규식도 아닌 `str.format` 용 형식 문자열이라는 점에 주의하세요 — 이름이 비슷해 셋을 셀 때 잘못 짚기 쉽습니다.
 
-budget_app/domain/config.py:25-27
+budget_app/domain/config.py:29-31
 ```python
 TX_ID_PATTERN = r"^TX-(\d+)$"
 TX_ID_FORMAT = "TX-{:06d}"
@@ -1024,7 +1024,7 @@ _SCAN = re.compile(config.TX_ID_SCAN_PATTERN)
 정규식에서 `\d` 는 **유니코드 전체의 십진 숫자**(아라비아-인도 숫자 `١٢٣` 포함)이고
 `[0-9]` 는 ASCII 다섯 문자 범위뿐입니다. 그래서 금액 검증기
 `_INTEGER`(domain/validators.py:36-37)는 의도적으로 `[0-9]` 를 쓰고, 그 판정을
-`parse_amount`(domain/validators.py:64-70)가 `int()` 보다 **먼저** 수행합니다.
+`parse_amount`(domain/validators.py:87-93)가 `int()` 보다 **먼저** 수행합니다.
 3.13.1 에서 그 함수를 직접 호출한 결과만 여기 옮겨 둡니다.
 
 | 입력 | `int()` 단독 | `parse_amount` |
@@ -1639,10 +1639,11 @@ __ge__ _ge_from_lt            functools
 
 **없으면 어떻게 되나** — `TransactionService.stream_sorted` 가 `(date, id)` 튜플로 정렬합니다.
 
-budget_app/services/transactions.py:85-86
+budget_app/services/transactions.py:22-24
 ```python
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
+def _sort_key(tx: Transaction) -> tuple[str, TransactionId]:
+    """최신순 정렬 키 — 날짜가 같으면 발급 번호로 가른다(둘 다 유일 순서를 만든다)."""
+    return (tx.date, tx.id)
 ```
 
 튜플 비교는 앞 원소가 같을 때만 뒤로 내려가므로, **같은 날짜의 거래가 둘 이상일 때** 비로소 `TransactionId` 끼리 비교됩니다. `__lt__` 조차 없으면 그 순간 `TypeError: '<' not supported between instances of 'TransactionId' and 'TransactionId'` 가 납니다 — 날짜가 전부 다른 테스트 데이터에서는 절대 드러나지 않는 잠재 버그입니다.
@@ -1992,7 +1993,7 @@ budget_app/storage/repositories.py:30-31
 직접 써야 했습니다. 즉 `yield` 는 **이터레이터 클래스를 한 줄로 대체하는 문법**입니다.
 
 > **💡 쉽게 말하면** — 도서관 책을 통째로 복사해 가방에 넣어 오는 대신, 열람실에 앉아 한 장씩 넘겨 보는 것입니다. 백만 줄짜리 파일이어도 **읽어 들이는 동안** 손에 들려 있는 것은 늘 한 줄뿐이라, 파일 전체를 문자열로 들고 있는 순간이 없습니다.
-> 다만 이 비유는 되돌아갈 수 없다는 점에서 깨집니다 — 책은 앞 장을 다시 펼 수 있지만, 제너레이터는 한 번 지나간 줄로 돌아가지 못하고 처음부터 다시 만들어야 합니다. 그리고 중간에 **정렬**이 끼면 한 줄씩의 이점이 사라집니다 — 첫 결과가 무엇인지 알려면 마지막 줄까지 봐야 해서, `stream_sorted` 는 조건을 통과한 거래를 한 번 다 모아 둡니다(같은 항목 뒤쪽의 "정렬은 근본적으로 지연될 수 없는 연산입니다" 부분).
+> 다만 이 비유는 되돌아갈 수 없다는 점에서 깨집니다 — 책은 앞 장을 다시 펼 수 있지만, 제너레이터는 한 번 지나간 줄로 돌아가지 못하고 처음부터 다시 만들어야 합니다. 그리고 중간에 **정렬**이 끼면 "첫 줄만 보고 끝낸다"는 이점이 사라집니다 — 첫 결과가 무엇인지 알려면 마지막 줄까지 봐야 하기 때문입니다. 그래도 손에 드는 양은 `limit` 으로 묶을 수 있어서, `stream_sorted` 는 한도가 있으면 상위 N 만 힙에 남기고 한도가 없을 때만 통과분을 다 모아 둡니다(같은 항목 뒤쪽의 "정렬은 근본적으로 지연될 수 없는 연산입니다" 부분).
 
 **무엇으로 풀리나** — 핵심은 "함수 안에 `yield` 가 하나라도 있으면 그 함수는 더 이상
 보통 함수가 아니다"라는 점이고, 이 판정은 **실행 시점이 아니라 컴파일 시점**에 끝납니다.
@@ -2025,7 +2026,7 @@ tx_table            0x1000023 True
 
 **이 소스에서** — 읽기 경로 전체가 제너레이터로 이어져 있습니다.
 
-budget_app/storage/jsonl.py:162-179
+budget_app/storage/jsonl.py:162-182
 ```python
     def iter_raw(self) -> Iterator[RawLine]:
         """모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.
@@ -2044,7 +2045,7 @@ budget_app/storage/jsonl.py:162-179
 여기서 `return` 은 "빈 제너레이터로 끝낸다"는 뜻이지 `None` 을 돌려주는 것이 아닙니다.
 `yield` 가 함수 전체의 의미를 바꿔 놓았기 때문에, 같은 `return` 키워드가 다른 일을 합니다.
 
-budget_app/storage/jsonl.py:193-203
+budget_app/storage/jsonl.py:215-225
 ```python
     def stream(self) -> Iterator[T]:
         """검증을 통과한 도메인 객체만 yield 한다 — 조회 전용 경로.
@@ -2057,13 +2058,17 @@ budget_app/storage/jsonl.py:193-203
                 logger.warning(messages.LOG_CORRUPT_LINE, self.path.name, raw.lineno, raw.error)
 ```
 
-budget_app/cli/presenter.py:42-55
+budget_app/cli/presenter.py:42-59
 ```python
 def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
     """거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.
 
     제너레이터인 이유: 상류(``stream_sorted``)가 제너레이터이므로 여기서 리스트로
-    모으면 스트리밍이 끊긴다. ``limit`` 이 걸리면 그 지점에서 상류 소비도 멈춘다.
+    모으면 스트리밍이 끊긴다.
+
+    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
+    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
+    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
     """
     count = 0
     for tx in rows:
@@ -2105,13 +2110,19 @@ docstring 의 마지막 주장은 실제로 관찰됩니다. `limit=3` 으로 10
 
 **이 소스에서** — CSV 읽기 경로입니다.
 
-budget_app/storage/csv_io.py:72-87
+budget_app/storage/csv_io.py:73-101
 ```python
 def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
     """CSV 를 읽어 ``(줄번호, 원시 dict)`` 를 yield 한다.
 
     헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며
     ``id`` 는 요구하지 않는다.
+
+    ``csv.Error`` 를 ``AppError`` 로 바꾸는 이유: 파서가 던지는 이 예외는 **일반
+    사용자 조작만으로** 닿는다(한 필드가 128KB 를 넘거나, 따옴표가 닫히지 않아 파일
+    끝까지 한 필드로 읽히는 CSV). 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가
+    "예기치 못한 오류"로 표시된다 — 원인도 해결 방법도 알 수 있는 오류인데
+    분류되지 않은 버그처럼 보이는 것은 요구사항 Q2(원인 + 해결 힌트)에 어긋난다.
     """
     path = Path(path)
     if not path.exists():
@@ -2119,10 +2130,17 @@ def read_rows(path: Path) -> Iterator[tuple[int, dict[str, str]]]:
 
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
-        _check_header(path, reader.fieldnames)
-        # ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,
-        # 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
-        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
+        try:
+            # ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.
+            _check_header(path, reader.fieldnames)
+            # 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을
+            # 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
+            for item in enumerate(reader, start=config.CSV_DATA_START_LINE):
+                yield item
+        except csv.Error as exc:
+            raise AppError(
+                messages.ERR_CSV_PARSE.format(error=exc), hint=messages.HINT_CSV_PARSE
+            ) from exc
 ```
 
 여기서 벌어지는 일을 정확히 말하면 이렇습니다. **`with` 블록이 이 함수의 프레임 안에
@@ -2146,7 +2164,7 @@ del gen; gc.collect()   → closed = True   (참조가 사라지면 close() 가 
 
 **없으면 어떻게 되나** — 이 구조가 실제로 걸리는 자리는 원자 모드 가져오기입니다.
 
-budget_app/services/importexport.py:111-120
+budget_app/services/importexport.py:118-127
 ```python
         for lineno, row in csv_io.read_rows(in_path):
             try:
@@ -2178,33 +2196,36 @@ budget_app/services/importexport.py:111-120
 **이 소스에서** — 제너레이터를 쓴다고 항상 메모리가 상수가 되는 것은 아닙니다.
 이 코드가 그 반례를 정직하게 적어 두었습니다.
 
-budget_app/services/transactions.py:79-87
+budget_app/services/transactions.py:104-108
 ```python
-    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
-        """최신순 정렬된 거래를 yield 한다.
-
-        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).
-        그러나 메모리 사용량은 '필터 통과 항목'으로 제한된다.
-        """
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
 **정렬은 근본적으로 지연될 수 없는 연산입니다.** 첫 번째 결과가 무엇인지 알려면
-마지막 원소까지 봐야 하기 때문입니다. 그래서 `yield from items` 앞에서 리스트가
-한 번 완성됩니다. 그럼에도 이 함수가 제너레이터인 것은 무의미하지 않습니다.
+마지막 원소까지 봐야 하기 때문입니다. 그래서 `yield from` 앞에서 전체 스캔이 한 번
+끝납니다. 다만 "훑는 것"과 "모으는 것"은 다르고, 그 둘을 가르는 것이 `limit` 입니다.
 
-- `self.txs.stream()` 이 제너레이터이므로 **파일 전체를 문자열로 들고 있는 순간이
-  없습니다.** 한 줄씩 읽어 객체로 만들고, 필터를 통과한 것만 리스트에 남습니다.
-  `--category 식비` 검색이면 메모리는 "식비 거래 수"에 비례하지 전체 파일 크기가 아닙니다.
+- `limit` 이 있으면(`list --limit N`) `heapq.nlargest` 가 **크기 N 짜리 힙 하나만**
+  유지하며 스트림을 흘려보냅니다. 메모리 상한이 파일 크기가 아니라 **O(N)** 입니다.
+  이전 구현은 통과분 전체를 리스트로 모은 뒤 잘랐기 때문에, `--limit 1` 이어도
+  파일이 통째로 메모리에 올라왔습니다 — 하류의 `break` 는 **이미 만들어진 리스트**를
+  자를 뿐이라 아무것도 아끼지 못했습니다.
+- `limit` 이 없으면(`search`) `sorted` 가 통과분을 모읍니다. 그때도 `self.txs.stream()`
+  이 제너레이터이므로 **파일 전체를 문자열로 들고 있는 순간은 없고**, 리스트에 남는
+  것은 필터를 통과한 것뿐입니다. `--category 식비` 검색이면 메모리는 "식비 거래 수"에
+  비례하지 전체 파일 크기가 아닙니다.
 - 반환 타입이 `Iterator[Transaction]` 로 유지되므로 하류(`tx_table`)의 계약이 깨지지
   않습니다. 나중에 파일이 정렬 저장으로 바뀌면 이 함수 안만 고치면 됩니다.
 - `co_flags` 로 확인해 보면 `stream_sorted` 도 `CO_GENERATOR` 가 켜져 있습니다. 즉
   `TransactionService().stream_sorted()` 를 호출한 시점에는 **파일을 아직 열지도
   않았습니다.** 정렬 비용은 첫 `next()` 때 지불됩니다.
 
-**없으면 어떻게 되나** — `return items` 로 바꾸면 타입이 `list` 가 되어 하류에서
+**없으면 어떻게 되나** — `limit` 인자를 없애고 하류의 `break` 에만 기대면 위의 옛
+동작으로 되돌아갑니다. 반환을 `return items` 로 바꾸면 타입이 `list` 가 되어 하류에서
 `len()` 을 쓰거나 두 번 순회하는 코드가 슬금슬금 생기고, 그 순간 "이 계층은
 스트리밍한다"는 계약이 사라집니다.
 
@@ -2574,17 +2595,17 @@ budget_app/cli/error_handler.py:56-74
 
 - `BrokenPipeError` 는 `OSError` 의 손자이므로 (3) 의 `except OSError` 보다 반드시
   위여야 합니다. 아래로 내리면 파이프 끊김이 "입출력 오류입니다" 메시지와 종료
-  코드 3(`config.EXIT_IO`, error_handler.py:99-103 / config.py:25)으로 끝나고,
+  코드 3(`config.EXIT_IO`, error_handler.py:106-110 / config.py:29)으로 끝나고,
   `list | head` 가 매번 오류를 뿜습니다.
 - `FileNotFoundError`/`IsADirectoryError`/`NotADirectoryError`/`PermissionError` 네
-  개는 전부 `OSError` 의 직계 자식이라 error_handler.py:99 의 `except OSError` 보다
+  개는 전부 `OSError` 의 직계 자식이라 error_handler.py:106 의 `except OSError` 보다
   위여야 합니다. 하나라도 아래로 내려가면 그 절은 죽은 코드가 되고, 사용자는
   "파일을 찾을 수 없습니다" 대신 일반 입출력 메시지를 봅니다.
 - `ValidationError` 는 `ValueError` 의 자식이고 `UnicodeDecodeError` 도 `ValueError`
   의 자손입니다. 두 절이 서로를 가리지 않는 이유는 **둘 다 `ValueError` 자체를
   잡지 않기 때문**입니다. 만약 어느 절이든 `except ValueError` 로 넓히면 다른 쪽이
   즉시 죽습니다.
-- 마지막 error_handler.py:106 의 `except Exception` 은 위 어느 것과도 겹치지 않는
+- 마지막 error_handler.py:113 의 `except Exception` 은 위 어느 것과도 겹치지 않는
   버그만 받아야 하므로 반드시 맨 아래여야 합니다.
 
 **없으면 어떻게 되나** — `except` 순서를 알파벳순이나 "중요한 것 먼저"로 정리하는
@@ -2625,7 +2646,7 @@ raise ... from None           →  __cause__ = None, __suppress_context__ = True
 
 **이 소스에서** — 경계에서 예외를 도메인 어휘로 번역하는 자리마다 붙어 있습니다.
 
-budget_app/domain/validators.py:94-99
+budget_app/domain/validators.py:117-122
 ```python
     v = str(value or "").strip()
     try:
@@ -2639,8 +2660,8 @@ budget_app/domain/validators.py:94-99
 던진 `time data '2024/01/05' does not match format '%Y-%m-%d'` 가 아닙니다. 그러나
 `--debug` 로 스택을 남길 때는 원본이 함께 보존됩니다 — **사용자용 문구와 개발자용
 원인을 동시에 갖는 것**이 `from` 의 요점입니다. 같은 형태가
-`validators.py:112`(`parse_month`), `prompts.py:57`(`EOFError` → `InputAborted`),
-`parser.py:52`(`ValueError` → `ArgumentTypeError`), `importexport.py:120`
+`validators.py:135`(`parse_month`), `prompts.py:57`(`EOFError` → `InputAborted`),
+`parser.py:52`(`ValueError` → `ArgumentTypeError`), `importexport.py:127`
 (`ValidationError` → `AppError`)에 있습니다.
 
 **없으면 어떻게 되나** — `from exc` 를 빼도 `__context__` 덕분에 원인이 완전히
@@ -2680,8 +2701,8 @@ budget_app/cli/app.py:84-94
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:
@@ -2788,7 +2809,7 @@ budget_app/storage/jsonl.py:37-40
 _LINE_ERRORS = (json.JSONDecodeError, ValidationError, KeyError, TypeError)
 ```
 
-budget_app/storage/jsonl.py:181-191
+budget_app/storage/jsonl.py:201-213
 ```python
     def _parse_line(self, lineno: int, line: str) -> RawLine:
         try:
@@ -2851,7 +2872,7 @@ GeneratorExit     → except Exception 을 통과
 
 **이 소스에서** — 이 성질 때문에 `handle_errors` 의 구조가 성립합니다.
 
-budget_app/cli/error_handler.py:105-109
+budget_app/cli/error_handler.py:112-116
 ```python
         # ---------- (4) 최후 방어선 — 분류 밖의 버그 ----------
         except Exception as exc:  # noqa: BLE001 — 어떤 예외도 트레이스백으로 끝내지 않기 위함
@@ -2946,7 +2967,7 @@ budget_app/storage/unit_of_work.py:169-181
 을 돌려주므로 `UnitOfWork` 는 **예외를 절대 삼키지 않습니다.** 블록 안에서 예외가
 나면 `.tmp` 를 지우고 나서 그 예외를 그대로 올려 보냅니다. 사용처는 이렇습니다.
 
-budget_app/services/importexport.py:201-208
+budget_app/services/importexport.py:254-261
 ```python
         fresh_categories = [Category(name=n) for n in batch.new_categories]
         # 파일을 저장소 밖(UoW)에서 쓰므로 id 워터마크는 여기서 명시적으로 알린다.
@@ -2993,8 +3014,8 @@ _IOBase → object` 입니다. **`__enter__`/`__exit__` 는 `_IOBase` 에 정의
 ```
 
 **이 소스에서** — 파일을 여는 모든 자리가 `with` 입니다: `jsonl.py:61`(`.tmp` 쓰기),
-`jsonl.py:174`(읽기), `jsonl.py:234`(이어 쓰기), `jsonl.py:258`(꼬리 1바이트 확인),
-`csv_io.py:82`(CSV 읽기), `csv_io.py:142`(CSV 쓰기). 예외가 있는 자리가 하나도
+`jsonl.py:177`(읽기), `jsonl.py:256`(이어 쓰기), `jsonl.py:280`(꼬리 1바이트 확인),
+`csv_io.py:89`(CSV 읽기), `csv_io.py:170`(CSV 쓰기). 예외가 있는 자리가 하나도
 없다는 것 자체가 규칙입니다.
 
 budget_app/storage/jsonl.py:61-72
@@ -3154,7 +3175,7 @@ budget_app/domain/entities.py:60-66
     tags: tuple[str, ...] = ()
 ```
 
-budget_app/storage/csv_io.py:47-53
+budget_app/storage/csv_io.py:48-54
 ```python
     tx_id: TransactionId | None
     type: str
@@ -3266,7 +3287,7 @@ class JsonlStore(Generic[T]):
 있는 `entity_cls: type` 이 이 설계의 핵심을 드러냅니다 — 런타임에 실제로 쓰이는
 "어떤 엔티티인가" 정보는 `T` 가 아니라 **평범한 클래스 속성 `entity_cls`** 입니다.
 `_parse_line` 이 `self.entity_cls.from_dict(data)` 를 호출하는 것이 그 증거입니다
-(jsonl.py:187). `T` 가 하는 일은 `stream()` 의 반환 타입을 `Iterator[Transaction]` 으로
+(jsonl.py:209). `T` 가 하는 일은 `stream()` 의 반환 타입을 `Iterator[Transaction]` 으로
 좁히고, `append`/`append_all`/`plan_rewrite`/`rewrite` 의 인자 타입을 엔티티별로
 좁혀 주는 것뿐입니다 — 런타임 효과는 없습니다.
 
@@ -3352,7 +3373,7 @@ storage/unit_of_work.py), `Generic`/`TypeVar`(jsonl.py, prompts.py) 뿐이고,
 
 **타입 자리가 아닌 진짜 용도도 있습니다.**
 
-budget_app/domain/validators.py:149-156
+budget_app/domain/validators.py:174-181
 ```python
     if value is None:
         return []
@@ -3380,7 +3401,7 @@ TypeError: isinstance() argument 2 cannot be a parameterized generic
 
 **없으면 어떻게 되나** — `typing.Iterable` 로 바꿔도 지금은 동작합니다. 다만
 비권장 경로이고, `pyupgrade` 계열 규칙(이 프로젝트 Ruff 설정의 `UP`)이 자동으로
-`collections.abc` 로 되돌리라고 지적합니다. 그리고 `validators.py:153` 의
+`collections.abc` 로 되돌리라고 지적합니다. 그리고 `validators.py:178` 의
 `isinstance` 자리에서는 의미가 더 분명합니다 — 그 자리는 처음부터 "타입 힌트"가
 아니라 **런타임 프로토콜 검사**이므로 `collections.abc` 가 원래 있어야 할 자리입니다.
 
@@ -3430,7 +3451,7 @@ scanstring = c_scanstring or py_scanstring
 
 **이 소스에서**
 
-budget_app/storage/jsonl.py:181-191
+budget_app/storage/jsonl.py:201-213
 ```python
     def _parse_line(self, lineno: int, line: str) -> RawLine:
         try:
@@ -3561,7 +3582,7 @@ json.dumps({'a':1,'b':2}, indent=2)  → '{\n  "a": 1,\n  "b": 2\n}'
 
 **이 소스에서**
 
-budget_app/storage/jsonl.py:207-208
+budget_app/storage/jsonl.py:229-230
 ```python
     def _encode(self, entity: T) -> str:
         return json.dumps(entity.to_dict(), ensure_ascii=False)
@@ -3571,7 +3592,7 @@ budget_app/storage/jsonl.py:207-208
 
 이 함수가 만든 문자열은 `plan_rewrite` 에서 **원문과 직접 비교**됩니다.
 
-budget_app/storage/jsonl.py:298-302
+budget_app/storage/jsonl.py:320-324
 ```python
             encoded = self._encode(new_entity)
             if encoded != raw.text:
@@ -3637,19 +3658,26 @@ class DictReader:
 
 **이 소스에서**
 
-budget_app/storage/csv_io.py:82-87
+budget_app/storage/csv_io.py:89-101
 ```python
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
-        _check_header(path, reader.fieldnames)
-        # ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,
-        # 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
-        yield from enumerate(reader, start=config.CSV_DATA_START_LINE)
+        try:
+            # ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.
+            _check_header(path, reader.fieldnames)
+            # 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을
+            # 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).
+            for item in enumerate(reader, start=config.CSV_DATA_START_LINE):
+                yield item
+        except csv.Error as exc:
+            raise AppError(
+                messages.ERR_CSV_PARSE.format(error=exc), hint=messages.HINT_CSV_PARSE
+            ) from exc
 ```
 
-`_check_header(path, reader.fieldnames)` 이 **바로 그 지연 시점을 이용합니다.** 이 한 줄이 (1) 헤더 행을 소비하고 (2) 검증하고 (3) 그 결과를 캐시하는 세 가지를 한꺼번에 합니다. 다음 줄의 `enumerate(reader, ...)` 는 이미 헤더가 소비된 상태에서 시작하므로 데이터 행부터 나옵니다.
+`_check_header(path, reader.fieldnames)` 이 **바로 그 지연 시점을 이용합니다.** 이 한 줄이 (1) 헤더 행을 소비하고 (2) 검증하고 (3) 그 결과를 캐시하는 세 가지를 한꺼번에 합니다. 다음 줄의 `enumerate(reader, ...)` 는 이미 헤더가 소비된 상태에서 시작하므로 데이터 행부터 나옵니다. **그 조회가 `try` 안에 들어 있는 것도 같은 이유입니다** — 헤더 행을 읽는 그 순간에 이미 `csv.Error` 가 날 수 있기 때문입니다.
 
-budget_app/storage/csv_io.py:90-94
+budget_app/storage/csv_io.py:104-108
 ```python
 def _check_header(path: Path, fieldnames: Iterable[str] | None) -> None:
     names = list(fieldnames or [])
@@ -3662,7 +3690,7 @@ def _check_header(path: Path, fieldnames: Iterable[str] | None) -> None:
 
 짧은 행이 `restval=None` 으로 채워진다는 사실도 이 소스의 오류 메시지에 영향을 줍니다.
 
-budget_app/storage/csv_io.py:113-123
+budget_app/storage/csv_io.py:127-137
 ```python
     raw_id = (row.get(config.CSV_ID_COLUMN) or "").strip()
     return ParsedRow(
@@ -3736,21 +3764,25 @@ writerow({'a':1,'b':2,'c':3,'z':9})→ ValueError: dict contains fields not in f
 
 **이 소스에서**
 
-budget_app/storage/csv_io.py:139-148
+budget_app/storage/csv_io.py:165-178
 ```python
     fieldnames = list(config.CSV_FIELDS if include_id else config.CSV_FIELDS_WITHOUT_ID)
 
+    tmp = path.with_name(path.name + config.TMP_SUFFIX)
     count = 0
-    with open(path, "w", encoding=config.CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for tx in txs:
-            writer.writerow(_to_row(tx, include_id))
-            count += 1
-    return count
+    try:
+        with open(tmp, "w", encoding=config.CSV_ENCODING, newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for tx in txs:
+                writer.writerow(_to_row(tx, include_id))
+                count += 1
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
 ```
 
-budget_app/storage/csv_io.py:151-163
+budget_app/storage/csv_io.py:189-201
 ```python
 def _to_row(tx: Transaction, include_id: bool) -> dict[str, object]:
     row: dict[str, object] = {
@@ -3810,16 +3842,16 @@ newline=None 로 읽으면  ['line1\nline2',  'plain']   ← \r\n 이 \n 으로 
 
 **이 소스에서** — CSV 는 읽기·쓰기 양쪽 모두 `newline=""` 입니다.
 
-budget_app/storage/csv_io.py:82-83
+budget_app/storage/csv_io.py:89-90
 ```python
     with open(path, encoding=config.CSV_READ_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
 ```
 
-budget_app/storage/csv_io.py:142-143
+budget_app/storage/csv_io.py:170-171
 ```python
-    with open(path, "w", encoding=config.CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        with open(tmp, "w", encoding=config.CSV_ENCODING, newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
 ```
 
 **JSONL 은 다릅니다** — 쓰기에서 `newline="\n"` 을 씁니다.
@@ -3855,7 +3887,7 @@ newline=None  로 'a\nb\n' 쓰기 → b'a\r\nb\r\n'    ← Windows
 - CSV 의 `newline=""` 은 "**csv 모듈이 시킨 것**"입니다. 이 자리에 다른 값을 넣으면 안 됩니다.
 - JSONL 의 `newline="\n"` 은 "**이 파일의 줄 종결자는 `\n` 이다**"라는 이 프로그램 자신의 포맷 선언이고, 그래서 상수 `LINE_TERMINATOR` 를 참조합니다. 같은 상수가 `f.write(line + config.LINE_TERMINATOR)` 와 `_has_torn_tail()` 의 마지막 바이트 비교에도 쓰입니다.
 
-budget_app/storage/jsonl.py:258-260
+budget_app/storage/jsonl.py:280-282
 ```python
             with open(self.path, "rb") as f:
                 f.seek(-1, os.SEEK_END)
@@ -3911,7 +3943,7 @@ CSV_READ_ENCODING = "utf-8-sig"
 - **읽기 = `utf-8-sig`** → 엑셀이 저장한 CSV(BOM 있음)와 이 프로그램이 내보낸 CSV(BOM 없음)를 **둘 다** 받습니다. `utf-8-sig` 는 BOM 이 없어도 잘 읽히므로, 관용 범위가 순수하게 넓어지기만 합니다.
 - **쓰기 = `utf-8`** → BOM 을 붙이지 않습니다. 그 이유가 `write_transactions` 의 docstring 에 적혀 있습니다.
 
-budget_app/storage/csv_io.py:134-136
+budget_app/storage/csv_io.py:148-150
 ```python
     인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.
     반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은
@@ -4006,7 +4038,7 @@ _INTEGER = re.compile(r"^[+-]?[0-9]+$")
 
 패턴 문자열 자체는 도메인 설정에 있습니다.
 
-budget_app/domain/config.py:24-27
+budget_app/domain/config.py:28-31
 ```python
 # 거래 ID — 형식·검증·발굴 세 패턴이 값 객체(tx_id.TransactionId)와 짝을 이룬다
 TX_ID_PATTERN = r"^TX-(\d+)$"
@@ -4033,13 +4065,16 @@ budget_app/domain/tx_id.py:91-95
         return self.number < other.number
 ```
 
-budget_app/services/transactions.py:85-86
+budget_app/services/transactions.py:104-108
 ```python
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
-`sort` 가 날짜가 같은 두 거래를 만나면 튜플 비교가 `t.id` 로 내려가고 → `__lt__` → `number` → `_EXACT.match` 입니다. **정렬 비교 한 번에 정규식 매칭이 두 번**이고, n 개를 정렬하면 O(n log n) 번 불립니다. 모듈 함수 `re.match(...)` 를 썼다면 그 자리마다 튜플 해시와 dict 조회가 얹혔을 것입니다.
+`sorted`(또는 `heapq.nlargest`)가 날짜가 같은 두 거래를 만나면 튜플 비교가 `tx.id` 로 내려가고 → `__lt__` → `number` → `_EXACT.match` 입니다. **정렬 비교 한 번에 정규식 매칭이 두 번**이고, n 개를 정렬하면 O(n log n) 번 불립니다. 모듈 함수 `re.match(...)` 를 썼다면 그 자리마다 튜플 해시와 dict 조회가 얹혔을 것입니다.
 
 **없으면 어떻게 되나** — 기능은 똑같이 동작합니다. `re` 의 캐시가 있으니 재컴파일도 일어나지 않습니다. 잃는 것은 두 가지입니다. 첫째는 위의 정렬 경로 성능이고, 둘째가 더 중요한데 — **패턴 문자열이 코드 여기저기에 흩어집니다.** 지금은 `_EXACT`, `_SCAN` 이라는 이름 하나로 "무엇을 검사하는 패턴인가"가 드러나고, 실제 문자열은 `domain/config.py` 한 곳에만 있습니다. ID 형식을 바꿀 때 고칠 자리가 한 줄이라는 것이 이 값 객체의 설계 목표였습니다.
 
@@ -4140,7 +4175,7 @@ _INTEGER = re.compile(r"^[+-]?[0-9]+$")
 
 `parse_amount` 의 docstring 이 `int()` 를 검증기로 쓰지 않는 이유를 표로 정리해 두었는데, 그중 두 행이 위에서 실측한 내용입니다(`'1_000'` → `int()` 가 `1000` 으로 읽습니다 — **PEP 515**(숫자 리터럴의 밑줄 구분자)가 들어오면서 문자열을 받는 `int()` 도 같이 관대해졌습니다. 3.13.1 실측: `int('1_000') == 1000`, `int('1_0_0') == 100`. 도입 버전은 로컬에서 확인할 수 없어 적지 않습니다).
 
-budget_app/domain/validators.py:64-70
+budget_app/domain/validators.py:87-93
 ```python
     text = str(value).strip()
     if not _INTEGER.match(text):
@@ -4207,7 +4242,7 @@ datetime.strptime('٢٠٢٤-01-05', '%Y-%m-%d')  →  datetime(2024, 1, 5)
 
 **이 소스에서** — 이 관대함이 `parse_date` 설계의 직접적 원인입니다.
 
-budget_app/domain/validators.py:94-99
+budget_app/domain/validators.py:117-122
 ```python
     v = str(value or "").strip()
     try:
@@ -4219,7 +4254,7 @@ budget_app/domain/validators.py:94-99
 
 마지막 줄이 전부입니다. **검증만 하고 원문을 돌려주지 않고, `strftime` 으로 되찍어 정규형을 강제합니다.** `strptime` → `datetime` → `strftime` 왕복을 거치면 표기의 자유도가 사라집니다. docstring 이 그 이유를 정확히 짚습니다.
 
-budget_app/domain/validators.py:83-88
+budget_app/domain/validators.py:106-111
 ```python
     ``strptime`` 은 검증기이지 정규화기가 아니다 — ``"2024-1-5"`` 를 오류 없이
     받아 준다. 검증만 하고 원문을 돌려주면 같은 날이 파일에 두 표기로 공존하고,
@@ -4235,7 +4270,7 @@ budget_app/domain/specs.py:178-179 근처의 `DateFrom`/`DateTo`, `month_range` 
 
 `parse_month` 도 같은 구조이고, 거기서는 결과가 더 직접적입니다.
 
-budget_app/domain/validators.py:108-113
+budget_app/domain/validators.py:131-136
 ```python
     v = str(value or "").strip()
     try:
@@ -4268,7 +4303,7 @@ Windows (CPython 3.13.1) 에서:
 
 **이 소스에서** — 이 프로젝트가 쓰는 지시자는 셋뿐이고 전부 표준 집합 안에 있습니다.
 
-budget_app/domain/config.py:20-22
+budget_app/domain/config.py:24-26
 ```python
 # 날짜/월 형식
 DATE_FORMAT = "%Y-%m-%d"
@@ -4645,7 +4680,7 @@ if len(root.handlers) == 0:
 
 **이 소스에서** — 설정 지점은 이 한 곳뿐입니다.
 
-budget_app/cli/output.py:93-100
+budget_app/cli/output.py:111-119
 ```python
     enabled = bool(debug) or _env_debug()
     logging.basicConfig(
@@ -4682,7 +4717,7 @@ corrupt line 3
 handlers: [] | effective: WARNING
 ```
 
-`warning` 은 나오지만 `debug` 는 **어디에도 남지 않습니다.** 두 겹으로 막히기 때문입니다 — 로거의 유효 레벨이 WARNING 이라 `isEnabledFor(DEBUG)` 에서 걸리고, 설령 통과했더라도 `lastResort` 의 레벨이 WARNING 이라 또 걸립니다. `output.py:82-85` 의 docstring 이 "이 호출이 없으면 `handle_errors` 의 의도가 성립하지 않는다"고 적은 것이 이 사실을 가리킵니다.
+`warning` 은 나오지만 `debug` 는 **어디에도 남지 않습니다.** 두 겹으로 막히기 때문입니다 — 로거의 유효 레벨이 WARNING 이라 `isEnabledFor(DEBUG)` 에서 걸리고, 설령 통과했더라도 `lastResort` 의 레벨이 WARNING 이라 또 걸립니다. `output.py:97-100` 의 docstring 이 "이 호출이 없으면 `handle_errors` 의 정책이 성립하지 않는다"고 적은 것이 이 사실을 가리킵니다.
 
 ---
 
@@ -4703,17 +4738,19 @@ def exception(self, msg, *args, exc_info=True, **kwargs):
 
 `exc_info=True` 가 실제로 하는 일은 `_log` 안에서 `sys.exc_info()` 를 호출해 `(type, value, traceback)` 삼중항을 `LogRecord.exc_info` 에 싣는 것이고, 문자열로 바꾸는 것은 역시 `Formatter.format` 이 `formatException` 을 부를 때입니다(여기서도 지연됩니다). 그래서 **`except` 블록 안에서 불러야 합니다** — 밖에서 부르면 `sys.exc_info()` 가 잡을 예외가 없습니다.
 
-**이 소스에서** — `handle_errors` 의 마지막 `except Exception` 절, 즉 최후 방어선입니다.
+**이 소스에서** — `handle_errors` 의 마지막 `except Exception` 절, 즉 최후 방어선입니다. 여기서는 **편의 메서드를 쓰지 않습니다.**
 
-budget_app/cli/error_handler.py:118-119
+budget_app/cli/error_handler.py:125-126
 ```python
-            logger.exception(messages.LOG_UNHANDLED)
+            logger.error(messages.LOG_UNHANDLED, exc_info=output.debug_enabled())
             return config.EXIT_ERROR
 ```
 
-`LOG_UNHANDLED` 는 `cli/messages.py:18` 의 `"unhandled error"` 한 줄이고, 트레이스백은 메시지가 아니라 `exc_info` 로 붙습니다. `error_handler.py:110-113` 의 주석이 "이전에는 DEBUG 였고 기본 레벨이 WARNING 이라 스택트레이스가 아무 데도 남지 않았다"고 적은 그 자리입니다 — ERROR 로 올린 지금은 `setup_logging(debug=False)` 의 WARNING 레벨도 통과합니다.
+이유가 바로 위 (2)·(3)입니다. `logger.exception` 은 `exc_info` 를 **참으로 고정**하고, ERROR 레코드는 기본 로그 레벨(WARNING)을 그대로 통과하므로 `--debug` 없이도 트레이스백이 화면에 뿌려집니다. 그런데 바로 앞줄에서 출력하는 힌트는 "`--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다"라고 안내합니다 — 안내와 동작이 정반대였습니다. `exc_info` 자리에 `output.debug_enabled()` 를 넣으면 **레벨은 ERROR 로 유지한 채 트레이스백만 스위치**가 됩니다.
 
-**없으면 어떻게 되나** — `logger.error(messages.LOG_UNHANDLED)` 로만 쓰면 로그에 `[ERROR] unhandled error` 한 줄만 남습니다. 분류되지 않은 버그에서 **어느 줄에서 터졌는지가 유일한 단서**인데 그것이 사라집니다.
+`LOG_UNHANDLED` 는 `cli/messages.py:18` 의 `"unhandled error"` 한 줄이고, 트레이스백은 메시지가 아니라 `exc_info` 로 붙습니다. `error_handler.py:117-124` 의 주석이 그 변경 이유를 직접 적어 둔 자리입니다.
+
+**없으면 어떻게 되나** — `exc_info` 를 빼고 `logger.error(messages.LOG_UNHANDLED)` 로만 쓰면 `--debug` 를 켜도 로그에 `[ERROR] unhandled error` 한 줄뿐입니다. 분류되지 않은 버그에서 **어느 줄에서 터졌는지가 유일한 단서**인데 그것을 되살릴 방법이 사라집니다. 반대로 `logger.exception` 으로 되돌리면 스위치가 없어져 기본 실행 화면에 트레이스백이 다시 나옵니다.
 
 ---
 
@@ -4747,8 +4784,8 @@ budget_app/cli/app.py:84-90
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
 ```
@@ -4928,7 +4965,7 @@ budget_app/cli/parser.py:110-111
     p.set_defaults(handler="add")
 ```
 
-budget_app/cli/parser.py:242-243
+budget_app/cli/parser.py:251-252
 ```python
     # 백업은 기존 폴더를 읽기만 한다 — 없으면 만들지 말고 오류로 알려야 한다.
     p.set_defaults(handler="backup", needs_storage=False)
@@ -4954,7 +4991,7 @@ budget_app/cli/app.py:78-81
     return HANDLERS[args.handler](ctx, args)
 ```
 
-둘째는 **최상위에서 켜고 말단에서 끄는 플래그**입니다. `parser.py:91` 이 `needs_storage=True` 를 최상위 `_defaults` 에 넣고, `parser.py:243` 이 `backup` 서브파서에서만 `False` 로 덮습니다. 여기서는 SUPPRESS 와 반대 방향으로 `vars(subnamespace)` 복사를 **이용합니다** — 하위 파서의 `_defaults` 가 상위 값을 덮는 성질이 이 경우에는 정확히 원하는 동작입니다.
+둘째는 **최상위에서 켜고 말단에서 끄는 플래그**입니다. `parser.py:91` 이 `needs_storage=True` 를 최상위 `_defaults` 에 넣고, `parser.py:252` 이 `backup` 서브파서에서만 `False` 로 덮습니다. 여기서는 SUPPRESS 와 반대 방향으로 `vars(subnamespace)` 복사를 **이용합니다** — 하위 파서의 `_defaults` 가 상위 값을 덮는 성질이 이 경우에는 정확히 원하는 동작입니다.
 
 셋째는 `parser.py:214` 의 `p.set_defaults(handler="export", include_id=True)` 로, `action="store_false"` 옵션의 기본값을 뒤에서 정하는 용법입니다(다음 항목).
 
@@ -5042,7 +5079,7 @@ budget_app/cli/parser.py:208-214
 
 읽는 순서는 이렇습니다. 사용자가 보는 이름은 **부정형** `--no-id` 이고, 코드가 보는 이름은 **긍정형** `args.include_id` 입니다. `store_false` 가 그 뒤집기를 담당하고, `set_defaults(include_id=True)` 가 "주지 않았으면 포함"을 정합니다(`store_false` 의 기본 `default=True` 와 같은 값이지만, 명시해 두면 `parser.py:214` 한 줄만 읽어도 기본이 무엇인지 압니다).
 
-budget_app/cli/handlers.py:155-155
+budget_app/cli/handlers.py:159-159
 ```python
     count = ctx.io_service.export_csv(Path(args.out), flt, include_id=args.include_id)
 ```
@@ -5091,8 +5128,8 @@ budget_app/cli/app.py:84-94
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:
@@ -5127,7 +5164,7 @@ $ python -m budget_app nosuch > /dev/null 2>&1; echo $?
 2
 ```
 
-**없으면 어떻게 되나** — `SystemExit` 이 `Exception` 의 자식이었다면 `error_handler.py:106` 의 `except Exception as exc:` 가 그것을 잡아 "예기치 못한 오류" 메시지 + 종료 코드 1 로 바꿔 버렸을 것입니다. 즉 `--help` 조차 "예기치 못한 오류"로 끝났을 것입니다. 예외 계층에서 `BaseException` 을 분리해 둔 결정이 이 소스의 오류 정책을 **아무 코드도 쓰지 않고** 지켜 주고 있습니다.
+**없으면 어떻게 되나** — `SystemExit` 이 `Exception` 의 자식이었다면 `error_handler.py:113` 의 `except Exception as exc:` 가 그것을 잡아 "예기치 못한 오류" 메시지 + 종료 코드 1 로 바꿔 버렸을 것입니다. 즉 `--help` 조차 "예기치 못한 오류"로 끝났을 것입니다. 예외 계층에서 `BaseException` 을 분리해 둔 결정이 이 소스의 오류 정책을 **아무 코드도 쓰지 않고** 지켜 주고 있습니다.
 
 ---
 
@@ -5402,7 +5439,7 @@ def log_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
 나머지 네 파일은 전부 `domain` 쪽이고, 용도가 하나로 모입니다 — **검증 전의 입력**입니다.
 
-budget_app/domain/validators.py:40-40
+budget_app/domain/validators.py:63-63
 ```python
 def parse_amount(value: Any) -> int:
 ```
@@ -5482,7 +5519,7 @@ False
 
 `BUDGET_APP_DEBUG=yes`, `=on`, `=true`, `=아무거나` 가 모두 참이 됩니다. 디버그 스위치에는 이쪽이 맞습니다 — 사용자가 뭔가 값을 넣었다는 것 자체가 "켜고 싶다"는 뜻이고, `BUDGET_APP_DEBUG=y` 를 조용히 무시하는 것보다 낫습니다.
 
-이 값이 쓰이는 곳은 `output.py:93` 한 줄입니다: `enabled = bool(debug) or _env_debug()`. `--debug` **또는** 환경변수, 즉 둘 중 하나면 켜집니다.
+이 값이 쓰이는 곳은 `output.py:111` 한 줄입니다: `enabled = bool(debug) or _env_debug()`. `--debug` **또는** 환경변수, 즉 둘 중 하나면 켜집니다.
 
 **없으면 어떻게 되나** — 환경변수 경로가 없다면 `--debug` 를 붙일 수 없는 상황에서 디버그 로그를 켤 방법이 사라집니다. 그런 상황이 실제로 있습니다 — CI 스크립트가 명령줄을 고정으로 조립하는 경우, 또는 `handle_errors` 가 잡아 버려 재현이 어려운 오류를 사용자에게 "환경변수 하나만 세팅하고 다시 실행해 달라"고 부탁하는 경우입니다.
 
@@ -5620,7 +5657,7 @@ budget_app/storage/jsonl.py:59-72
 | `f.flush()` 까지 (페이지 캐시) | 살아남는다 | **잃을 수 있다** |
 | `os.fsync()` 까지 (디스크) | 살아남는다 | 살아남는다 |
 
-**이 소스에서** — 원자적 쓰기 경로(`stage_lines`, jsonl.py:70-71)와 이어 쓰기 경로(`_append_lines`, jsonl.py:246-247)가 **둘 다** `flush` + `fsync` 를 합니다. 후자의 docstring 이 그 이유를 "내구성 비대칭"이라고 부릅니다 — 같은 프로그램의 두 쓰기 경로가 서로 다른 내구성을 약속할 이유가 없다는 것입니다.
+**이 소스에서** — 원자적 쓰기 경로(`stage_lines`, jsonl.py:70-71)와 이어 쓰기 경로(`_append_lines`, jsonl.py:268-269)가 **둘 다** `flush` + `fsync` 를 합니다. 후자의 docstring 이 그 이유를 "내구성 비대칭"이라고 부릅니다 — 같은 프로그램의 두 쓰기 경로가 서로 다른 내구성을 약속할 이유가 없다는 것입니다.
 
 **없으면 어떻게 되나** — `stage_lines` 의 docstring 이 정확히 적어 두었습니다. `os.replace` 가 보장하는 것은 "이름이 가리키는 대상이 순간적으로 바뀐다"이지 "내용이 디스크에 도달했다"가 아닙니다. fsync 없이 전원이 끊기면 **새 이름이 내용 없는(또는 절반만 찬) 파일을 가리킬 수** 있습니다. 원자성은 지켜졌는데 데이터는 사라진, 최악의 조합입니다.
 
@@ -5756,20 +5793,20 @@ LINE_TERMINATOR = "\n"
 TMP_SUFFIX = ".tmp"
 ```
 
-`stage_lines`(jsonl.py:66)와 `_append_lines`(jsonl.py:239)가 둘 다 `newline=config.LINE_TERMINATOR` 로 엽니다.
+`stage_lines`(jsonl.py:66)와 `_append_lines`(jsonl.py:261)가 둘 다 `newline=config.LINE_TERMINATOR` 로 엽니다.
 
 **없으면 어떻게 되나** — Windows 에서 `newline=` 을 빼면 코드가 쓴 `"\n"` 이 전부 `"\r\n"` 이 됩니다. 결과가 두 갈래로 번집니다.
 
 - **JSONL 파일이 플랫폼마다 달라집니다.** 리눅스에서 만든 데이터 폴더와 Windows 에서 만든 데이터 폴더의 바이트가 달라지고, 같은 내용인데 파일 해시가 다릅니다.
 - **`_has_torn_tail` 이 무너집니다.** 그 함수는 마지막 바이트를 `config.LINE_TERMINATOR.encode(...)` 즉 `b"\n"` 과 비교하는데, 파일 끝이 `\r\n` 이면 마지막 바이트는 여전히 `b"\n"` 이라 우연히 통과합니다. 반대로 `newline="\r"` 같은 설정이었다면 매번 "찢어진 꼬리"로 오판해 빈 줄을 계속 추가했을 것입니다. **쓰기 정책과 검사 기준이 같은 상수를 보고 있어야** 이 검사가 성립합니다.
 
-> **CSV 는 정반대로 `newline=""` 입니다** — `csv` 모듈이 줄 끝을 **직접** 쓰므로, 텍스트 층이 또 변환하면 `\r` 이 두 번 들어갑니다. 이 소스는 읽기(csv_io.py:82)와 쓰기(csv_io.py:142) 양쪽 모두 `newline=""` 로 열어 그 요구를 지킵니다. 오염된 바이트열 실측과 "여러 줄 메모가 조용히 바뀐다"는 결과는 §2-A 의 「`open(..., newline="")`」 항목에 있습니다.
+> **CSV 는 정반대로 `newline=""` 입니다** — `csv` 모듈이 줄 끝을 **직접** 쓰므로, 텍스트 층이 또 변환하면 `\r` 이 두 번 들어갑니다. 이 소스는 읽기(csv_io.py:89)와 쓰기(csv_io.py:170) 양쪽 모두 `newline=""` 로 열어 그 요구를 지킵니다. 오염된 바이트열 실측과 "여러 줄 메모가 조용히 바뀐다"는 결과는 §2-A 의 「`open(..., newline="")`」 항목에 있습니다.
 
 ### 읽기 쪽의 비대칭 — `iter_raw` 는 왜 `newline=` 을 지정하지 않아도 안전한가
 
 **이 소스에서** — 쓰기는 `newline` 을 못 박는데 읽기는 지정하지 않습니다.
 
-budget_app/storage/jsonl.py:172-179
+budget_app/storage/jsonl.py:175-182
 ```python
         if not self.path.exists():
             return
@@ -5812,7 +5849,7 @@ roundtrip ok  : True                        ← 원래 바이트가 정확히 �
 
 `0xff` → `\udcff`, `0x80` → `\udc80`. 규칙이 눈에 그대로 보입니다.
 
-**이 소스에서** — `FILE_ERRORS = "surrogateescape"`(storage/config.py:25)가 **읽기와 쓰기 양쪽에** 넘어갑니다 — `iter_raw`(jsonl.py:174), `stage_lines`(jsonl.py:65), `_append_lines`(jsonl.py:238). 양쪽이 같아야 왕복이 성립하므로, 이 상수가 한 곳에 있다는 사실 자체가 방어입니다.
+**이 소스에서** — `FILE_ERRORS = "surrogateescape"`(storage/config.py:25)가 **읽기와 쓰기 양쪽에** 넘어갑니다 — `iter_raw`(jsonl.py:177), `stage_lines`(jsonl.py:65), `_append_lines`(jsonl.py:260). 양쪽이 같아야 왕복이 성립하므로, 이 상수가 한 곳에 있다는 사실 자체가 방어입니다.
 
 `iter_raw` 의 docstring 이 이것을 "약속의 구멍을 메운 것"이라고 설명합니다 — JSON 이 깨진 줄은 `RawLine` 으로 격리해 원문 보존하면서, 바이트가 깨진 줄만 격리하지 못하는 것은 같은 정책의 예외였다는 것입니다.
 
@@ -5841,7 +5878,7 @@ binary last byte    -> b'\n'    ← 바이너리에서는 문제없다
 
 **이 소스에서** —
 
-budget_app/storage/jsonl.py:249-262
+budget_app/storage/jsonl.py:271-284
 ```python
     def _has_torn_tail(self) -> bool:
         """마지막 바이트가 개행이 아닌가 — 바이트로 직접 확인한다.
@@ -5893,7 +5930,7 @@ file after append+write -> b'abc\nX'    ← 쓰기는 끝에 붙었다
 
 **이 소스에서** — `_append_lines` 가 이어 쓰기 전에 개행을 먼저 씁니다.
 
-budget_app/storage/jsonl.py:232-247
+budget_app/storage/jsonl.py:254-269
 ```python
         self.path.parent.mkdir(parents=True, exist_ok=True)
         needs_newline = self._has_torn_tail()
@@ -6035,7 +6072,7 @@ OSError: [Errno 22] Invalid argument       ← 사용자는 잘못한 것이 없
 (stderr 출력 0바이트)
 ```
 
-**Windows 에서의 정직한 단서** — 위 트레이스백을 보면 예외가 `BrokenPipeError` 가 아니라 `OSError [Errno 22] Invalid argument`(EINVAL)입니다. Windows 에는 `SIGPIPE` 자체가 없고(3.13 확인: `hasattr(signal, 'SIGPIPE')` 는 `False`), 닫힌 파이프에 쓸 때 나는 오류가 `EPIPE` 로 매핑되지 않는 경우가 있습니다. 그러면 `main` 의 `except BrokenPipeError` 에 걸리지 않고 `handle_errors` 의 마지막 `except OSError`(error_handler.py:99-103)에 걸려 **"[오류] 입출력 문제" 메시지와 종료 코드 3** 으로 끝납니다. 유닉스에서는 조용히 0 으로 끝나는 같은 명령이 Windows 에서는 오류로 보이는 것 — 이 소스가 아직 다루지 않는 플랫폼 차이입니다.
+**Windows 에서의 정직한 단서** — 위 트레이스백을 보면 예외가 `BrokenPipeError` 가 아니라 `OSError [Errno 22] Invalid argument`(EINVAL)입니다. Windows 에는 `SIGPIPE` 자체가 없고(3.13 확인: `hasattr(signal, 'SIGPIPE')` 는 `False`), 닫힌 파이프에 쓸 때 나는 오류가 `EPIPE` 로 매핑되지 않는 경우가 있습니다. 그러면 `main` 의 `except BrokenPipeError` 에 걸리지 않고 `handle_errors` 의 마지막 `except OSError`(error_handler.py:106-110)에 걸려 **"[오류] 입출력 문제" 메시지와 종료 코드 3** 으로 끝납니다. 유닉스에서는 조용히 0 으로 끝나는 같은 명령이 Windows 에서는 오류로 보이는 것 — 이 소스가 아직 다루지 않는 플랫폼 차이입니다.
 
 ### `os.open(os.devnull, os.O_WRONLY)` — 저수준 fd 와 `open()` 의 차이
 
@@ -6140,11 +6177,11 @@ budget_app/storage/jsonl.py:150-158
         return not self.path.exists() or self.path.stat().st_size == 0
 ```
 
-`if not self.path.exists()` 로 감싼 것이 중요합니다. `touch()` 는 기존 파일의 **내용**은 지키지만 **mtime 은 바꿉니다.** 조회만 하는 명령이 데이터 파일의 수정 시각을 바꾸면 백업 도구와 파일 감시가 헛돕니다 — `rewrite()` 가 "바뀐 것이 없으면 파일을 건드리지 않는다"(jsonl.py:326-327)로 지키려는 것과 같은 원칙입니다.
+`if not self.path.exists()` 로 감싼 것이 중요합니다. `touch()` 는 기존 파일의 **내용**은 지키지만 **mtime 은 바꿉니다.** 조회만 하는 명령이 데이터 파일의 수정 시각을 바꾸면 백업 도구와 파일 감시가 헛돕니다 — `rewrite()` 가 "바뀐 것이 없으면 파일을 건드리지 않는다"(jsonl.py:348-349)로 지키려는 것과 같은 원칙입니다.
 
 `is_empty` 는 파일을 **열지 않고** 크기만 봅니다. `CategoryStore.seed_defaults` 가 "빈 파일이면 기본 카테고리를 심는다"를 판정할 때 쓰는데, 여기서 파일을 읽어 줄 수를 세면 손상된 줄에서 예외가 날 수 있고 무엇보다 불필요합니다. `st_size` 는 이미 디렉터리 엔트리에 있는 메타데이터라 내용 읽기가 없습니다.
 
-`_has_torn_tail` 도 같은 판정을 다른 목적으로 씁니다(jsonl.py:256) — 빈 파일에서 `seek(-1, SEEK_END)` 가 `OSError` 로 죽는 것을 미리 막는 가드입니다.
+`_has_torn_tail` 도 같은 판정을 다른 목적으로 씁니다(jsonl.py:278) — 빈 파일에서 `seek(-1, SEEK_END)` 가 `OSError` 로 죽는 것을 미리 막는 가드입니다.
 
 **없으면 어떻게 되나** — `st_size` 대신 `path.read_text()` 로 빈 파일을 판정했다면, 카테고리 파일에 손상 바이트가 섞이는 순간 **프로그램 부팅(`AppContext.prepare`)이 통째로 실패**합니다. 데이터 한 줄이 깨졌다고 프로그램이 시작조차 못 하는 것은 이 소스가 저장소 계층 전체에서 피하려는 실패 방식입니다.
 
@@ -6173,7 +6210,7 @@ budget_app/storage/jsonl.py:150-158
 | `cli/__init__.py` | 재수출 한 줄과 `__all__` 의 실제 효력 범위 | §1-A |
 | `cli/app.py` | 상대 임포트와 `import as`, `from __future__ import annotations`, `X \| None`·`dict[str, Handler]` 타입 별칭, `parse_args`, argparse 의 `SystemExit(2)`, `os.dup2`/`os.devnull`, `BrokenPipeError`, `sys.exit` | §1-A, §1-C, §2-B, §3 |
 | `cli/config.py` | `EXIT_*` 종료 코드 상수, `frozenset` 을 상수로 쓰는 이유, 환경변수 이름 | §1-A, §2-B, §3 |
-| `cli/error_handler.py` | 데코레이터와 `wraps`, `except` 체인의 순서 규칙, 인자 없는 `raise`, `BaseException` vs `Exception`, `logger.exception`, `exc.filename or exc` | §1-C, §2-B |
+| `cli/error_handler.py` | 데코레이터와 `wraps`, `except` 체인의 순서 규칙, 인자 없는 `raise`, `BaseException` vs `Exception`, `logger.error(..., exc_info=...)`, `exc.filename or exc` | §1-C, §2-B |
 | `cli/handlers.py` | 문자열 키 디스패치의 소비 지점, `store_false`+`dest` 로 뒤집힌 플래그를 읽는 자리 | §2-B |
 | `cli/messages.py` | `str.format` 템플릿을 상수로 두는 이유, 포맷 스펙 미니 언어(`{:<7}`), `%`-스타일 로그 포맷 | §1-A, §2-B |
 | `cli/output.py` | `logging.basicConfig(force=True)`, `lastResort` 핸들러, `os.environ` 과 `.strip().lower()`, stdout/stderr 버퍼링과 `flush` 순서 | §1-A, §2-B, §3 |

@@ -75,7 +75,7 @@
 <ol>
 <li><strong>횡단 관심사(cross-cutting concern)</strong> 란 무엇이고 왜 데코레이터로 분리하는가</li>
 <li>데코레이터 셋이 <strong>두 파일로 나뉜 이유</strong> — 관측 vs 표현</li>
-<li><code>@handle_errors</code> 의 except 체인 11단과 <strong>순서가 곧 정책</strong>인 이유</li>
+<li><code>@handle_errors</code> 의 except 체인 12단과 <strong>순서가 곧 정책</strong>인 이유</li>
 <li>예외 하나가 발생해서 셸 종료 코드가 되기까지의 전체 경로</li>
 </ol>
 <hr>
@@ -90,8 +90,8 @@
 </blockquote>
 <p>이런 처리를 각 함수 본문에 넣으면 이렇게 됩니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — 횡단 관심사가 본문에 섞인 코드</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date</span><span class="p">,</span> <span class="n">type_</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">memo</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;call add&quot;</span><span class="p">)</span>                 <span class="c1"># ← 관심사 1</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date</span><span class="p">,</span> <span class="n">type_</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="p">,</span> <span class="n">memo</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"call add"</span><span class="p">)</span>                 <span class="c1"># ← 관심사 1</span>
     <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>              <span class="c1"># ← 관심사 2</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">cats</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">category</span><span class="p">):</span>   <span class="c1"># ← 진짜 로직</span>
@@ -100,10 +100,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tx</span><span class="p">)</span>                  <span class="c1">#</span>
         <span class="k">return</span> <span class="n">tx</span>                            <span class="c1">#</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>                   <span class="c1"># ← 관심사 3</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[오류] </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>                  <span class="c1">#</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[오류] </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>                  <span class="c1">#</span>
         <span class="k">return</span> <span class="mi">1</span>                             <span class="c1">#</span>
     <span class="k">finally</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;took </span><span class="si">%.2f</span><span class="s2">ms&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>     <span class="c1"># ← 관심사 2</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"took </span><span class="si">%.2f</span><span class="s2">ms"</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>     <span class="c1"># ← 관심사 2</span>
 </code></pre></div>
 
 <p>진짜 로직 5줄이 부대 처리 8줄에 묻힙니다. 그리고 이 8줄이 <strong>모든 함수에 복사</strong>됩니다. 데코레이터로 분리하면 본문은 로직만 남습니다.</p>
@@ -121,7 +121,7 @@
 <tr>
 <td><code>@log_call</code></td>
 <td>decorators.py:37-47</td>
-<td><code>TransactionService.add</code>(transactions.py:27) / <code>update</code>(52) / <code>delete</code>(72)</td>
+<td><code>TransactionService.add</code>(transactions.py:34) / <code>update</code>(52) / <code>delete</code>(72)</td>
 <td>호출/반환 DEBUG 로그</td>
 </tr>
 <tr>
@@ -132,14 +132,14 @@
 </tr>
 <tr>
 <td><code>@handle_errors</code></td>
-<td><strong>cli/error_handler.py:20-121</strong></td>
+<td><strong>cli/error_handler.py:20-128</strong></td>
 <td><strong><code>cli/app.py:61</code> 의 <code>_dispatch</code> 단 한 곳</strong></td>
 <td>예외 → 메시지 + 종료 코드</td>
 </tr>
 </tbody>
 </table></div>
 <p>적용 현황을 소스에서 확인하려면:</p>
-<div class="codehilite"><pre><span></span><code>grep<span class="w"> </span>-rn<span class="w"> </span><span class="s2">&quot;@log_call\|@measure_time\|@handle_errors&quot;</span><span class="w"> </span>budget_app/
+<div class="codehilite"><pre><span></span><code>grep<span class="w"> </span>-rn<span class="w"> </span><span class="s2">"@log_call\|@measure_time\|@handle_errors"</span><span class="w"> </span>budget_app/
 </code></pre></div>
 
 <p><strong><code>@handle_errors</code> 가 한 곳뿐인 것이 중요합니다.</strong> 이전에는 CLI 핸들러 13개에 각각 붙어 있었지만, 지금은 <code>_dispatch</code> 하나에만 붙습니다. 이유는 §5 와 <code>cli/app.py:63-77</code> 의 docstring 에 있습니다 — 컨텍스트 조립(<code>AppContext(...)</code>, <code>prepare()</code>)이 데코레이터 <strong>밖</strong>에 있으면 <code>--data-dir</code> 오타 하나로 원시 트레이스백이 새어 나갔기 때문입니다. 방패는 파일을 여는 코드까지 감싸야 방패입니다.</p>
@@ -182,7 +182,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 </code></pre></div>
 
 <p>budget_app/decorators.py:1-16</p>
-<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;횡단 관심사 데코레이터 — 관측(로그/실행시간)만 담당한다.</span>
+<div class="codehilite"><pre><span></span><code><span class="sd">"""횡단 관심사 데코레이터 — 관측(로그/실행시간)만 담당한다.</span>
 
 <span class="sd">## 왜 ``handle_errors`` 가 여기 없나</span>
 
@@ -195,9 +195,9 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <span class="sd">그래서 ``handle_errors`` 는 ``error_handler.py`` (CLI 계층)로 옮겼다. 지금 이 모듈이</span>
 <span class="sd">아는 것은 ``logging`` 과 문자열 템플릿뿐이고, 어느 계층에서 써도 아래로만 의존한다.</span>
 
-<span class="sd">남은 둘은 진짜 횡단 관심사다. &quot;무엇을 계산하는가&quot;와 무관하게 &quot;언제 불렸고 얼마나</span>
-<span class="sd">걸렸는가&quot;를 기록하는 일이라, 함수 본문에 섞이면 본래 로직을 가린다.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">남은 둘은 진짜 횡단 관심사다. "무엇을 계산하는가"와 무관하게 "언제 불렸고 얼마나</span>
+<span class="sd">걸렸는가"를 기록하는 일이라, 함수 본문에 섞이면 본래 로직을 가린다.</span>
+<span class="sd">"""</span>
 </code></pre></div>
 
 <p><strong>과제 방어 포인트</strong>: "데코레이터로 분리한 공통 기능이 무엇이며 왜 분리가 필요했나?"에는 두 층으로 답하세요.</p>
@@ -210,7 +210,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <p>함수가 언제 불렸고 언제 끝났는지를 기록으로 남기는 데코레이터입니다. 본래 하던 일에는 손대지 않고, 그 앞뒤에 로그 한 줄씩만 더합니다. 열한 줄짜리 짧은 코드지만 파이썬 관용구가 셋이나 들어 있어, 하나씩 뜯어볼 값어치가 있습니다.</p>
 <p>budget_app/decorators.py:37-47</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_call</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;함수 호출/반환을 DEBUG 로그로 남긴다.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""함수 호출/반환을 DEBUG 로그로 남긴다."""</span>
 
     <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -244,9 +244,9 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <p>로컬 CPython 3.13.1 에서 직접 확인한 값입니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">functools</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">functools</span><span class="o">.</span><span class="n">WRAPPER_ASSIGNMENTS</span>
-<span class="p">(</span><span class="s1">&#39;__module__&#39;</span><span class="p">,</span> <span class="s1">&#39;__name__&#39;</span><span class="p">,</span> <span class="s1">&#39;__qualname__&#39;</span><span class="p">,</span> <span class="s1">&#39;__doc__&#39;</span><span class="p">,</span> <span class="s1">&#39;__annotations__&#39;</span><span class="p">,</span> <span class="s1">&#39;__type_params__&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="s1">'__module__'</span><span class="p">,</span> <span class="s1">'__name__'</span><span class="p">,</span> <span class="s1">'__qualname__'</span><span class="p">,</span> <span class="s1">'__doc__'</span><span class="p">,</span> <span class="s1">'__annotations__'</span><span class="p">,</span> <span class="s1">'__type_params__'</span><span class="p">)</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">functools</span><span class="o">.</span><span class="n">WRAPPER_UPDATES</span>
-<span class="p">(</span><span class="s1">&#39;__dict__&#39;</span><span class="p">,)</span>
+<span class="p">(</span><span class="s1">'__dict__'</span><span class="p">,)</span>
 </code></pre></div>
 
 <p><code>__type_params__</code> 는 제네릭 타입 파라미터 문법이 생기면서 나중에 추가된 항목이라, 프로젝트 하한인 3.10 에서는 앞의 다섯 개만 있습니다. 어느 쪽이든 <strong><code>__name__</code> 이 복사된다</strong>는 점이 핵심입니다.</p>
@@ -254,7 +254,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">from</span><span class="w"> </span><span class="nn">budget_app.services.transactions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransactionService</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">d</span> <span class="o">=</span> <span class="n">TransactionService</span><span class="o">.</span><span class="n">delete</span>       <span class="c1"># @log_call 이 붙은 wrapper</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">d</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="vm">__qualname__</span>
-<span class="p">(</span><span class="s1">&#39;delete&#39;</span><span class="p">,</span> <span class="s1">&#39;TransactionService.delete&#39;</span><span class="p">)</span>
+<span class="p">(</span><span class="s1">'delete'</span><span class="p">,</span> <span class="s1">'TransactionService.delete'</span><span class="p">)</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">d</span><span class="o">.</span><span class="n">__wrapped__</span>                        <span class="c1"># wraps 가 남겨 준 원본</span>
 <span class="o">&lt;</span><span class="n">function</span> <span class="n">TransactionService</span><span class="o">.</span><span class="n">delete</span> <span class="n">at</span> <span class="mi">0</span><span class="n">x</span><span class="o">...&gt;</span>
 </code></pre></div>
@@ -266,7 +266,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 살아 있습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">d</span><span class="o">.</span><span class="vm">__code__</span><span class="o">.</span><span class="n">co_freevars</span>                       <span class="c1"># 자유변수 목록</span>
-<span class="p">(</span><span class="s1">&#39;func&#39;</span><span class="p">,)</span>
+<span class="p">(</span><span class="s1">'func'</span><span class="p">,)</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">cell_contents</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="vm">__closure__</span><span class="p">]</span>     <span class="c1"># 셀 안에 붙잡힌 실제 객체</span>
 <span class="p">[</span><span class="o">&lt;</span><span class="n">function</span> <span class="n">TransactionService</span><span class="o">.</span><span class="n">delete</span> <span class="n">at</span> <span class="mi">0</span><span class="n">x</span><span class="o">...&gt;</span><span class="p">]</span>
 </code></pre></div>
@@ -287,7 +287,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 </blockquote>
 <p><strong>"call" 과 "done" 이 짝인 이유</strong>는 예외 감지입니다. <code>add</code> 가 중간에 예외를 던지면 <code>call add</code> 만 찍히고 <code>done add</code> 는 안 찍힙니다. 로그만 보고도 "어디서 끊겼는지"를 알 수 있습니다.</p>
 <p>실제 동작:</p>
-<div class="codehilite"><pre><span></span><code>$<span class="w"> </span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;2024-01-15\nexpense\nfood\n15000\n\n\n&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>add<span class="w"> </span>--debug
+<div class="codehilite"><pre><span></span><code>$<span class="w"> </span><span class="nb">printf</span><span class="w"> </span><span class="s1">'2024-01-15\nexpense\nfood\n15000\n\n\n'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>add<span class="w"> </span>--debug
 <span class="o">[</span>DEBUG<span class="o">]</span><span class="w"> </span><span class="m">2026</span>-08-06<span class="w"> </span><span class="m">10</span>:30:00<span class="w"> </span>budget_app:42<span class="w"> </span>call<span class="w"> </span>add
 <span class="o">[</span>DEBUG<span class="o">]</span><span class="w"> </span><span class="m">2026</span>-08-06<span class="w"> </span><span class="m">10</span>:30:00<span class="w"> </span>budget_app:44<span class="w"> </span><span class="k">done</span><span class="w"> </span>add
 <span class="o">[</span>저장<span class="w"> </span>완료<span class="o">]</span><span class="w"> </span><span class="nv">id</span><span class="o">=</span>TX-000001
@@ -300,11 +300,11 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <p>함수가 몇 밀리초 걸렸는지를 재서 로그로 남기는 데코레이터입니다. 여기서 눈여겨볼 것은 두 가지입니다. 하나는 <strong>중간에 실패해도 시간이 찍힌다</strong>는 점이고, 다른 하나는 시간을 재는 데 쓰는 시계를 <strong>일부러 골랐다</strong>는 점입니다.</p>
 <p>budget_app/decorators.py:50-66</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">measure_time</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;함수 실행 시간을 DEBUG 로그로 남긴다.</span>
+<span class="w">    </span><span class="sd">"""함수 실행 시간을 DEBUG 로그로 남긴다.</span>
 
-<span class="sd">    ``try/finally`` 인 이유: 예외로 빠져나가는 경로에서도 시간이 찍혀야 &quot;느려서</span>
-<span class="sd">    타임아웃이 났다&quot;와 &quot;즉시 터졌다&quot;를 구분할 수 있다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    ``try/finally`` 인 이유: 예외로 빠져나가는 경로에서도 시간이 찍혀야 "느려서</span>
+<span class="sd">    타임아웃이 났다"와 "즉시 터졌다"를 구분할 수 있다.</span>
+<span class="sd">    """</span>
 
     <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -348,10 +348,10 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 이 성질을 실행 시점에 알려 줍니다. → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">get_clock_info</span><span class="p">(</span><span class="s2">&quot;perf_counter&quot;</span><span class="p">)</span>   <span class="c1"># Windows / CPython 3.13.1</span>
-<span class="n">namespace</span><span class="p">(</span><span class="n">implementation</span><span class="o">=</span><span class="s1">&#39;QueryPerformanceCounter()&#39;</span><span class="p">,</span> <span class="n">monotonic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">adjustable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">get_clock_info</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">)</span>
-<span class="n">namespace</span><span class="p">(</span><span class="n">implementation</span><span class="o">=</span><span class="s1">&#39;GetSystemTimePreciseAsFileTime()&#39;</span><span class="p">,</span> <span class="n">monotonic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">adjustable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">get_clock_info</span><span class="p">(</span><span class="s2">"perf_counter"</span><span class="p">)</span>   <span class="c1"># Windows / CPython 3.13.1</span>
+<span class="n">namespace</span><span class="p">(</span><span class="n">implementation</span><span class="o">=</span><span class="s1">'QueryPerformanceCounter()'</span><span class="p">,</span> <span class="n">monotonic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">adjustable</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">time</span><span class="o">.</span><span class="n">get_clock_info</span><span class="p">(</span><span class="s2">"time"</span><span class="p">)</span>
+<span class="n">namespace</span><span class="p">(</span><span class="n">implementation</span><span class="o">=</span><span class="s1">'GetSystemTimePreciseAsFileTime()'</span><span class="p">,</span> <span class="n">monotonic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">adjustable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">)</span>
 </code></pre></div>
 
 <p><code>monotonic=True</code>/<code>adjustable=False</code> 가 곧 "뒤로 가지 않고 관리자가 바꿀 수도 없다"는 보장입니다. 리눅스에서는 <code>implementation</code> 이 <code>clock_gettime(CLOCK_MONOTONIC)</code> 으로 바뀌지만 두 플래그의 값은 같습니다.</p>
@@ -374,16 +374,16 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 <h3 id="51-시그니처와-반환값-규약">5.1 시그니처와 반환값 규약</h3>
 <p>budget_app/cli/error_handler.py:20-21 / 45-54</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_errors</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;CLI 핸들러 공용 — 예외를 잡아 [오류]/[힌트] 를 **stderr** 로 내보내고 종료 코드를 반환한다.</span>
+<span class="w">    </span><span class="sd">"""CLI 핸들러 공용 — 예외를 잡아 [오류]/[힌트] 를 **stderr** 로 내보내고 종료 코드를 반환한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="c1"># `func(...) or EXIT_OK` 로 쓰면 0/&quot;&quot;/[]/False 같은 falsy 반환값까지</span>
-            <span class="c1"># 전부 EXIT_OK 로 바뀐다. 규약은 &quot;None 이면 EXIT_OK&quot; 이므로 None 만</span>
+            <span class="c1"># `func(...) or EXIT_OK` 로 쓰면 0/""/[]/False 같은 falsy 반환값까지</span>
+            <span class="c1"># 전부 EXIT_OK 로 바뀐다. 규약은 "None 이면 EXIT_OK" 이므로 None 만</span>
             <span class="c1"># 정확히 검사한다 (EXIT_OK 가 0 이 아니게 되어도 의미가 흔들리지 않는다).</span>
             <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_OK</span> <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">result</span>
 </code></pre></div>
@@ -407,22 +407,22 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 없습니다. <code>== None</code> 은 상대 객체의 <code>__eq__</code> 를 부르므로 그 보장이 없습니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
-<h3 id="52-except-체인-네-부류로-묶인-11단">5.2 except 체인 — 네 부류로 묶인 11단</h3>
+<h3 id="52-except-체인-네-부류로-묶인-12단">5.2 except 체인 — 네 부류로 묶인 12단</h3>
 <p><code>handle_errors</code> 의 docstring 이 순서 정책을 스스로 설명합니다.</p>
 <p>budget_app/cli/error_handler.py:23-42</p>
 <div class="codehilite"><pre><span></span><code>    <span class="n">여기서</span> <span class="n">잡는</span> <span class="n">예외는</span> <span class="n">성격이</span> <span class="n">네</span> <span class="n">부류로</span> <span class="n">갈리고</span><span class="p">,</span> <span class="k">except</span> <span class="n">절도</span> <span class="n">그</span> <span class="n">순서대로</span> <span class="n">묶여</span> <span class="n">있다</span><span class="o">.</span>
-    <span class="n">파이썬은</span> <span class="s1">&#39;먼저 일치하는 절&#39;</span><span class="n">을</span> <span class="n">실행하므로</span> <span class="k">except</span> <span class="n">순서가</span> <span class="n">곧</span> <span class="n">정책이고</span><span class="p">,</span> <span class="n">그래서</span>
-    <span class="n">같은</span> <span class="n">부류끼리</span> <span class="n">붙여</span> <span class="n">두어야</span> <span class="s2">&quot;왜 이 순서인가&quot;</span><span class="n">가</span> <span class="n">코드에서</span> <span class="n">읽힌다</span><span class="o">.</span>
+    <span class="n">파이썬은</span> <span class="s1">'먼저 일치하는 절'</span><span class="n">을</span> <span class="n">실행하므로</span> <span class="k">except</span> <span class="n">순서가</span> <span class="n">곧</span> <span class="n">정책이고</span><span class="p">,</span> <span class="n">그래서</span>
+    <span class="n">같은</span> <span class="n">부류끼리</span> <span class="n">붙여</span> <span class="n">두어야</span> <span class="s2">"왜 이 순서인가"</span><span class="n">가</span> <span class="n">코드에서</span> <span class="n">읽힌다</span><span class="o">.</span>
 
-    <span class="mf">1.</span> <span class="o">**</span><span class="n">종료</span> <span class="n">신호</span><span class="o">**</span> <span class="err">—</span> <span class="n">오류가</span> <span class="n">아니다</span><span class="o">.</span> <span class="n">사용자나</span> <span class="n">하류</span> <span class="n">프로세스가</span> <span class="s2">&quot;그만&quot;</span><span class="n">이라고</span> <span class="n">알린</span> <span class="n">것</span><span class="o">.</span>
+    <span class="mf">1.</span> <span class="o">**</span><span class="n">종료</span> <span class="n">신호</span><span class="o">**</span> <span class="err">—</span> <span class="n">오류가</span> <span class="n">아니다</span><span class="o">.</span> <span class="n">사용자나</span> <span class="n">하류</span> <span class="n">프로세스가</span> <span class="s2">"그만"</span><span class="n">이라고</span> <span class="n">알린</span> <span class="n">것</span><span class="o">.</span>
        <span class="err">``</span><span class="ne">BrokenPipeError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">KeyboardInterrupt</span><span class="err">``</span>
     <span class="mf">2.</span> <span class="o">**</span><span class="n">입력</span> <span class="n">오류</span><span class="o">**</span> <span class="err">—</span> <span class="n">사용자가</span> <span class="n">값을</span> <span class="n">고치면</span> <span class="n">해결된다</span><span class="o">.</span>
        <span class="err">``</span><span class="n">ValidationError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="n">AppError</span><span class="err">``</span>
     <span class="mf">3.</span> <span class="o">**</span><span class="n">환경</span> <span class="n">상태</span><span class="o">**</span> <span class="err">—</span> <span class="n">프로그램</span> <span class="n">밖</span><span class="p">(</span><span class="n">파일·권한·디스크·인코딩</span><span class="p">)</span><span class="n">의</span> <span class="n">상태</span> <span class="n">문제</span><span class="o">.</span>
        <span class="err">``</span><span class="ne">FileNotFoundError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">IsADirectoryError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">NotADirectoryError</span><span class="err">``</span> <span class="o">/</span>
-       <span class="err">``</span><span class="ne">PermissionError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">UnicodeDecodeError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">OSError</span><span class="err">``</span>
+       <span class="err">``</span><span class="ne">PermissionError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">UnicodeDecodeError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">UnicodeEncodeError</span><span class="err">``</span> <span class="o">/</span> <span class="err">``</span><span class="ne">OSError</span><span class="err">``</span>
     <span class="mf">4.</span> <span class="o">**</span><span class="n">최후</span> <span class="n">방어선</span><span class="o">**</span> <span class="err">—</span> <span class="n">위</span> <span class="n">어디에도</span> <span class="n">속하지</span> <span class="n">않는</span> <span class="n">버그</span><span class="o">.</span>
-       <span class="err">``</span><span class="ne">Exception</span><span class="err">``</span> <span class="err">—</span> <span class="n">사용자에겐</span> <span class="n">스택트레이스를</span> <span class="n">감추고</span> <span class="n">로그에만</span> <span class="n">남긴다</span><span class="o">.</span>
+       <span class="err">``</span><span class="ne">Exception</span><span class="err">``</span> <span class="err">—</span> <span class="n">사용자에겐</span> <span class="n">스택트레이스를</span> <span class="n">감추고</span><span class="p">,</span> <span class="err">``</span><span class="o">--</span><span class="n">debug</span><span class="err">``</span> <span class="n">일</span> <span class="n">때만</span> <span class="n">로그에</span> <span class="n">남긴다</span><span class="o">.</span>
 
     <span class="n">부류를</span> <span class="n">나눠도</span> <span class="n">지켜야</span> <span class="n">하는</span> <span class="n">상속</span> <span class="n">제약이</span> <span class="n">둘</span> <span class="n">있고</span><span class="p">,</span> <span class="n">지금</span> <span class="n">순서가</span> <span class="n">둘</span> <span class="n">다</span> <span class="n">만족한다</span><span class="p">:</span>
 
@@ -517,9 +517,9 @@ to re-raise</code> 가 납니다. → <a href="12-syntax-and-stdlib.html">12 §1
 <p>왜 여기서 처리하지 않는가 — <code>list | head</code>(가운데 <code>|</code> 는 앞 명령의 출력을 뒤 명령의 입력으로 잇는 파이프입니다)에서 <code>head</code> 가 먼저 닫히면 stdout 이 깨진 상태입니다. 이 상황에서 <code>output.err(...)</code> 를 부르면 <code>err()</code> 안의 <code>sys.stdout.flush()</code> 가 또 <code>BrokenPipeError</code> 를 냅니다(그래서 <code>output.err</code> 도 그 예외를 삼키도록 되어 있습니다 — cli/output.py:60-65). 근본 해결은 <strong>stdout 을 통째로 블랙홀로 갈아끼우는 것</strong>이고, 그 일은 <code>main()</code> 이 합니다.</p>
 <p>budget_app/cli/app.py:50-58</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
-<span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 &#39;Exception ignored&#39; 출력을 막는다</span>
-<span class="sd">    (파이썬 공식 권장 레시피).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
+<span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다</span>
+<span class="sd">    (파이썬 공식 권장 레시피)."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">devnull</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">O_WRONLY</span><span class="p">)</span>
         <span class="n">os</span><span class="o">.</span><span class="n">dup2</span><span class="p">(</span><span class="n">devnull</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">fileno</span><span class="p">())</span>
@@ -585,7 +585,7 @@ C 레벨 신호 핸들러가 플래그만 세우고 즉시 돌아옵니다. 인�
 <div class="codehilite"><pre><span></span><code>        <span class="c1"># ---------- (3) 환경 상태 — 파일/권한/인코딩/디스크 ----------</span>
 </code></pre></div>
 
-<p>이 부류에는 절이 여섯 개 있습니다 — <code>FileNotFoundError</code> / <code>IsADirectoryError</code> / <code>NotADirectoryError</code> / <code>PermissionError</code> / <code>UnicodeDecodeError</code> / <code>OSError</code>. 앞의 넷은 전부 <code>OSError</code> 의 자식이라 <strong>마지막 <code>OSError</code> 보다 위에 있어야</strong> 합니다. 이것이 상속 제약입니다.</p>
+<p>이 부류에는 절이 일곱 개 있습니다 — <code>FileNotFoundError</code> / <code>IsADirectoryError</code> / <code>NotADirectoryError</code> / <code>PermissionError</code> / <code>UnicodeDecodeError</code> / <code>UnicodeEncodeError</code> / <code>OSError</code>. 앞의 넷은 전부 <code>OSError</code> 의 자식이라 <strong>마지막 <code>OSError</code> 보다 위에 있어야</strong> 합니다. 이것이 상속 제약입니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처 — <code>FileNotFoundError</code> 라는 이름 자체</strong> — 예전에는 이런 구분이
 없어서 <code>except IOError as e:</code> 로 잡은 다음 <code>if e.errno == errno.ENOENT:</code> 로 직접
 갈라야 했습니다(<code>errno</code> 는 운영체제가 실패 원인을 숫자로 알려 주는 값입니다).
@@ -607,9 +607,9 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong><code>UnicodeDecodeError</code> 는 왜 여기 있나.</strong> 이것은 <code>ValueError</code> 의 자손이지만, "사용자가 값을 고치면 되는 문제"가 아니라 <strong>파일 자체의 상태 문제</strong>입니다. 그래서 부류 3 에 넣고 전용 종료 코드(6)를 줍니다. 힌트도 구체적입니다.</p>
-<p>budget_app/cli/messages.py:115-116</p>
-<div class="codehilite"><pre><span></span><code><span class="n">MSG_ERR_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다).&quot;</span>
-<span class="n">HINT_ENCODING</span> <span class="o">=</span> <span class="s2">&quot;[힌트] CSV 를 UTF-8 로 다시 저장하세요 (엑셀: &#39;다른 이름으로 저장 &gt; CSV UTF-8&#39;).&quot;</span>
+<p>budget_app/cli/messages.py:116-117</p>
+<div class="codehilite"><pre><span></span><code><span class="n">MSG_ERR_ENCODING</span> <span class="o">=</span> <span class="s2">"[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다)."</span>
+<span class="n">HINT_ENCODING</span> <span class="o">=</span> <span class="s2">"[힌트] CSV 를 UTF-8 로 다시 저장하세요 (엑셀: '다른 이름으로 저장 &gt; CSV UTF-8')."</span>
 </code></pre></div>
 
 <p>한국 사용자의 CSV 가 CP949 로 저장되는 일이 흔하다는 현실을 반영한 안내입니다.</p>
@@ -620,16 +620,24 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 정확히 들고 있습니다.
 → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
-<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\xc7\xd1</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>          <span class="c1"># CP949 로 저장된 &quot;한&quot; 의 바이트</span>
+<div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="sa">b</span><span class="s2">"</span><span class="se">\xc7\xd1</span><span class="s2">"</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>          <span class="c1"># CP949 로 저장된 "한" 의 바이트</span>
 <span class="n">Traceback</span> <span class="p">(</span><span class="n">most</span> <span class="n">recent</span> <span class="n">call</span> <span class="n">last</span><span class="p">):</span>
   <span class="o">...</span>
-<span class="ne">UnicodeDecodeError</span><span class="p">:</span> <span class="s1">&#39;utf-8&#39;</span> <span class="n">codec</span> <span class="n">can</span><span class="s1">&#39;t decode byte 0xc7 in position 0: invalid continuation byte</span>
+<span class="ne">UnicodeDecodeError</span><span class="p">:</span> <span class="s1">'utf-8'</span> <span class="n">codec</span> <span class="n">can</span><span class="s1">'t decode byte 0xc7 in position 0: invalid continuation byte</span>
 </code></pre></div>
 
 <p><code>exc.encoding</code>(<code>'utf-8'</code>) / <code>exc.object</code>(문제의 바이트열) / <code>exc.start</code>·<code>exc.end</code>(위치) / <code>exc.reason</code>(사유)이 전부 채워져 있습니다. 이 코드가 그 값들을 화면에 노출하지 않는 이유는 <strong>사용자가 할 일이 "UTF-8 로 다시 저장"뿐</strong>이기 때문입니다 — 바이트 오프셋을 알려 줘도 행동이 달라지지 않습니다.</p>
+<p><strong><code>UnicodeEncodeError</code> 는 그 짝입니다.</strong> 읽기(decode)가 아니라 <strong>쓰기(encode)</strong> 가 실패한 경우로, UTF-8 로 표현할 수 없는 문자가 데이터에 남아 있으면 <code>export</code> 나 백업이 여기로 옵니다. 같은 부류·같은 종료 코드(6)를 쓰되 문구만 쓰기 쪽으로 바꿉니다 — 분류해 두지 않으면 부류 4 로 떨어져 "예기치 못한 오류"가 됩니다.</p>
+<p>budget_app/cli/messages.py:118-121</p>
+<div class="codehilite"><pre><span></span><code><span class="n">MSG_ERR_ENCODING_WRITE</span> <span class="o">=</span> <span class="s2">"[오류] UTF-8 로 저장할 수 없는 문자가 있습니다 (손상된 바이트가 섞였습니다)."</span>
+<span class="n">HINT_ENCODING_WRITE</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"[힌트] 해당 값을 UTF-8 로 다시 입력해 주세요 (터미널·입력 파일 인코딩을 UTF-8 로 맞추세요)."</span>
+<span class="p">)</span>
+</code></pre></div>
+
 <p><strong><code>OSError</code> 포괄 절</strong>은 디스크 가득 참(ENOSPC), 파일 잠금 같은 나머지를 받습니다. 원자적 쓰기(임시 파일에 다 쓴 뒤 이름만 갈아 끼워, <strong>대상 파일 하나가 반쯤 쓰인 모습으로는 보이지 않게</strong> 하는 저장 방식 — 여기까지가 이 방식이 지켜 주는 범위이고, 남는 한계는 <a href="07-repository.html">07 문서</a>에 있습니다) 중 디스크가 차면 여기로 옵니다 — 그리고 임시 파일에 쓰던 중이므로 <strong>원본은 무사합니다</strong>.</p>
 <h3 id="56-부류-4-최후-방어선">5.6 부류 4 — 최후 방어선</h3>
-<p>budget_app/cli/error_handler.py:105-109</p>
+<p>budget_app/cli/error_handler.py:112-116</p>
 <div class="codehilite"><pre><span></span><code>        <span class="c1"># ---------- (4) 최후 방어선 — 분류 밖의 버그 ----------</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 — 어떤 예외도 트레이스백으로 끝내지 않기 위함</span>
             <span class="c1"># 사용자용 한 줄 요약을 먼저 내고, 그다음에 원인 추적용 기록을 남긴다.</span>
@@ -637,8 +645,8 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
             <span class="n">output</span><span class="o">.</span><span class="n">err</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_UNEXPECTED</span><span class="p">)</span>
 </code></pre></div>
 
-<p>budget_app/cli/error_handler.py:118-119</p>
-<div class="codehilite"><pre><span></span><code>            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UNHANDLED</span><span class="p">)</span>
+<p>budget_app/cli/error_handler.py:125-126</p>
+<div class="codehilite"><pre><span></span><code>            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UNHANDLED</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">debug_enabled</span><span class="p">())</span>
             <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_ERROR</span>
 </code></pre></div>
 
@@ -651,37 +659,46 @@ flake8-blind-except 플러그인에서 온 것이고 <code>BLE001</code> 이 "�
 <code>select = ["E", "F", "I", "UP", "B"]</code> 를 쓰므로, 이 주석은 규칙을 끄는 효과보다
 <strong>"이건 실수가 아니라 의도"라는 표시</strong>로 읽는 편이 정확합니다.</p>
 </blockquote>
-<p><strong><code>logger.exception(...)</code> 이 이 절의 핵심입니다.</strong> 스택트레이스를 버리는 게 아니라 <strong>로그로 옮깁니다.</strong></p>
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>logger.exception(msg)</code></strong> — 이것은 <code>logger.error(msg, exc_info=True)</code>
-와 정확히 같습니다(<code>logging/__init__.py</code> 의 <code>Logger.exception</code> 이 한 줄로 그렇게
-위임합니다). <code>exc_info=True</code> 를 주면 로깅이 <code>sys.exc_info()</code> 를 읽어 그 3-튜플을
-<code>LogRecord.exc_info</code> 에 담고, 포매터가 <code>formatException()</code> 에서 <code>traceback</code> 모듈로
-<strong>문자열화해 메시지 뒤에 덧붙입니다</strong>(결과는 <code>record.exc_text</code> 에 캐시됩니다).
-그래서 반드시 <strong>except 블록 안에서</strong> 불러야 하며, 밖에서 부르면 붙일 예외가 없습니다.
+<p><strong><code>exc_info=output.debug_enabled()</code> 가 이 절의 핵심입니다.</strong> 스택트레이스를 버리는 게 아니라 <strong><code>--debug</code> 일 때만 로그에 싣습니다.</strong></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>logger.error(msg, exc_info=...)</code></strong> — <code>exc_info</code> 가 참이면 로깅이
+<code>sys.exc_info()</code> 를 읽어 그 3-튜플을 <code>LogRecord.exc_info</code> 에 담고, 포매터가
+<code>formatException()</code> 에서 <code>traceback</code> 모듈로 <strong>문자열화해 메시지 뒤에 덧붙입니다</strong>
+(결과는 <code>record.exc_text</code> 에 캐시됩니다). 그래서 반드시 <strong>except 블록 안에서</strong>
+불러야 하며, 밖에서 부르면 붙일 예외가 없습니다. <code>logger.exception(msg)</code> 는
+<code>exc_info=True</code> 를 고정한 축약형이라(<code>logging/__init__.py</code> 의 <code>Logger.exception</code> 이
+한 줄로 그렇게 위임합니다) <strong>끌 수가 없고</strong>, 그래서 여기서는 쓰지 않습니다.
 → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
-<p><strong>여기서 중요한 것은 레벨이 DEBUG 가 아니라 ERROR 라는 점입니다.</strong> 소스 주석(error_handler.py:110-117)이 그 변경 이유를 직접 설명합니다 — 이전에는 <code>logger.debug(..., exc_info=True)</code> 였는데, 기본 로그 레벨이 WARNING 이라 <strong><code>--debug</code> 없이 실행하면 스택트레이스가 아무 데도 남지 않았습니다.</strong> 여기까지 온 예외는 분류되지 않은 버그이고, 그 스택이 원인을 찾을 유일한 단서인데 말입니다.</p>
-<p><code>logger.exception</code> 은 ERROR 로 기록하므로 WARNING 문턱을 넘습니다. 즉 <strong>평소 실행에서도</strong> 트레이스백이 stderr 에 남습니다. 실제 출력입니다.</p>
+<p><strong>레벨은 ERROR 이고, 스택트레이스만 스위치가 달렸습니다.</strong> 소스 주석(error_handler.py:117-124)이 그 이유를 직접 설명합니다 — 바로 위 <code>HINT_UNEXPECTED</code> 가 "<code>--debug</code> 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다"라고 안내하는데, 이전 코드는 <code>logger.exception</code> 이라 <code>exc_info</code> 가 항상 참이었습니다. 기본 로그 레벨(WARNING)이 ERROR 레코드를 통과시키므로 <strong><code>--debug</code> 없이도 트레이스백이 화면에 뿌려졌고</strong>, 안내와 동작이 정반대였습니다. 레벨을 ERROR 로 남겨 두는 것은 별개의 이유입니다 — 기본 실행에서도 "분류되지 않은 오류가 났다"는 사실 한 줄은 보여야, 사용자가 <code>--debug</code> 로 재현해 스택을 볼 단서가 됩니다.</p>
+<p>즉 <strong>평소 실행에서는 기록 한 줄로 끝납니다.</strong> 실제 출력입니다.</p>
 <div class="codehilite"><pre><span></span><code>$ python -m budget_app &lt;버그를 밟는 명령&gt;          # --debug 없이
-[오류] 예기치 못한 오류가 발생했습니다: &#39;nope&#39;
+[오류] 예기치 못한 오류가 발생했습니다: 'nope'
 [힌트] `--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다.
 [ERROR] unhandled error
-Traceback (most recent call last):
-  File &quot;.../budget_app/cli/error_handler.py&quot;, line 50, in wrapper
-    result = func(*args, **kwargs)
-  ...
-KeyError: &#39;nope&#39;
 </code></pre></div>
 
-<p><strong>정책이 부류마다 다르다</strong>는 것이 요점입니다. 사용자가 고칠 수 있는 앞의 세 부류(§5.3~§5.5)는 여전히 한두 줄로 끝나고 트레이스백이 없습니다. 마지막 부류만 "프로그램이 예상하지 못한 상태"이므로, 감추는 것보다 <strong>신고할 수 있게 하는 편</strong>을 택했습니다. 힌트 문구가 <code>--debug</code> 를 안내하는 것은 그때 <code>%(asctime)s %(name)s:%(lineno)d</code> 까지 붙은 상세 포맷(<code>LOG_FORMAT_DEBUG</code>)으로 바뀌고 다른 DEBUG 로그도 함께 보이기 때문입니다.</p>
-<p><strong>그리고 <code>setup_logging</code> 이 로그를 화면에 얹는 유일한 지점입니다.</strong> <code>cli/app.py:87-88</code> 의 주석이 그 의존을 명시합니다 — <code>main()</code> 이 <code>output.setup_logging()</code> 을 부르지 않으면 로거에 핸들러가 하나도 붙지 않습니다.</p>
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나(주의: 소스 주석보다 이쪽이 현재 사실)</strong>
-— <code>logging.getLogger("budget_app")</code> 로 만든 로거는 처리를 부모(루트)에게 전파하는데,
-루트에도 핸들러가 없으면 <code>logging.lastResort</code> 라는 <strong>최후 수단 핸들러</strong>가 대신
-받습니다. 이것은 stderr 로 쓰는 핸들러이고 레벨이 WARNING 이라, ERROR 로 찍는
-<code>logger.exception(...)</code> 은 <code>setup_logging</code> 없이도 (포맷 없이 맨 메시지 + 트레이스백
-형태로) 출력됩니다. 반면 DEBUG 레코드는 문턱을 못 넘어 사라집니다 —
-<code>@log_call</code>/<code>@measure_time</code> 의 로그가 <code>--debug</code> 없이는 보이지 않는 이유가 이것입니다.
+<div class="codehilite"><pre><span></span><code>$ python -m budget_app --debug &lt;버그를 밟는 명령&gt;
+[오류] 예기치 못한 오류가 발생했습니다: 'nope'
+[힌트] `--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다.
+[ERROR] 2026-01-01 00:00:00,000 budget_app:125 unhandled error
+Traceback (most recent call last):
+  File ".../budget_app/cli/error_handler.py", line 50, in wrapper
+    result = func(*args, **kwargs)
+  ...
+KeyError: 'nope'
+</code></pre></div>
+
+<p><strong>정책이 부류마다 같다</strong>는 것이 요점입니다. 어느 부류든 사용자 화면에는 원인 한 줄과 힌트만 나가고 트레이스백이 없습니다(요구사항 Q2). 마지막 부류만 "프로그램이 예상하지 못한 상태"라 <code>[ERROR] unhandled error</code> 기록 한 줄이 더 붙을 뿐이고, 스택은 힌트가 안내하는 대로 <code>--debug</code> 를 켰을 때 비로소 나옵니다 — 그때 <code>%(asctime)s %(name)s:%(lineno)d</code> 까지 붙은 상세 포맷(<code>LOG_FORMAT_DEBUG</code>)으로 바뀌고 다른 DEBUG 로그도 함께 보입니다.</p>
+<p><strong>그리고 <code>setup_logging</code> 이 "디버그인가"를 확정하는 유일한 지점입니다.</strong> <code>cli/app.py:87-88</code> 의 주석이 그 의존을 명시합니다 — <code>main()</code> 이 <code>output.setup_logging()</code> 을 부르지 않으면 로거에 핸들러가 붙지 않고, <code>output.debug_enabled()</code> 도 계속 <code>False</code> 라 <code>--debug</code> 로 요청한 스택트레이스가 어디에도 남지 않습니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나</strong> — <code>logging.getLogger("budget_app")</code> 로
+만든 로거는 처리를 부모(루트)에게 전파하는데, 루트에도 핸들러가 없으면
+<code>logging.lastResort</code> 라는 <strong>최후 수단 핸들러</strong>가 대신 받습니다. 이것은 stderr 로
+쓰는 핸들러이고 레벨이 WARNING 이라, ERROR 로 찍는 <code>logger.error(...)</code> 는
+<code>setup_logging</code> 없이도 <strong>포맷 없이 맨 메시지</strong>(<code>unhandled error</code>)만 출력됩니다 —
+<code>[ERROR]</code> 접두사는 <code>LOG_FORMAT</code> 이 붙이는 것이라 이때는 나오지 않고,
+<code>exc_info</code> 도 <code>False</code> 라 트레이스백은 애초에 실리지 않습니다. 반면 DEBUG 레코드는
+문턱을 못 넘어 사라집니다 — <code>@log_call</code>/<code>@measure_time</code> 의 로그가 <code>--debug</code> 없이는
+보이지 않는 이유가 이것입니다.
 → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <div class="codehilite"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
@@ -689,7 +706,7 @@ KeyError: &#39;nope&#39;
 <span class="o">&lt;</span><span class="n">_StderrHandler</span> <span class="o">&lt;</span><span class="n">stderr</span><span class="o">&gt;</span> <span class="p">(</span><span class="n">WARNING</span><span class="p">)</span><span class="o">&gt;</span>
 </code></pre></div>
 
-<p><code>cli/output.py:82-85</code> 와 <code>cli/app.py:87-88</code> 의 주석은 "<code>setup_logging</code> 이 없으면 스택트레이스가 어디에도 남지 않는다"고 적고 있는데, 이것은 이 절이 <strong><code>logger.debug(..., exc_info=True)</code> 였던 시절의 설명</strong>입니다. ERROR 로 올린 지금은 <code>lastResort</code> 덕분에 살아남습니다. 그래도 <code>setup_logging</code> 이 하는 일은 그대로 남습니다 — 레벨을 정하고(<code>--debug</code> → DEBUG), 포맷을 붙이고, <code>force=True</code> 로 재호출 시에도 설정을 확정합니다(<code>cli/output.py:94-99</code>).</p>
+<p><code>setup_logging</code> 이 하는 일은 셋입니다 — 레벨을 정하고(<code>--debug</code> → DEBUG), 포맷을 붙이고, <code>force=True</code> 로 재호출 시에도 설정을 확정합니다. 여기에 <strong>디버그 여부를 모듈 상태로 확정하는 일</strong>이 더해집니다(<code>cli/output.py:97-100</code>). <code>handle_errors</code> 가 로깅 설정을 직접 들여다보지 않고 <code>output.debug_enabled()</code>(<code>cli/output.py:84-91</code>) 하나만 묻는 이유가 이것입니다 — "디버그인가"의 정의가 <code>--debug</code> 플래그와 <code>BUDGET_APP_DEBUG</code> 환경변수 둘로 나뉘어 있어서, 그 합성을 아는 곳이 한 곳뿐이어야 두 경로의 동작이 갈라지지 않습니다.</p>
 <hr>
 <h2 id="6-except-순서를-검증하는-법">6. except 순서를 검증하는 법</h2>
 <p>앞 절의 순서가 정말 맞는지는 눈대중 대신 파이썬에게 직접 물어 확인할 수 있습니다. 물어볼 것은 하나뿐입니다 — "이 예외가 저 예외의 한 갈래인가". 한 갈래라면 좁은 쪽이 반드시 위에 와야 합니다.</p>
@@ -707,7 +724,8 @@ KeyError: &#39;nope&#39;
     ├── ValueError
     │   ├── ValidationError          (errors.py 정의)
     │   └── UnicodeError
-    │       └── UnicodeDecodeError
+    │       ├── UnicodeDecodeError
+    │       └── UnicodeEncodeError
     ├── AppError                     (errors.py 정의)
     │   └── InputAborted             (prompts.py 정의)
     └── KeyError, TypeError, ...
@@ -744,25 +762,26 @@ KeyError: &#39;nope&#39;
 <p>현재 코드의 순서가 제약을 만족하는지 검증하는 코드:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">ORDER</span> <span class="o">=</span> <span class="p">[</span><span class="ne">BrokenPipeError</span><span class="p">,</span> <span class="ne">KeyboardInterrupt</span><span class="p">,</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">AppError</span><span class="p">,</span>
          <span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="ne">IsADirectoryError</span><span class="p">,</span> <span class="ne">NotADirectoryError</span><span class="p">,</span> <span class="ne">PermissionError</span><span class="p">,</span>
-         <span class="ne">UnicodeDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">]</span>   <span class="c1"># 소스와 같은 11개, 같은 순서</span>
+         <span class="ne">UnicodeDecodeError</span><span class="p">,</span> <span class="ne">UnicodeEncodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">]</span>   <span class="c1"># 소스와 같은 12개, 같은 순서</span>
 
 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ORDER</span><span class="p">):</span>
     <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">ORDER</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]:</span>
         <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;문제: </span><span class="si">{</span><span class="n">b</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> 가 </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> 뒤에 있어 도달 불가&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;검증 완료&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"문제: </span><span class="si">{</span><span class="n">b</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> 가 </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> 뒤에 있어 도달 불가"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"검증 완료"</span><span class="p">)</span>
 </code></pre></div>
 
 <h3 id="61-예외-하나의-여행-apperror-를-예로">6.1 예외 하나의 여행 — <code>AppError</code> 를 예로</h3>
 <p><code>python -m budget_app delete --id TX-999999</code> 를 실행했을 때의 전체 경로입니다.</p>
 <div class="codehilite"><pre><span></span><code>1) cli.cmd_delete(ctx, args)
-       │  ctx.tx_service.delete(&quot;TX-999999&quot;)
+       │  ctx.tx_service.delete("TX-999999")
        ▼
-2) services.TransactionService.delete                          [services/transactions.py:72-77]
+2) services.TransactionService.delete                          [services/transactions.py:79-84]
        │  if not self.txs.delete(tx_id):
        ▼
 3) repository.TransactionRepository.delete → False             [storage/repositories.py:150-171]
-       │  (exists() 가 False → 파일을 건드리지 않고 False 반환)
+       │  (파일을 한 번 훑는 동안 일치하는 id 를 못 만나 found=False,
+       │   plan.changed=False 라 파일을 건드리지 않고 False 반환)
        ▼
 4) services 가 False 를 받아 AppError 로 승격
        raise AppError(messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id),
@@ -772,8 +791,8 @@ KeyError: &#39;nope&#39;
 5) @handle_errors 의 wrapper 가 except AppError 로 포착         [cli/error_handler.py:70]
        │  (핸들러가 아니라 app.py:61 의 _dispatch 를 감싼 wrapper 다)
        │
-       ├─▶ output.err(&quot;[오류] 해당 id 의 거래를 찾을 수 없습니다: TX-999999&quot;)
-       ├─▶ output.err(&quot;[힌트] `list` 로 id 를 확인하세요.&quot;)
+       ├─▶ output.err("[오류] 해당 id 의 거래를 찾을 수 없습니다: TX-999999")
+       ├─▶ output.err("[힌트] `list` 로 id 를 확인하세요.")
        └─▶ return config.EXIT_APP   (= 4)
        │
        ▼
@@ -797,7 +816,7 @@ KeyError: &#39;nope&#39;
             <span class="k">return</span> <span class="n">tx</span>
 </code></pre></div>
 
-<p>budget_app/services/transactions.py:72-76</p>
+<p>budget_app/services/transactions.py:79-83</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@log_call</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">tx_id</span><span class="p">):</span>
@@ -878,8 +897,8 @@ stderr 로 따로 내보냅니다.</p>
 <tr>
 <td>6</td>
 <td><code>EXIT_ENCODING</code></td>
-<td><code>UnicodeDecodeError</code></td>
-<td>CP949 로 저장한 CSV 를 import</td>
+<td><code>UnicodeDecodeError</code> / <code>UnicodeEncodeError</code></td>
+<td>CP949 로 저장한 CSV 를 import / UTF-8 로 쓸 수 없는 값을 export</td>
 </tr>
 <tr>
 <td>130</td>
@@ -923,7 +942,7 @@ stderr 로 따로 내보냅니다.</p>
 <p><strong>Q. 예외 처리 정책이 어떻게 되나요?</strong></p>
 <p>예외를 네 부류로 나눕니다 — 종료 신호(오류 아님), 입력 오류(사용자가 고치면 됨), 환경 상태(프로그램 밖의 문제), 최후 방어선(버그). except 절이 그 순서로 묶여 있고, 부류 안에서는 상속 제약(자식이 부모보다 위)을 지킵니다. 이 두 종류의 제약을 docstring 에 구분해서 적어 두었습니다.</p>
 <p><strong>Q. 스택트레이스를 감추면 디버깅은 어떻게 하나요?</strong></p>
-<p>부류를 나눠 답이 다릅니다. 사용자가 고칠 수 있는 앞의 세 부류는 한두 줄 메시지로 끝냅니다. 마지막 <code>except Exception</code> 절만은 <code>logger.exception(...)</code>(= <code>logger.error(..., exc_info=True)</code>)으로 트레이스백을 <strong>ERROR 레벨로 남깁니다.</strong> 기본 로그 레벨이 WARNING 이므로 이 기록은 <code>--debug</code> 없이도 stderr 에 나옵니다 — 이전 버전이 DEBUG 레벨을 써서 기본 실행에서는 스택이 아무 데도 남지 않던 것을 고친 자리입니다(error_handler.py:110-117 주석). <code>--debug</code>(또는 <code>BUDGET_APP_DEBUG</code> 환경변수)를 켜면 시각·모듈·줄 번호가 붙은 상세 포맷과 다른 DEBUG 로그까지 함께 보입니다.</p>
+<p><code>--debug</code> 로 되살립니다. 어느 부류든 기본 실행에서는 원인 한 줄과 힌트로 끝내고, 마지막 <code>except Exception</code> 절만 <code>logger.error(..., exc_info=output.debug_enabled())</code> 로 <code>[ERROR] unhandled error</code> 기록 한 줄을 더 남깁니다 — "분류되지 않은 오류가 났다"는 사실은 남기되 스택은 붙이지 않는 것입니다. <code>--debug</code>(또는 <code>BUDGET_APP_DEBUG</code> 환경변수)를 켜면 그 레코드에 트레이스백이 실리고, 시각·모듈·줄 번호가 붙은 상세 포맷과 다른 DEBUG 로그까지 함께 보입니다. 이전 버전은 <code>logger.exception</code> 이라 <code>exc_info</code> 를 끌 수 없어 <code>--debug</code> 없이도 트레이스백이 화면에 나왔고, 바로 위 힌트 문구와 모순이었습니다(error_handler.py:117-124 주석).</p>
 <p><strong>Q. 왜 오류를 stdout 이 아니라 stderr 로 보내나요?</strong></p>
 <p><code>list &gt; out.txt</code> 같은 리다이렉트에서 데이터 파일이 오류 문자열로 오염되지 않게 하기 위해서입니다. 또 파이프가 끊겨 stdout 이 깨진 상황에서도 stderr 는 살아 있어 원인을 전할 수 있습니다.</p>
 <p><strong>Q. <code>BrokenPipeError</code> 는 왜 처리하지 않고 다시 던지나요?</strong></p>
@@ -931,7 +950,7 @@ stderr 로 따로 내보냅니다.</p>
 <hr>
 <p><strong>다음 문서</strong>: <a href="07-repository.html">07. 저장소 계층</a> — 스트리밍 읽기, 원자적 교체, 손상 줄 보존, ID 발급.</p>
 <div class="pager"><span><a href="05-config-and-models.html">← 05. 설정·검증·모델 — config / messages / validators / errors / entities</a></span><span><a href="07-repository.html">07. 저장소 계층 — `storage/` 패키지 (jsonl · ids · repositories · csv_io · backup · unit_of_work) →</a></span></div>
-<footer>docs/06-decorators.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/06-decorators.md 에서 자동 생성됨 (2026-08-26 08:39) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

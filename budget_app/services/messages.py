@@ -27,3 +27,14 @@ HINT_ATOMIC_IMPORT = "CSV 를 고쳐 다시 시도하거나, --atomic 없이 부
 ERR_DUPLICATE_ID = "이미 존재하는 거래 id 입니다: {tx_id}"
 HINT_DUPLICATE_ID = "`--on-duplicate new-id` 로 새 id 를 발급하거나, CSV 의 id 컬럼을 비우세요."
 ERR_UNKNOWN_DUPLICATE_POLICY = "알 수 없는 중복 정책입니다: {policy}"
+#: 가져오기의 미등록 카테고리. 상황의 이름은 add/update 와 같고(등록되지 않았다),
+#: "그래서 뭘 하면 되는가"만 가져오기 맥락으로 바꾼다.
+#: 건너뛴 줄은 줄마다 사유로 표시되므로(힌트 줄이 따로 없다) 해결책을 문장에 담는다.
+ERR_IMPORT_CATEGORY_NOT_REGISTERED = (
+    "등록되지 않은 카테고리입니다: {name} "
+    "(`category add --name {name}` 으로 등록하거나 `--auto-category` 를 쓰세요)"
+)
+HINT_IMPORT_CATEGORY = (
+    "`category add --name <이름>` 으로 먼저 등록하거나, `--auto-category` 로 CSV 의 "
+    "카테고리를 자동 등록하세요."
+)

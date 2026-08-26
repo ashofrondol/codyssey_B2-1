@@ -30,9 +30,9 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
        ``ValidationError`` / ``AppError``
     3. **환경 상태** — 프로그램 밖(파일·권한·디스크·인코딩)의 상태 문제.
        ``FileNotFoundError`` / ``IsADirectoryError`` / ``NotADirectoryError`` /
-       ``PermissionError`` / ``UnicodeDecodeError`` / ``OSError``
+       ``PermissionError`` / ``UnicodeDecodeError`` / ``UnicodeEncodeError`` / ``OSError``
     4. **최후 방어선** — 위 어디에도 속하지 않는 버그.
-       ``Exception`` — 사용자에겐 스택트레이스를 감추고 로그에만 남긴다.
+       ``Exception`` — 사용자에겐 스택트레이스를 감추고, ``--debug`` 일 때만 로그에 남긴다.
 
     부류를 나눠도 지켜야 하는 상속 제약이 둘 있고, 지금 순서가 둘 다 만족한다:
 
@@ -96,6 +96,13 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
             output.err(messages.MSG_ERR_ENCODING)
             output.err(messages.HINT_ENCODING)
             return config.EXIT_ENCODING
+        except UnicodeEncodeError:
+            # 읽기(decode)와 짝을 이루는 쓰기(encode) 실패. UTF-8 로 표현할 수 없는
+            # 문자가 데이터에 남아 있으면 export/백업이 여기로 온다. 분류해 두지
+            # 않으면 최후 방어선으로 떨어져 "예기치 못한 오류"가 된다.
+            output.err(messages.MSG_ERR_ENCODING_WRITE)
+            output.err(messages.HINT_ENCODING_WRITE)
+            return config.EXIT_ENCODING
         except OSError as exc:
             # 디스크 가득 참(ENOSPC), 파일 잠금 등 위에서 못 잡은 입출력 오류.
             output.err(messages.MSG_ERR_IO.format(error=exc))
@@ -107,15 +114,15 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
             # 사용자용 한 줄 요약을 먼저 내고, 그다음에 원인 추적용 기록을 남긴다.
             output.err(messages.MSG_ERR_UNEXPECTED.format(error=exc))
             output.err(messages.HINT_UNEXPECTED)
-            # ERROR 인 이유: 이전에는 DEBUG 였고, 기본 로그 레벨이 WARNING 이라
-            # **기본 실행에서는 스택트레이스가 아무 데도 남지 않았다.** 여기까지 온
-            # 예외는 분류되지 않은 버그이고, 그 스택은 나중에 원인을 찾을 유일한
-            # 단서다. `--debug` 를 켜고 재현할 수 있는 상황이 아닐 수도 있다.
+            # **스택트레이스는 `--debug` 일 때만 붙인다.** 요구사항 Q2 가 "스택트레이스
+            # 대신 원인 + 해결 힌트"를 요구하고, 바로 위 힌트도 "`--debug` 를 붙이면
+            # 남는다"고 안내한다. 이전 코드는 `logger.exception` 이라 exc_info 가 항상
+            # 참이었고, 기본 로그 레벨(WARNING)이 ERROR 레코드를 통과시키므로
+            # **`--debug` 없이도 트레이스백이 화면에 뿌려졌다** — 안내와 동작이 모순이었다.
             #
-            # 트레이스백이 화면에 보이게 되는 것은 감수한다. 이 자리는 "프로그램이
-            # 예상하지 못한 상태"이고, 그때는 감추는 것보다 신고할 수 있게 하는 편이
-            # 낫다 — 앞선 세 부류(사용자가 고칠 수 있는 오류)는 여전히 한 줄로 끝난다.
-            logger.exception(messages.LOG_UNHANDLED)
+            # 레벨은 ERROR 로 남긴다. 기본 실행에서도 "분류되지 않은 오류가 났다"는
+            # 사실 한 줄은 남아야, 나중에 `--debug` 로 재현해 스택을 볼 단서가 된다.
+            logger.error(messages.LOG_UNHANDLED, exc_info=output.debug_enabled())
             return config.EXIT_ERROR
 
     return wrapper

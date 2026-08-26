@@ -121,7 +121,7 @@
 
 덧붙이는 속도도 다릅니다. 단일 JSON 배열은 append 할 때 닫는 `]` 를 지우고 다시 붙여야 해서 O(파일 크기)입니다 — 파일이 열 배 커지면 한 건 추가에 드는 시간도 열 배가 된다는 뜻입니다. 반면 JSONL 은 끝에 한 줄 붙이면 끝이라 O(1), 즉 파일이 아무리 커져도 같은 시간입니다. 이 점까지 포함한 비교가 [10 §5](./10-advanced-design.md)에 있습니다.
 
-> **⚙️ 내부 동작** — JSONL 한 줄을 만드는 `json.dumps(..., ensure_ascii=False)`(`storage/jsonl.py:207-208`)
+> **⚙️ 내부 동작** — JSONL 한 줄을 만드는 `json.dumps(..., ensure_ascii=False)`(`storage/jsonl.py:229-230`)
 > 에서 `ensure_ascii` 는 기본값이 `True` 이고, 그대로 두면 한글이 `가` 같은
 > 이스케이프로 나갑니다. 파일은 여전히 올바른 JSON 이지만 사람이 못 읽습니다.
 > 반대로 읽는 쪽 `json.loads` 는 C 로 구현된 스캐너(`_json`)를 쓰고, 실패하면
@@ -222,17 +222,18 @@ CLI 핸들러(명령 하나를 실제로 처리하는 함수) 13개가 각자 `t
 > 열람실에 앉아 한 장씩 넘겨 보는 것입니다. 찾던 문장이 3쪽에 있으면 거기서 덮고
 > 나오면 되고, 책이 1000쪽이든 10쪽이든 손에 들고 있는 것은 언제나 펼친 한 장뿐입니다.
 > `category_in_use` 가 첫 일치에서 멈추는 것이 "3쪽에서 덮고 나오는" 쪽입니다.
-> 다만 이 비유는 정렬에서 깨집니다 — "날짜순으로 줄 세우기"는 마지막 장을 보기
+> 다만 이 비유는 정렬에서 반쯤 깨집니다 — "날짜순으로 줄 세우기"는 마지막 장을 보기
 > 전에는 답이 정해지지 않으므로, `stream_sorted` 만은 한 번은 파일 끝까지 **읽어야**
-> 합니다. 그래도 손에 남겨 두는 것은 조건에 걸린 것들뿐입니다.
+> 합니다. 그래도 손에 남겨 두는 것은 `--limit` 이 있으면 상위 N 개뿐이고, 한도가
+> 없을 때만 조건에 걸린 것 전부입니다.
 
 **조기 종료의 이점**도 큽니다. `category_in_use` 는 `any()` 로 첫 일치에서 멈추므로 파일 뒷부분을 아예 읽지 않습니다. `export` 는 제너레이터 식을 CSV writer 에 그대로 넘겨 100만 건을 내보내도 메모리가 일정합니다.
 
-**예외는 `stream_sorted`** 입니다. 정렬은 본질적으로 전체를 봐야 하므로 리스트를 만듭니다. 다만 담기는 것은 "필터 통과분"뿐입니다(`services/transactions.py:79-87`).
+**예외는 `stream_sorted`** 입니다. 정렬은 본질적으로 전체를 **훑어야** 하지만, 손에 모아 두는 양은 `limit` 이 가릅니다 — `list --limit N` 은 `heapq.nlargest` 로 크기 N 짜리 힙만 유지하고, 한도가 없는 `search` 만 "필터 통과분"을 리스트로 모읍니다(`services/transactions.py:86-108`).
 
 > **🔎 문법의 출처** — `yield` 로 함수를 중단·재개하는 제너레이터는 PEP 255(파이썬 2.2)
-> 입니다. `stream_sorted` 끝줄의 `yield from items`(`services/transactions.py:87`)에 쓰인
-> `yield from` 은 그보다 한참 뒤인 PEP 380(3.3)이고, 그 전에는
+> 입니다. `stream_sorted` 끝줄의 `yield from sorted(...)`(`services/transactions.py:108`)에
+> 쓰인 `yield from` 은 그보다 한참 뒤인 PEP 380(3.3)이고, 그 전에는
 > `for x in items: yield x` 라고 풀어 써야 했습니다.
 > → [12 §1-C](./12-syntax-and-stdlib.md)
 
@@ -330,7 +331,7 @@ esac
 
 그래서 문자열 그대로 비교(`SearchFilter.matches`)·정렬(`stream_sorted`)·JSON 저장이 전부 가능합니다. `datetime.date` 객체로 들고 있으면 저장할 때마다 문자열로 바꾸고 읽을 때마다 파싱해야 하는데, 얻는 것이 없습니다.
 
-검증은 `datetime.strptime` 으로 하되, **`datetime` 객체를 들고 다니지는 않고 `strftime` 으로 정규형**(표기법을 하나로 통일한 형태) **문자열을 다시 찍어** 돌려줍니다(`domain/validators.py:80-99`) — 파싱은 검증의 수단이고, 저장·비교에 쓰이는 것은 그 결과 문자열입니다.
+검증은 `datetime.strptime` 으로 하되, **`datetime` 객체를 들고 다니지는 않고 `strftime` 으로 정규형**(표기법을 하나로 통일한 형태) **문자열을 다시 찍어** 돌려줍니다(`domain/validators.py:103-122`) — 파싱은 검증의 수단이고, 저장·비교에 쓰이는 것은 그 결과 문자열입니다.
 
 원문을 그대로 돌려주면 안 되는 이유가 소스 docstring 에 적혀 있습니다. `strptime` 은 **검증기이지 정규화기가 아니어서** `"2024-1-5"` 를 오류 없이 받아 줍니다. 그것을 그대로 저장하면 같은 날이 파일에 두 표기로 공존하고, 문자열 비교라는 이 프로그램의 전제가 그 순간 깨집니다.
 
@@ -420,7 +421,7 @@ id 는 **거래를 영구히 식별하는 이름**입니다. 재사용하면 이
 > 읽으면 파일 맨 앞 3바이트 `EF BB BF` 는 오류 없이 문자 `"﻿"` 로 디코딩됩니다.
 > 그래서 첫 줄이 `"﻿id,date,..."` 가 되고, `csv.DictReader` 가 만든 첫 컬럼명은
 > `"id"` 가 아니라 `"﻿id"` 입니다 — 눈으로는 똑같아 보이는데 다른 문자열입니다.
-> 첫 컬럼이 필수 컬럼이면 `_check_header`(`storage/csv_io.py:90-104`)가 "컬럼이 없다"고
+> 첫 컬럼이 필수 컬럼이면 `_check_header`(`storage/csv_io.py:104-118`)가 "컬럼이 없다"고
 > 막아 주지만, 첫 컬럼이 선택 컬럼인 `id` 면 **오류 없이 id 만 조용히 사라져** 왕복이
 > 거래를 복제합니다(Q30 이 고친 바로 그 증상). **오류가 나지 않고 조용히 다른 문자열이
 > 되는 것**이 이 버그가 찾기 어려운 이유입니다. → [12 §3](./12-syntax-and-stdlib.md)
@@ -468,7 +469,7 @@ logger.debug(f"call {func.__name__}")            # 매번 문자열을 만듦
 
 **데이터 유실을 사용자가 인지해야** 하기 때문입니다. 조용히 건너뛰면 "왜 거래 수가 안 맞지?"를 영원히 알 수 없습니다.
 
-`stream()` 은 손상 줄마다 경고 로그를 남깁니다(`storage/jsonl.py:203`). 기본 로그 레벨이 WARNING 이므로 `--debug` 없이도 보입니다.
+`stream()` 은 손상 줄마다 경고 로그를 남깁니다(`storage/jsonl.py:225`). 기본 로그 레벨이 WARNING 이므로 `--debug` 없이도 보입니다.
 
 리팩터에서 **경고가 두 종류로 늘었습니다.**
 
@@ -482,12 +483,16 @@ logger.debug(f"call {func.__name__}")            # 매번 문자열을 만듦
 > **⚙️ 내부 동작** — "손상"에는 두 층이 있고, 이 코드는 **둘 다** 격리합니다.
 > ① JSON 문법이 깨진 줄은 `json.loads` 가 `JSONDecodeError` 를 던져 걸립니다.
 > ② 그보다 아래층에서 **바이트 자체가 UTF-8 이 아닌** 줄도 있는데, 이쪽은
-> `open(..., errors="surrogateescape")`(`storage/jsonl.py:162-179`)가 막습니다.
+> `open(..., errors="surrogateescape")`(`storage/jsonl.py:162-182`)가 막습니다.
 > 기본값인 `errors="strict"` 였다면 디코딩 실패가 `UnicodeDecodeError` 로 올라와
 > **파일 읽기 전체를 죽였을** 것입니다 — 한 줄을 격리하려던 설계가 인코딩 층에서
 > 구멍이 나는 자리였습니다. `surrogateescape` 는 디코딩 못 하는 바이트를 유니코드의
 > 미사용 영역(서로게이트) 문자로 바꿔 두었다가 **같은 옵션으로 인코딩할 때 원래
 > 바이트로 정확히 되돌립니다.** 그래서 "읽어서 다시 쓰기"가 원문을 손상시키지 않습니다.
+> 다만 무손실로 **읽는 것**과 정상 거래로 **통과시키는 것**은 다릅니다 — 그런 줄이
+> 조회 경로로 나가면 엄격 UTF-8 로 쓰는 `export` 가 나중에 `UnicodeEncodeError` 로
+> 죽습니다. 그래서 `_parse_line` 의 첫 검사(`_is_utf8_text`, `storage/jsonl.py:184-199`)가
+> 그 줄을 **손상 줄로 판정**합니다 — 원문은 보존하되 조회에는 내보내지 않는 것입니다.
 > → [12 §3](./12-syntax-and-stdlib.md)
 
 > **🔎 문법의 출처** — `surrogateescape` 오류 처리기는 **PEP 383**(파이썬 3.1)에서
@@ -672,7 +677,7 @@ raw.data 가 있으면      → data["id"]              (규칙 위반이지만 
 없으면 원문 정규식       → '"id"\s*:\s*"(TX-\d+)"'  (JSON 조차 아님)
 ```
 
-구현은 `storage/repositories.py:39-51`(`_scan_id`)이고, 정규식은 `domain/config.py:27`(`TX_ID_SCAN_PATTERN`)에 있습니다.
+구현은 `storage/repositories.py:39-51`(`_scan_id`)이고, 정규식은 `domain/config.py:31`(`TX_ID_SCAN_PATTERN`)에 있습니다.
 
 > **⚙️ 내부 동작** — 그 정규식 문자열이 `r'...'`(raw 문자열)인 이유가 있습니다. 보통
 > 문자열이면 `\s`·`\d` 의 백슬래시를 **파이썬 문자열 문법이 먼저** 해석하려 들고,
@@ -745,11 +750,11 @@ $ python -m budget_app import --from rt.csv
 
 **고아 데이터(orphan)** — *(쉬운 뜻: 가리키던 대상이 사라져 버려 어디에도 걸리지 않는 기록)* 참조 대상이 사라져 홀로 남은 데이터. 출처: 관계형 데이터베이스의 참조 무결성 논의에서 온 말입니다. 이 프로젝트는 카테고리 삭제 시 거래가 고아가 되지 않도록 차단합니다. 위치: `services/categories.py:38-73`(Q14).
 
-**고차 함수(higher-order function)** — *(쉬운 뜻: 다른 함수를 재료로 받거나, 결과로 함수를 내놓는 함수)* 함수를 인자로 받거나 함수를 반환하는 함수. 출처: 람다 계산법과 함수형 프로그래밍 전통의 용어이며, 파이썬에서는 함수가 **일급 객체**(변수에 담고 인자로 넘길 수 있는 값)라서 가능합니다. 위치: `decorators.py:37-47`(`log_call` 이 함수를 받아 함수를 반환), `cli/prompts.py:60-74`(`ask_until` 이 검증기를 받음), `storage/jsonl.py:313-329`(`rewrite` 가 `transform` 을 받음).
+**고차 함수(higher-order function)** — *(쉬운 뜻: 다른 함수를 재료로 받거나, 결과로 함수를 내놓는 함수)* 함수를 인자로 받거나 함수를 반환하는 함수. 출처: 람다 계산법과 함수형 프로그래밍 전통의 용어이며, 파이썬에서는 함수가 **일급 객체**(변수에 담고 인자로 넘길 수 있는 값)라서 가능합니다. 위치: `decorators.py:37-47`(`log_call` 이 함수를 받아 함수를 반환), `cli/prompts.py:60-74`(`ask_until` 이 검증기를 받음), `storage/jsonl.py:335-351`(`rewrite` 가 `transform` 을 받음).
 
 **관심사 분리(separation of concerns)** — *(쉬운 뜻: 성격이 다른 일은 다른 파일에 두어, 한쪽을 고칠 때 다른 쪽이 딸려 오지 않게 하는 것)* 서로 다른 목적의 코드를 섞지 않는 원칙. 출처: Edsger Dijkstra 가 1974년 글 "On the role of scientific thought" 에서 쓴 표현이 시초로 인용됩니다. 위치: `decorators.py:1-16`(모듈 docstring), [04 §8.1](./04-architecture.md).
 
-**국제표준 날짜(ISO 8601)** — *(쉬운 뜻: 날짜를 `2024-01-15` 처럼 연·월·일 순으로, 자릿수를 채워 적는 세계 공통 표기)* 날짜를 `YYYY-MM-DD`, 월을 `YYYY-MM` 으로 쓰는 형식. 큰 단위부터라 문자열 정렬이 시간 순서와 일치합니다. 출처: 국제표준화기구(ISO)가 1988년에 처음 낸 표준으로, 파이썬은 `datetime.date.isoformat()`/`fromisoformat()` 로 직접 지원합니다(이 프로젝트는 포맷 문자열 `"%Y-%m-%d"` 쪽을 씁니다). 위치: `domain/config.py:21`, 검증·정규화는 `domain/validators.py:80-99`(Q12).
+**국제표준 날짜(ISO 8601)** — *(쉬운 뜻: 날짜를 `2024-01-15` 처럼 연·월·일 순으로, 자릿수를 채워 적는 세계 공통 표기)* 날짜를 `YYYY-MM-DD`, 월을 `YYYY-MM` 으로 쓰는 형식. 큰 단위부터라 문자열 정렬이 시간 순서와 일치합니다. 출처: 국제표준화기구(ISO)가 1988년에 처음 낸 표준으로, 파이썬은 `datetime.date.isoformat()`/`fromisoformat()` 로 직접 지원합니다(이 프로젝트는 포맷 문자열 `"%Y-%m-%d"` 쪽을 씁니다). 위치: `domain/config.py:25`, 검증·정규화는 `domain/validators.py:103-122`(Q12).
 
 **널 객체(Null Object)** — *(쉬운 뜻: "아무것도 아님"을 빈칸으로 두지 않고, 그 자리에 놓을 물건을 하나 따로 만들어 두는 것)* "아무 조건 없음", "아무것도 안 함" 같은 **비어 있는 경우를 객체 하나로** 표현해 `None` 검사를 없애는 패턴. 출처: Bobby Woolf 가 PLoP 패턴 문헌에서 제안했고, Martin Fowler 의 『Refactoring』에도 "Introduce Null Object" 로 실려 있습니다. 위치: `domain/specs.py:136-147`(`Always` — 조건이 하나도 없는 `list` 명령이 `if spec is None` 없이 같은 코드를 타게 합니다).
 
@@ -761,9 +766,9 @@ $ python -m budget_app import --from rt.csv
 
 **대체 생성자(alternative constructor)** — *(쉬운 뜻: "이런 재료로도 만들어 드립니다"라고 하나 더 열어 둔 제작 창구)* 기본 생성자 외에 다른 형태의 입력으로 객체를 만드는 classmethod. 출처: `classmethod` 는 파이썬 2.2 의 새 스타일 클래스와 함께 들어온 내장 데코레이터이고, "첫 인자로 클래스 자신(`cls`)을 받는다"는 성질 덕분에 상속받은 하위 클래스에서도 올바른 타입을 만들어 냅니다. 위치: `Transaction.from_dict`(`domain/entities.py:99-111`), `SearchFilter.for_month`(`domain/queries.py:74-78`).
 
-**덕 타이핑(duck typing)** — *(쉬운 뜻: 족보를 따지지 않고, 시킨 일을 할 줄 알면 같은 것으로 취급하는 태도)* 공통 조상 없이도 "같은 메서드를 갖고 있으면 같게 다룬다"는 파이썬의 다형성. 출처: "오리처럼 걷고 운다면 오리다"라는 속담에서 온 말로, 파이썬 커뮤니티에서는 Alex Martelli 가 2000년 무렵 뉴스그룹 글에서 쓴 것이 널리 인용됩니다. 위치: `storage/jsonl.py:187` — `self.entity_cls.from_dict(data)` 가 `Transaction`/`Category`/`Budget` 셋 모두에 동작합니다. 셋은 공통 부모 클래스가 **없고**, `from_dict` 라는 이름의 classmethod 를 각자 갖고 있을 뿐입니다.
+**덕 타이핑(duck typing)** — *(쉬운 뜻: 족보를 따지지 않고, 시킨 일을 할 줄 알면 같은 것으로 취급하는 태도)* 공통 조상 없이도 "같은 메서드를 갖고 있으면 같게 다룬다"는 파이썬의 다형성. 출처: "오리처럼 걷고 운다면 오리다"라는 속담에서 온 말로, 파이썬 커뮤니티에서는 Alex Martelli 가 2000년 무렵 뉴스그룹 글에서 쓴 것이 널리 인용됩니다. 위치: `storage/jsonl.py:209` — `self.entity_cls.from_dict(data)` 가 `Transaction`/`Category`/`Budget` 셋 모두에 동작합니다. 셋은 공통 부모 클래스가 **없고**, `from_dict` 라는 이름의 classmethod 를 각자 갖고 있을 뿐입니다.
 
-**데코레이터(decorator)** — *(쉬운 뜻: 선물 포장처럼, 안의 물건은 그대로 두고 겉에 공통의 무언가만 덧입히는 것)* `@이름` 문법으로 기존 함수를 감싸 공통 동작을 덧입히는 기법. 출처: **PEP 318**(파이썬 2.4)이 `@` 표기를 도입했습니다. GoF 의 Decorator 디자인 패턴과 이름은 같지만 다른 것으로, 파이썬 쪽은 "함수를 함수로 감싸 재대입한다"는 문법 장치입니다. 위치: `decorators.py`(관측), `error_handler.py`(표현), 적용부는 `services/transactions.py:27, 52, 72`(`@log_call`)와 `cli/app.py:61`(`@handle_errors`).
+**데코레이터(decorator)** — *(쉬운 뜻: 선물 포장처럼, 안의 물건은 그대로 두고 겉에 공통의 무언가만 덧입히는 것)* `@이름` 문법으로 기존 함수를 감싸 공통 동작을 덧입히는 기법. 출처: **PEP 318**(파이썬 2.4)이 `@` 표기를 도입했습니다. GoF 의 Decorator 디자인 패턴과 이름은 같지만 다른 것으로, 파이썬 쪽은 "함수를 함수로 감싸 재대입한다"는 문법 장치입니다. 위치: `decorators.py`(관측), `error_handler.py`(표현), 적용부는 `services/transactions.py:34, 52, 72`(`@log_call`)와 `cli/app.py:61`(`@handle_errors`).
 
 **동시성(concurrency)** — *(쉬운 뜻: 한 파일을 여럿이 동시에 건드릴 때 서로 덮어써 버리는 문제)* 여러 프로세스가 같은 자원에 동시에 접근하는 상황. 이 프로젝트는 단일 사용자 CLI 전제라 파일 잠금이 없습니다. 위치: [10 §6](./10-advanced-design.md).
 
@@ -775,35 +780,35 @@ $ python -m budget_app import --from rt.csv
 
 **방어적 프로그래밍(defensive programming)** — *(쉬운 뜻: 사용자가 틀린 값을 넣을 것을 미리 가정하고 대비해 두는 태도)* 잘못된 입력·상태를 미리 가정하고 대비하는 코딩 방식. 위치: 25개 항목 인덱스가 [10 §7](./10-advanced-design.md)에 있습니다.
 
-**부분 성공(partial success)** — *(쉬운 뜻: 100줄 중 3줄이 잘못됐으면 그 3줄만 빼고 나머지 97줄은 받아들이는 정책)* 일괄 작업에서 실패한 항목만 건너뛰고 나머지를 반영하는 정책. import 의 기본 모드입니다. 위치: `services/importexport.py:88-102`(Q16, [08 §6](./08-services.md)).
+**부분 성공(partial success)** — *(쉬운 뜻: 100줄 중 3줄이 잘못됐으면 그 3줄만 빼고 나머지 97줄은 받아들이는 정책)* 일괄 작업에서 실패한 항목만 건너뛰고 나머지를 반영하는 정책. import 의 기본 모드입니다. 위치: `services/importexport.py:88-105`(Q16, [08 §6](./08-services.md)).
 
 **불변식(invariant)** — *(쉬운 뜻: 그 물건이 존재하는 내내 단 한 순간도 어겨져서는 안 되는 조건)* 객체가 존재하는 동안 항상 참이어야 하는 조건. 출처: Bertrand Meyer 의 **계약에 의한 설계(Design by Contract)** — Eiffel 언어(1980년대 후반)가 사전조건·사후조건과 함께 클래스 불변식을 언어 기능으로 넣은 것이 출발점입니다. 이 프로젝트는 언어 기능이 없으므로 생성자(`__post_init__`)가 그 자리를 대신합니다. 위치: `domain/entities.py:68-80`(Q4, [05 §6](./05-config-and-models.md)).
 
-**사전식 비교(lexicographic comparison)** — *(쉬운 뜻: 사전이 단어를 늘어놓듯 앞자리부터 한 글자씩 따져 순서를 정하는 방식)* 문자열을 앞자리부터 비교하는 방식. 출처: 사전(dictionary)이 단어를 늘어놓는 순서에서 온 이름입니다. ISO 8601 날짜는 사전식 순서 = 시간 순서입니다. 위치: `domain/specs.py:178-179`·`191-192`(범위 필터의 실제 비교), `services/transactions.py:86`(정렬 키 `(t.date, t.id)`).
+**사전식 비교(lexicographic comparison)** — *(쉬운 뜻: 사전이 단어를 늘어놓듯 앞자리부터 한 글자씩 따져 순서를 정하는 방식)* 문자열을 앞자리부터 비교하는 방식. 출처: 사전(dictionary)이 단어를 늘어놓는 순서에서 온 이름입니다. ISO 8601 날짜는 사전식 순서 = 시간 순서입니다. 위치: `domain/specs.py:178-179`·`191-192`(범위 필터의 실제 비교), `services/transactions.py:22-24`(정렬 키 `_sort_key` = `(tx.date, tx.id)`).
 
-**스트리밍(streaming)** — *(쉬운 뜻: 전부 모아 놓고 시작하지 않고, 오는 대로 한 건씩 처리해 흘려보내는 방식)* 데이터 전체를 메모리에 올리지 않고 한 건씩 흘려보내며 처리하는 방식. 위치: `storage/jsonl.py:162-179`(`iter_raw`)·`193-203`(`stream`), `services/importexport.py:83`(제너레이터 식을 CSV writer 에 그대로 전달)(Q6).
+**스트리밍(streaming)** — *(쉬운 뜻: 전부 모아 놓고 시작하지 않고, 오는 대로 한 건씩 처리해 흘려보내는 방식)* 데이터 전체를 메모리에 올리지 않고 한 건씩 흘려보내며 처리하는 방식. 위치: `storage/jsonl.py:162-182`(`iter_raw`)·`193-203`(`stream`), `services/importexport.py:83`(제너레이터 식을 CSV writer 에 그대로 전달)(Q6).
 
-**역직렬화/직렬화(deserialization/serialization)** — *(쉬운 뜻: 메모리 속 물건을 파일에 적을 글자로 펴는 일과, 그 글자를 다시 물건으로 세우는 일)* 객체 ↔ 저장 형식 변환. 위치: 직렬화는 `to_dict` + `json.dumps`(`domain/entities.py:82-97`, `storage/jsonl.py:207-208`), 역직렬화는 `json.loads` + `from_dict`(`storage/jsonl.py:181-191`).
+**역직렬화/직렬화(deserialization/serialization)** — *(쉬운 뜻: 메모리 속 물건을 파일에 적을 글자로 펴는 일과, 그 글자를 다시 물건으로 세우는 일)* 객체 ↔ 저장 형식 변환. 위치: 직렬화는 `to_dict` + `json.dumps`(`domain/entities.py:82-97`, `storage/jsonl.py:229-230`), 역직렬화는 `json.loads` + `from_dict`(`storage/jsonl.py:201-213`).
 
-**예외 계층(exception hierarchy)** — *(쉬운 뜻: 오류 종류를 가계도처럼 묶어, 잡는 쪽이 "이 하나만" 또는 "이 계열 전부"를 골라 잡을 수 있게 한 것)* 예외 클래스를 상속 관계로 조직해 잡는 쪽이 굵기를 선택할 수 있게 하는 설계. 출처: 파이썬 내장 예외의 뿌리를 `BaseException` 으로 정리한 것이 **PEP 352**(2.5)이고, `except X as e` 표기는 **PEP 3110**(3.0)입니다. 위치: `errors.py:33-51`(`ValidationError`/`AppError`), `InputAborted(AppError)`(`cli/prompts.py:28-37`), 매핑은 `cli/error_handler.py:57-119` — 좁은 예외를 위에, 넓은 예외를 아래에 두는 순서 자체가 계층을 이용한 것입니다(`BrokenPipeError` 가 `OSError` 보다 위에 있어야 하는 이유).
+**예외 계층(exception hierarchy)** — *(쉬운 뜻: 오류 종류를 가계도처럼 묶어, 잡는 쪽이 "이 하나만" 또는 "이 계열 전부"를 골라 잡을 수 있게 한 것)* 예외 클래스를 상속 관계로 조직해 잡는 쪽이 굵기를 선택할 수 있게 하는 설계. 출처: 파이썬 내장 예외의 뿌리를 `BaseException` 으로 정리한 것이 **PEP 352**(2.5)이고, `except X as e` 표기는 **PEP 3110**(3.0)입니다. 위치: `errors.py:33-51`(`ValidationError`/`AppError`), `InputAborted(AppError)`(`cli/prompts.py:28-37`), 매핑은 `cli/error_handler.py:57-126` — 좁은 예외를 위에, 넓은 예외를 아래에 두는 순서 자체가 계층을 이용한 것입니다(`BrokenPipeError` 가 `OSError` 보다 위에 있어야 하는 이유).
 
-**원자성(atomicity)** — *(쉬운 뜻: 전부 되거나 전혀 안 되거나 둘 중 하나로만 끝나고, 반쯤 된 상태가 남지 않는 성질)* 작업이 "전부 반영" 아니면 "전혀 반영 안 됨" 둘 중 하나로만 끝나는 성질. 출처: 데이터베이스 트랜잭션의 **ACID** 네 성질 중 A 로, Jim Gray 의 트랜잭션 연구(1981)와 Härder·Reuter 의 1983년 논문이 그 약어를 정착시켰습니다. 위치: `storage/jsonl.py:48-77`(파일 하나), `storage/unit_of_work.py:125-156`(파일 여럿), `services/importexport.py:188-206`(import), [10 §1](./10-advanced-design.md).
+**원자성(atomicity)** — *(쉬운 뜻: 전부 되거나 전혀 안 되거나 둘 중 하나로만 끝나고, 반쯤 된 상태가 남지 않는 성질)* 작업이 "전부 반영" 아니면 "전혀 반영 안 됨" 둘 중 하나로만 끝나는 성질. 출처: 데이터베이스 트랜잭션의 **ACID** 네 성질 중 A 로, Jim Gray 의 트랜잭션 연구(1981)와 Härder·Reuter 의 1983년 논문이 그 약어를 정착시켰습니다. 위치: `storage/jsonl.py:48-77`(파일 하나), `storage/unit_of_work.py:125-156`(파일 여럿), `services/importexport.py:243-261`(import), [10 §1](./10-advanced-design.md).
 
-**의존성 주입(DI)** — *(쉬운 뜻: 일하는 데 필요한 도구를 스스로 사 오지 않고 밖에서 건네받는 방식)* 객체가 필요로 하는 협력자를 내부에서 만들지 않고 생성자 인자로 받는 기법. 출처: Martin Fowler 가 2004년 글 "Inversion of Control Containers and the Dependency Injection pattern" 에서 이 이름을 제안했습니다. 위치: `services/transactions.py:23-25`(저장소 둘을 인자로 받음), 조립은 `context.py:42-57`(`AppContext.__init__`).
+**의존성 주입(DI)** — *(쉬운 뜻: 일하는 데 필요한 도구를 스스로 사 오지 않고 밖에서 건네받는 방식)* 객체가 필요로 하는 협력자를 내부에서 만들지 않고 생성자 인자로 받는 기법. 출처: Martin Fowler 가 2004년 글 "Inversion of Control Containers and the Dependency Injection pattern" 에서 이 이름을 제안했습니다. 위치: `services/transactions.py:30-32`(저장소 둘을 인자로 받음), 조립은 `context.py:42-57`(`AppContext.__init__`).
 
 **작업 단위(Unit of Work)** — *(쉬운 뜻: 파일 여러 개에 걸친 변경을 한꺼번에 반영하거나 한꺼번에 취소하도록 묶어 둔 것)* 여러 저장소에 걸친 변경을 하나의 커밋으로 묶는 패턴. 출처: Martin Fowler 『Patterns of Enterprise Application Architecture』(2002). 위치: `storage/unit_of_work.py:73-181`. **다만 소스가 이름의 한계를 직접 밝혀 둡니다**(`storage/unit_of_work.py:1-49`) — Fowler 의 UoW 는 무엇이 새로 생기고 바뀌고 지워졌는지를 **스스로 추적**하지만, 이 클래스는 호출자가 이미 아는 최종 내용을 받아 `.tmp` 로 준비했다가 `os.replace` 만 몰아 실행합니다. 정확히는 *staged commit* 입니다.
 
 **저장소 패턴(Repository)** — *(쉬운 뜻: 데이터를 어디에 어떻게 넣어 두는지는 감추고, 위층에는 "맡기고 찾아가기" 창구만 보여 주는 것)* 도메인 객체의 보관·조회를 컬렉션처럼 다루게 감싸, 위층이 파일·SQL 같은 저장 수단을 모르게 하는 패턴. 출처: Martin Fowler 『PoEAA』(2002)와 Eric Evans 『Domain-Driven Design』(2003). 위치: `storage/repositories.py:27-214`(`TransactionRepository`), `217-280`(`CategoryStore`), `283-308`(`BudgetStore`). 이 프로젝트의 저장소는 **도메인 판단을 하지 않는다**는 규칙을 지킵니다 — "무엇으로 바꿀지"는 서비스와 도메인이 정하고, 저장소는 완성된 객체를 받아 쓰기만 합니다.
 
-**전수 롤백(all-or-nothing rollback)** — *(쉬운 뜻: 한 건이라도 잘못되면 나머지가 멀쩡해도 전부 없던 일로 되돌리는 정책)* 하나라도 실패하면 전체를 없던 일로 되돌리는 정책. `import --atomic` 의 동작입니다. 위치: `services/importexport.py:188-206`(`_commit_atomic`), [10 §3](./10-advanced-design.md).
+**전수 롤백(all-or-nothing rollback)** — *(쉬운 뜻: 한 건이라도 잘못되면 나머지가 멀쩡해도 전부 없던 일로 되돌리는 정책)* 하나라도 실패하면 전체를 없던 일로 되돌리는 정책. `import --atomic` 의 동작입니다. 위치: `services/importexport.py:243-261`(`_commit_atomic`), [10 §3](./10-advanced-design.md).
 
-**제너레이터(generator)** — *(쉬운 뜻: 결과를 한꺼번에 다 만들어 주지 않고, 달라고 할 때마다 하나씩 내어 주는 함수)* `yield` 로 값을 하나씩 내어 주다가 다음 요청 때 이어서 실행되는 함수. 출처: **PEP 255**(파이썬 2.2)가 `yield` 를 도입했고, 괄호로 쓰는 제너레이터 식(`(tx for tx in ...)`)은 **PEP 289**(2.4), 하위 제너레이터에 위임하는 `yield from` 은 **PEP 380**(3.3)입니다. 세 가지가 이 소스에 모두 나옵니다. 위치: `storage/jsonl.py:162`(`iter_raw`), `services/transactions.py:79-87`(`stream_sorted` + `yield from`), `services/importexport.py:83`(제너레이터 식), `cli/presenter.py:42-55`.
+**제너레이터(generator)** — *(쉬운 뜻: 결과를 한꺼번에 다 만들어 주지 않고, 달라고 할 때마다 하나씩 내어 주는 함수)* `yield` 로 값을 하나씩 내어 주다가 다음 요청 때 이어서 실행되는 함수. 출처: **PEP 255**(파이썬 2.2)가 `yield` 를 도입했고, 괄호로 쓰는 제너레이터 식(`(tx for tx in ...)`)은 **PEP 289**(2.4), 하위 제너레이터에 위임하는 `yield from` 은 **PEP 380**(3.3)입니다. 세 가지가 이 소스에 모두 나옵니다. 위치: `storage/jsonl.py:162`(`iter_raw`), `services/transactions.py:86-108`(`stream_sorted` + `yield from`), `services/importexport.py:83`(제너레이터 식), `cli/presenter.py:42-59`.
 
 **제네릭(generic)** — *(쉬운 뜻: "무엇을 담을지"만 나중에 정하면 되도록 속을 비워 둔 틀. 서랍장은 하나, 안에 넣는 것은 그때그때)* 타입을 매개변수로 받는 클래스/함수. `TypeVar` 로 자리표시자를 만들고 `Generic[T]` 로 선언합니다. 출처: **PEP 484**(3.5)가 `typing.TypeVar`/`Generic` 을 들여왔고, `list[str]` 처럼 내장 자료형을 바로 첨자화하는 표기는 **PEP 585**(3.9)입니다. **런타임에는 지워지므로**(type erasure) 실제 클래스는 별도로 지정해야 합니다 — 그것이 `entity_cls` 클래스 속성의 존재 이유입니다. 위치: `storage/jsonl.py:35`(`T = TypeVar("T")`)·`131`(`class JsonlStore(Generic[T])`), 실제 타입 지정은 `storage/repositories.py:30, 220, 286`(`entity_cls = Transaction` 등), [03 §6](./03-python-advanced.md).
 
 **종료 코드(exit code)** — *(쉬운 뜻: 프로그램이 끝나며 남기는 번호. 사람이 아니라 다음 프로그램이 읽습니다)* 프로세스가 OS 에 반환하는 정수. 0 은 성공, 나머지는 실패 종류. 출처: 유닉스/POSIX 의 프로세스 규약이며, "128 + 시그널 번호"(130 = 128 + SIGINT) 는 셸의 관례입니다. 위치: `cli/config.py:22-29`, 반환 경로는 `cli/error_handler.py` → `cli/app.py:61`(`_dispatch`) → `cli/app.py:84-94`(`main`) → `__main__.py:8`(`sys.exit`)(Q10).
 
-**지연 평가(lazy evaluation)** — *(쉬운 뜻: 쓰게 될지 안 될지 모르는 계산은 정말 필요해질 때까지 미뤄 두는 것)* 값이 실제로 필요해질 때까지 계산을 미루는 방식. 출처: 함수형 언어(Haskell 계열)에서 온 개념이며, 파이썬은 언어 전체가 아니라 **제너레이터·`range`·`logging` 처럼 자리를 골라** 도입했습니다. 위치: `storage/jsonl.py:193-203`(제너레이터), `decorators.py:42, 44`(%-스타일 로깅)(Q19).
+**지연 평가(lazy evaluation)** — *(쉬운 뜻: 쓰게 될지 안 될지 모르는 계산은 정말 필요해질 때까지 미뤄 두는 것)* 값이 실제로 필요해질 때까지 계산을 미루는 방식. 출처: 함수형 언어(Haskell 계열)에서 온 개념이며, 파이썬은 언어 전체가 아니라 **제너레이터·`range`·`logging` 처럼 자리를 골라** 도입했습니다. 위치: `storage/jsonl.py:215-225`(제너레이터), `decorators.py:42, 44`(%-스타일 로깅)(Q19).
 
 **참조 무결성(referential integrity)** — *(쉬운 뜻: 가리키는 대상이 반드시 실제로 있어야 한다는 약속)* 참조하는 대상이 반드시 존재해야 한다는 제약. 출처: E. F. Codd 의 관계형 데이터 모델(1970)에서 온 제약으로, SQL 의 외래 키와 `ON DELETE RESTRICT` 가 그 구현입니다. 위치: `services/categories.py:38-73`(카테고리 보호), Q14.
 
@@ -811,7 +816,7 @@ $ python -m budget_app import --from rt.csv
 
 **클로저(closure)** — *(쉬운 뜻: 만들어질 때 곁에 있던 값을 기억한 채로 돌아다니는 함수)* 자신이 만들어질 때의 바깥 변수를 기억하는 내부 함수. 출처: Peter Landin 이 1964년에 만든 용어로, 함수 본문과 그것이 참조하는 환경을 "닫아서" 한 덩어리로 본다는 뜻입니다. 위치: `cli/prompts.py:77-109`(`registered_category_validator` 가 `cat_service` 를 캡처), `storage/repositories.py:163-168`(`_drop` 이 `found` 를 `nonlocal` 로 갱신).
 
-**콜러블(callable)** — *(쉬운 뜻: 이름 뒤에 괄호를 붙여 "실행해 달라"고 할 수 있는 것 전부)* `f(...)` 처럼 호출 가능한 모든 객체. 함수뿐 아니라 클래스와 `__call__` 을 가진 인스턴스도 포함됩니다. 타입 힌트로는 `collections.abc.Callable[[인자], 반환]` 로 씁니다. 위치: `cli/prompts.py:100-107`(검증기 전달), `storage/jsonl.py:313-329`(`transform` 콜백), `cli/app.py:28-42`(`HANDLERS` 값이 전부 함수 객체).
+**콜러블(callable)** — *(쉬운 뜻: 이름 뒤에 괄호를 붙여 "실행해 달라"고 할 수 있는 것 전부)* `f(...)` 처럼 호출 가능한 모든 객체. 함수뿐 아니라 클래스와 `__call__` 을 가진 인스턴스도 포함됩니다. 타입 힌트로는 `collections.abc.Callable[[인자], 반환]` 로 씁니다. 위치: `cli/prompts.py:100-107`(검증기 전달), `storage/jsonl.py:335-351`(`transform` 콜백), `cli/app.py:28-42`(`HANDLERS` 값이 전부 함수 객체).
 
 **파이프(|)와 BrokenPipe** — *(쉬운 뜻: 앞 명령의 출력을 뒤 명령에 그대로 흘려 넣는 연결과, 받던 쪽이 먼저 자리를 뜬 상황)* 한 프로세스의 stdout 을 다른 프로세스의 stdin 에 연결하는 셸 기능과, 읽는 쪽이 먼저 닫혔을 때 발생하는 예외. 출처: 파이프는 Douglas McIlroy 의 제안으로 1973년 유닉스에 들어왔고, 닫힌 파이프에 쓸 때의 `SIGPIPE`/`EPIPE` 는 POSIX 규약입니다. 위치: `cli/error_handler.py:57-60`(잡지 않고 그대로 올림), `cli/app.py:50-58`(`os.dup2` 로 마무리)(Q23).
 
@@ -823,7 +828,7 @@ $ python -m budget_app import --from rt.csv
 
 ### 숫자·영문
 
-**2단계(준비→커밋) 구조** — *(쉬운 뜻: 먼저 전부 검사만 해 보고, 이상이 없을 때에야 실제로 반영하는 두 걸음)* 일괄 작업을 "전체 검증(준비)" 후 "일괄 반영(커밋)"으로 나눠, 실패가 준비 단계에서 걸리면 파일을 전혀 건드리지 않게 하는 구조. 위치: `services/importexport.py:104-131`(`_prepare`)·`166-177`(`_commit`), [10 §3.2](./10-advanced-design.md).
+**2단계(준비→커밋) 구조** — *(쉬운 뜻: 먼저 전부 검사만 해 보고, 이상이 없을 때에야 실제로 반영하는 두 걸음)* 일괄 작업을 "전체 검증(준비)" 후 "일괄 반영(커밋)"으로 나눠, 실패가 준비 단계에서 걸리면 파일을 전혀 건드리지 않게 하는 구조. 위치: `services/importexport.py:111-149`(`_prepare`)·`220-232`(`_commit`), [10 §3.2](./10-advanced-design.md).
 
 **BOM(Byte Order Mark)** — *(쉬운 뜻: 파일 맨 앞에 눈에 보이지 않게 붙는 세 바이트짜리 표식. 모르고 읽으면 첫 글자에 달라붙습니다)* 텍스트 파일 맨 앞에 붙는 유니코드 문자 **U+FEFF**(UTF-8 로는 3바이트 `EF BB BF`). 출처: 유니코드 표준. 원래는 UTF-16 의 바이트 순서를 알리는 표식이었는데, 마이크로소프트 도구가 "이 파일은 UTF-8" 이라는 신호로 전용하면서 관행이 됐습니다. 파이썬은 인코딩 이름 `"utf-8-sig"` 로 지원합니다. 위치: `storage/config.py:39-40`(쓰기는 `utf-8`, 읽기만 `utf-8-sig`)(Q17).
 
@@ -839,7 +844,7 @@ $ python -m budget_app import --from rt.csv
 
 **`os.replace`** — *(쉬운 뜻: 새로 다 써 놓은 종이를 압정 한 번 뽑아 기존 자리에 갈아 끼우는 동작)* 대상이 있어도 덮어쓰는 이름 교체. 같은 파일시스템 안에서 원자적입니다. 출처: 원자성 보장 자체는 POSIX `rename(2)` 규격에서 오고, 함수 `os.replace` 는 윈도우와 POSIX 의 동작 차이를 없애려고 **파이썬 3.3** 에 추가됐습니다. 위치: `storage/jsonl.py:77`(Q21).
 
-**`surrogateescape`** — *(쉬운 뜻: 읽을 수 없는 바이트를 버리지 않고 따로 숨겨 두었다가, 다시 쓸 때 원래대로 꺼내 놓는 처리기)* 디코딩할 수 없는 바이트를 유니코드 미사용 영역에 숨겨 두었다가 인코딩할 때 **원래 바이트로 정확히 되돌리는** 오류 처리기. 출처: **PEP 383**(파이썬 3.1). 위치: `storage/config.py:25`(`FILE_ERRORS`), 사용은 `storage/jsonl.py:162-179`(Q20).
+**`surrogateescape`** — *(쉬운 뜻: 읽을 수 없는 바이트를 버리지 않고 따로 숨겨 두었다가, 다시 쓸 때 원래대로 꺼내 놓는 처리기)* 디코딩할 수 없는 바이트를 유니코드 미사용 영역에 숨겨 두었다가 인코딩할 때 **원래 바이트로 정확히 되돌리는** 오류 처리기. 출처: **PEP 383**(파이썬 3.1). 위치: `storage/config.py:25`(`FILE_ERRORS`), 사용은 `storage/jsonl.py:162-182`(Q20).
 
 **`SUPPRESS`(argparse)** — *(쉬운 뜻: "값을 안 주면 빈칸을 만들지 말고 아예 없는 것으로 두라"는 특수 기본값)* "값이 명시되지 않으면 namespace 에 속성을 만들지 마라"는 특수 기본값. 하위 파서가 상위 파서의 값을 덮어쓰는 것을 막습니다. 출처: `argparse` 모듈 자체가 **PEP 389**(3.2)로 표준에 들어왔고, `SUPPRESS` 는 그 이전 `optparse` 시절부터 있던 관용구입니다. 위치: `cli/parser.py:75-76`, 실제 기본값은 `cli/parser.py:84` 아래 한 곳에만([09 §2.4](./09-cli.md)).
 

@@ -76,21 +76,40 @@ def _env_debug() -> bool:
     return value not in config.FALSY_ENV_VALUES
 
 
+#: ``setup_logging`` 이 확정한 디버그 여부(``--debug`` 플래그 + 환경변수).
+#: ``handle_errors`` 가 "스택트레이스를 기록에 실을까"를 이 값 하나로 판단한다.
+_debug_enabled = False
+
+
+def debug_enabled() -> bool:
+    """디버그 모드가 켜져 있는가 — ``setup_logging`` 이 확정한 값.
+
+    ``handle_errors`` 는 로깅 설정을 직접 읽지 않는다. "디버그인가"의 정의가
+    ``--debug`` 와 환경변수 둘로 나뉘어 있어서, 그 합성을 아는 곳(여기)이
+    한 곳뿐이어야 두 경로의 동작이 갈라지지 않는다.
+    """
+    return _debug_enabled
+
+
 def setup_logging(debug: bool = False) -> bool:
     """루트 로거에 핸들러를 붙인다 — ``main()`` 에서 한 번만 호출한다.
 
-    이 호출이 없으면 ``logging.getLogger(...)`` 로 만든 로거에는 핸들러가 하나도
-    없고 유효 레벨도 WARNING 이라, ``logger.debug(..., exc_info=True)`` 로 보존한
-    스택트레이스가 **어디에도 남지 않는다**. "사용자에게는 감추고 로그로 보존한다"는
-    ``handle_errors`` 의 의도는 이 함수가 있어야 비로소 성립한다.
+    이 호출은 두 가지를 확정한다 — **레벨/포맷**과 **디버그 여부**(``debug_enabled``).
+    호출되지 않으면 로그 레벨이 기본값 WARNING 에 머무르고 디버그도 꺼진 것으로 간주되어,
+    ``--debug`` 로 요청한 스택트레이스가 어디에도 남지 않는다. "사용자에게는 감추고
+    ``--debug`` 일 때만 남긴다"는 ``handle_errors`` 의 정책은 이 함수가 있어야 성립한다.
 
     - ``debug=False`` → WARNING. 손상된 JSONL 줄 경고 등만 stderr 로 나온다.
+      예기치 못한 예외는 "unhandled error" 한 줄만 남고 **스택트레이스는 붙지 않는다**
+      (요구사항 Q2: 사용자 화면에는 스택트레이스 대신 원인 + 힌트).
     - ``debug=True``  → DEBUG. ``@log_call``/``@measure_time`` 의 호출 로그와
       예기치 못한 예외의 스택트레이스까지 stderr 로 나온다.
 
     반환: 실제로 디버그 모드가 켜졌는지 여부(플래그 또는 환경변수).
     """
+    global _debug_enabled
     enabled = bool(debug) or _env_debug()
+    _debug_enabled = enabled
     logging.basicConfig(
         level=logging.DEBUG if enabled else logging.WARNING,
         format=messages.LOG_FORMAT_DEBUG if enabled else messages.LOG_FORMAT,

@@ -7,14 +7,21 @@
 
 from __future__ import annotations
 
+import heapq
 from collections.abc import Iterator
 
 from ..decorators import log_call
 from ..domain.entities import Transaction, TransactionPatch
 from ..domain.queries import SearchFilter
+from ..domain.tx_id import TransactionId
 from ..errors import AppError
 from ..storage.repositories import CategoryStore, TransactionRepository
 from . import messages
+
+
+def _sort_key(tx: Transaction) -> tuple[str, TransactionId]:
+    """최신순 정렬 키 — 날짜가 같으면 발급 번호로 가른다(둘 다 유일 순서를 만든다)."""
+    return (tx.date, tx.id)
 
 
 class TransactionService:
@@ -76,15 +83,29 @@ class TransactionService:
                 messages.ERR_TX_NOT_FOUND.format(tx_id=tx_id), hint=messages.HINT_LIST_ID
             )
 
-    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
-        """최신순 정렬된 거래를 yield 한다.
+    def stream_sorted(
+        self, flt: SearchFilter | None = None, *, limit: int | None = None
+    ) -> Iterator[Transaction]:
+        """최신순 정렬된 거래를 yield 한다 — ``limit`` 이 있으면 **상위 N 만** 들고 있는다.
 
-        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).
-        그러나 메모리 사용량은 '필터 통과 항목'으로 제한된다.
+        파일이 시간순으로 정렬돼 있지 않으므로 어느 쪽이든 전체를 한 번은 **훑어야**
+        한다. 문제는 훑는 것이 아니라 **모으는 것**이었다: 이전 구현은 필터 통과분
+        전체를 리스트로 적재한 뒤 정렬해서, ``list --limit 1`` 인데도 20만 행 파일이
+        통째로 메모리에 올라왔다(피크 RSS 146MB). 요구사항 G2 의 "파일 전체를 한 번에
+        로드하지 않고"가 여기서 깨졌다 — 하류 제너레이터의 ``break`` 는 **이미 만들어진
+        리스트**를 자를 뿐이라 아무것도 아끼지 못했다.
+
+        ``heapq.nlargest`` 는 크기 ``limit`` 짜리 힙 하나만 유지하며 스트림을 흘려
+        보낸다. 메모리 상한이 파일 크기가 아니라 **O(limit)** 이 되고, 결과 순서는
+        전체 정렬과 같다(키가 같은 항목이 없으므로 — id 는 유일하다).
+
+        ``limit`` 이 없으면(``search`` 경로) 전체 정렬이 필요하므로 예전과 같다.
         """
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 
     def _require_registered_category(self, name: str, *, hint: str) -> None:
         if not self.cats.exists(name):

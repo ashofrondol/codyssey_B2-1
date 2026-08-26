@@ -99,7 +99,7 @@ def cmd_summary(args: argparse.Namespace) -> int:
     return 0
 ```
 
-budget_app/cli/handlers.py:72-75
+budget_app/cli/handlers.py:76-79
 
 ```python
 def cmd_summary(ctx: AppContext, args: argparse.Namespace) -> int:
@@ -373,7 +373,7 @@ def _add_export(sub) -> None:
 
 ### 2.7 `needs_storage` — backup 만 예외
 
-budget_app/cli/parser.py:239-243
+budget_app/cli/parser.py:248-252
 
 ```python
 def _add_backup(sub) -> None:
@@ -471,7 +471,7 @@ budget_app/cli/prompts.py:1-11
 
 `_ask` 는 한 번만 묻습니다. 빈 값을 입력하면 `Category.normalize` 가 `ValidationError` 를 던지고 **종료 코드 2로 죽었습니다.** 반면 `cmd_add` 의 카테고리 입력은 틀리면 최대 10번 다시 물었습니다. 같은 "대화형 입력"인데 정책이 달랐던 것입니다.
 
-budget_app/cli/prompts.py:124-128
+budget_app/cli/prompts.py:130-134
 
 ```python
 def ask_category_name(given: str | None) -> str:
@@ -578,7 +578,7 @@ def registered_category_validator(cat_service: CategoryService) -> Callable[[str
 **`ask_transaction` 한 함수가 입력 순서와 각 필드의 검증기를 결정합니다.**
 
 - 필수 4개(`date`/`type`/`category`/`amount`)는 `ask_until` — 틀리면 다시 묻습니다.
-- 선택 2개(`memo`/`tags`)는 `ask` 한 번 — 빈 값이 정상이라 재입력할 이유가 없습니다.
+- 선택 2개(`memo`/`tags`)도 `ask_until` 입니다. 빈 값은 정상이지만 **거부되는 값이 따로 있기 때문**입니다 — UTF-8 로 표현할 수 없는 문자(`_require_utf8`)와 구분자 `,` 를 품은 태그가 그것입니다. 예전처럼 `ask` 한 번으로 끝내면 그때 재입력 기회 없이 명령이 끝나, 이 모듈이 선언한 "모든 대화형 입력은 `ask_until` 을 지난다"가 사실이 아니게 됩니다.
 
 **카테고리만 클로저 팩토리**(검사에 필요한 도구를 미리 품은 검사 함수를 그때그때 만들어 내는 방식)**인 이유**는 저장소를 봐야 판단되기 때문입니다. 나머지는 값만 보면 되므로 `validators` 모듈 함수를 그대로 넘깁니다. `ValidationError` 를 던지면 `ask_until` 이 잡아 재입력을 요구하므로, "등록 안 된 카테고리"도 **재입력 가능한 오류**가 됩니다.
 
@@ -632,16 +632,20 @@ budget_app/cli/presenter.py:1-16
 ### 4.2 제너레이터로 반환하는 이유
 
 > **💡 쉽게 말하면** — 도서관에서 두꺼운 책의 내용을 확인하는 방법은 둘입니다. 전권을 복사해 가방에 넣고 나와서 보거나, 열람실에서 필요한 만큼만 한 장씩 넘겨 보거나. 뒤쪽이 제너레이터입니다 — 스무 줄만 필요하면 스물한 장째는 넘기지 않고, 가방(메모리)이 무거워지지도 않습니다.
-> 다만 이 비유는 **중간에 정렬이 끼는 순간** 깨집니다 — 최신순으로 보려면 어차피 전권을 한 번은 훑어야 하고, 훑은 것을 다 손에 든 채로 첫 줄을 내놓게 됩니다. 즉 조건에 걸러진 항목 전체가 메모리에 쌓이고, `--limit 20` 을 붙여도 그 양은 줄지 않습니다. 이 프로그램의 `list` 가 정확히 그 경우라, 두 가지 이득 중 어느 쪽도 여기서는 얻지 못합니다. 그래서 이 절 뒤쪽에 "정직하게" 라는 단서가 붙습니다.
+> 다만 이 비유는 **중간에 정렬이 끼는 순간** 반쯤 깨집니다 — 최신순으로 보려면 어차피 전권을 한 번은 훑어야 하므로, 첫 줄이 나오기까지 걸리는 시간은 스무 줄만 필요해도 줄지 않습니다. 아끼는 쪽은 **손에 드는 양**입니다. `--limit 20` 을 서비스까지 내려보내면 훑는 동안 손에 남는 것이 스무 장뿐이라 가방은 무거워지지 않습니다. 그 한도가 없는 `search` 만 조건에 걸러진 항목 전체를 쌓아 둡니다. 그래서 이 절 뒤쪽에 "정직하게" 라는 단서가 붙습니다.
 
-budget_app/cli/presenter.py:42-55
+budget_app/cli/presenter.py:42-59
 
 ```python
 def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
     """거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.
 
     제너레이터인 이유: 상류(``stream_sorted``)가 제너레이터이므로 여기서 리스트로
-    모으면 스트리밍이 끊긴다. ``limit`` 이 걸리면 그 지점에서 상류 소비도 멈춘다.
+    모으면 스트리밍이 끊긴다.
+
+    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
+    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
+    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
     """
     count = 0
     for tx in rows:
@@ -665,25 +669,55 @@ def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[
 
 > **🔎 문법의 출처** — 함수 본문에 `yield` 가 하나라도 있으면 그 함수는 **호출해도 본문이 실행되지 않고** 제너레이터 객체를 돌려주는 함수가 됩니다(PEP 255, 파이썬 2.2). 컴파일러가 코드 객체에 `CO_GENERATOR` 플래그를 세우기 때문이고, 그래서 `tx_table(...)` 을 부르는 것만으로는 저장소를 한 줄도 읽지 않습니다. 본문은 `next()` 가 불릴 때마다 **다음 `yield` 까지만** 실행되고 거기서 지역 변수(`count`, `tx`)와 실행 위치를 프레임에 남긴 채 멈춥니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
-> **⚙️ `break` 가 상류까지 전파되는 실제 경로.** 제너레이터는 값을 **밀어내지(push) 않고 당겨집니다(pull)**. `for line in tx_table(...)` 이 도는 동안에만 `tx_table` 이 깨어나고, `tx_table` 이 깨어난 동안에만 `for tx in rows` 가 상류에 `next()` 를 겁니다. `break` 로 `tx_table` 이 멈추면 상류에 `next()` 를 거는 코드가 아무 데도 없으므로 상류는 **그 자리에 멈춘 채 그대로 남습니다** — 취소 신호를 보내는 것이 아니라 **아무도 부르지 않아서** 멈추는 것입니다. 이후 제너레이터 객체의 참조가 사라지면 파이썬이 `close()` 를 불러 멈춘 지점에 `GeneratorExit` 를 던지고, 그때 상류의 `with open(...)`(`storage/jsonl.py:174`)이 `finally` 를 타며 파일이 닫힙니다.
+> **⚙️ `break` 가 상류까지 전파되는 실제 경로.** 제너레이터는 값을 **밀어내지(push) 않고 당겨집니다(pull)**. `for line in tx_table(...)` 이 도는 동안에만 `tx_table` 이 깨어나고, `tx_table` 이 깨어난 동안에만 `for tx in rows` 가 상류에 `next()` 를 겁니다. `break` 로 `tx_table` 이 멈추면 상류에 `next()` 를 거는 코드가 아무 데도 없으므로 상류는 **그 자리에 멈춘 채 그대로 남습니다** — 취소 신호를 보내는 것이 아니라 **아무도 부르지 않아서** 멈추는 것입니다. 이후 제너레이터 객체의 참조가 사라지면 파이썬이 `close()` 를 불러 멈춘 지점에 `GeneratorExit` 를 던지고, 그때 상류의 `with open(...)`(`storage/jsonl.py:177`)이 `finally` 를 타며 파일이 닫힙니다.
 
 **정직하게 — `list` 경로에서는 파일 읽기까지 줄어들지는 않습니다.**
 
-budget_app/services/transactions.py:79-87
+budget_app/services/transactions.py:86-108
 
 ```python
-    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
-        """최신순 정렬된 거래를 yield 한다.
+    def stream_sorted(
+        self, flt: SearchFilter | None = None, *, limit: int | None = None
+    ) -> Iterator[Transaction]:
+        """최신순 정렬된 거래를 yield 한다 — ``limit`` 이 있으면 **상위 N 만** 들고 있는다.
 
-        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).
-        그러나 메모리 사용량은 '필터 통과 항목'으로 제한된다.
+        파일이 시간순으로 정렬돼 있지 않으므로 어느 쪽이든 전체를 한 번은 **훑어야**
+        한다. 문제는 훑는 것이 아니라 **모으는 것**이었다: 이전 구현은 필터 통과분
+        전체를 리스트로 적재한 뒤 정렬해서, ``list --limit 1`` 인데도 20만 행 파일이
+        통째로 메모리에 올라왔다(피크 RSS 146MB). 요구사항 G2 의 "파일 전체를 한 번에
+        로드하지 않고"가 여기서 깨졌다 — 하류 제너레이터의 ``break`` 는 **이미 만들어진
+        리스트**를 자를 뿐이라 아무것도 아끼지 못했다.
+
+        ``heapq.nlargest`` 는 크기 ``limit`` 짜리 힙 하나만 유지하며 스트림을 흘려
+        보낸다. 메모리 상한이 파일 크기가 아니라 **O(limit)** 이 되고, 결과 순서는
+        전체 정렬과 같다(키가 같은 항목이 없으므로 — id 는 유일하다).
+
+        ``limit`` 이 없으면(``search`` 경로) 전체 정렬이 필요하므로 예전과 같다.
         """
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
-`stream_sorted` 는 **정렬 때문에** 파일을 끝까지 읽어 리스트로 모은 뒤에야 첫 값을 내놓습니다(docstring 이 직접 그렇게 적어 두었습니다). 그러므로 `--limit 20` 에서 `break` 가 실제로 아끼는 것은 **디스크 읽기가 아니라 나머지 항목의 `tx_line()` 문자열 조립과 그 줄들의 `print`** 입니다. `break` 가 끊는 상류는 `stream_sorted` 안의 `yield from items` 이지 파일을 읽는 `iter_raw` 가 아닙니다 — 그쪽은 이미 다 돌고 파일도 닫힌 뒤입니다.
+`stream_sorted` 는 **정렬 때문에** 파일을 끝까지 훑은 뒤에야 첫 값을 내놓습니다(docstring 이 직접 그렇게 적어 두었습니다). 그러므로 `tx_table` 의 `break` 가 실제로 아끼는 것은 **디스크 읽기가 아니라 나머지 항목의 `tx_line()` 문자열 조립과 그 줄들의 `print`** 입니다. `break` 가 끊는 상류는 `stream_sorted` 의 마지막 `yield from` 이지 파일을 읽는 `iter_raw` 가 아닙니다 — 그쪽은 이미 다 돌고 파일도 닫힌 뒤입니다.
+
+**메모리를 잡는 것은 `break` 가 아니라 `limit` 을 서비스까지 내려보내는 것입니다.** `cmd_list` 는 같은 `--limit` 을 프레젠터와 서비스 **양쪽에** 넘깁니다.
+
+budget_app/cli/handlers.py:53-59
+
+```python
+def cmd_list(ctx: AppContext, args: argparse.Namespace) -> int:
+    # ``limit`` 을 서비스까지 내려보내는 것이 핵심이다. 프레젠터에만 주면 이미
+    # 만들어진 결과를 자르는 것이라 메모리는 파일 크기를 따라간다(G2 위반).
+    # 서비스가 알면 상위 N 만 힙에 유지하며 스트림을 흘려보낸다.
+    rows = ctx.tx_service.stream_sorted(limit=args.limit)
+    output.out_lines(presenter.tx_table(rows, limit=args.limit))
+    return config.EXIT_OK
+```
+
+서비스가 `limit` 을 알면 `heapq.nlargest` 로 **상위 N 만 힙에 유지**하며 스트림을 흘려보내므로, 메모리 상한이 파일 크기가 아니라 `O(limit)` 이 됩니다. 프레젠터의 `limit` 은 그다음 **표시 한도**일 뿐입니다 — 두 곳에 같은 값을 주는 것이 중복처럼 보이지만, 하나는 메모리 한도이고 하나는 출력 한도라 역할이 다릅니다.
 
 "당기는 만큼만 읽는다"가 **파일 읽기까지 그대로 성립하는 경로**는 정렬이 없는 곳입니다. 예를 들어 `TransactionRepository.get`(`storage/repositories.py:112-119`)이 `stream()` 을 돌다 원하는 id 를 찾는 순간 `return` 하면 그 뒤의 줄은 디스크에서 읽지도 않습니다. 제너레이터 사슬의 이득은 "사슬 전체가 게으를 때"만 끝까지 전달되고, **중간에 `sort` 같은 전량 소비자가 하나 끼면 거기서 끊긴다** — 이것이 이 구조를 읽을 때 가장 흔히 오해하는 지점입니다([10 §4](./10-advanced-design.md)의 성능 분석과 이어집니다).
 
@@ -691,7 +725,7 @@ budget_app/services/transactions.py:79-87
 
 ### 4.3 계산하지 않고 묻기만 한다
 
-budget_app/cli/presenter.py:63-88
+budget_app/cli/presenter.py:67-92
 
 ```python
 def summary_lines(summary: MonthlySummary) -> Iterator[str]:
@@ -726,13 +760,13 @@ def _budget_lines(summary: MonthlySummary) -> Iterator[str]:
 
 **`yield from _budget_lines(summary)`** 는 다른 제너레이터에 반복을 위임합니다. 예산 관련 두 줄을 별도 함수로 뺀 이유는 `summary_lines` 의 흐름(수입→지출→잔액→예산→TOP)이 한눈에 읽히게 하기 위해서입니다.
 
-> **🔎 문법의 출처** — `yield from` 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. 그 전에는 `for x in gen(): yield x` 라고 손으로 풀어 써야 했고, 여기서는 그것과 결과가 같습니다. 다만 `yield from` 이 단순한 축약이 아닌 이유는 **`send()`·`throw()`·`close()`·반환값(`StopIteration.value`)까지 하위 제너레이터에 그대로 통과시키기** 때문입니다. 이 소스는 값만 흘려보내므로 축약으로 봐도 무방하지만, 같은 문법이 `stream_sorted` 의 `yield from items` 처럼 **리스트에도** 쓰입니다 — 대상은 제너레이터가 아니라 아무 이터러블이면 됩니다.
+> **🔎 문법의 출처** — `yield from` 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. 그 전에는 `for x in gen(): yield x` 라고 손으로 풀어 써야 했고, 여기서는 그것과 결과가 같습니다. 다만 `yield from` 이 단순한 축약이 아닌 이유는 **`send()`·`throw()`·`close()`·반환값(`StopIteration.value`)까지 하위 제너레이터에 그대로 통과시키기** 때문입니다. 이 소스는 값만 흘려보내므로 축약으로 봐도 무방하지만, 같은 문법이 `stream_sorted` 의 `yield from sorted(...)` 처럼 **리스트에도** 쓰입니다 — 대상은 제너레이터가 아니라 아무 이터러블이면 됩니다.
 >
-> `summary_lines` 안의 `return`(`presenter.py:66`)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 `return` 은 "값을 하나 돌려준다"가 아니라 **`StopIteration` 을 일으켜 반복을 끝낸다**는 뜻이고, 그래서 `is_empty` 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 `return 값` 도 문법상 허용되지만 그 값은 `yield` 되지 않고 `StopIteration.value` 에 실립니다). → [12 §1-C](./12-syntax-and-stdlib.md)
+> `summary_lines` 안의 `return`(`presenter.py:70`)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 `return` 은 "값을 하나 돌려준다"가 아니라 **`StopIteration` 을 일으켜 반복을 끝낸다**는 뜻이고, 그래서 `is_empty` 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 `return 값` 도 문법상 허용되지만 그 값은 `yield` 되지 않고 `StopIteration.value` 에 실립니다). → [12 §1-C](./12-syntax-and-stdlib.md)
 
 ### 4.4 진단 줄도 프레젠터가 만든다
 
-budget_app/cli/presenter.py:109-115
+budget_app/cli/presenter.py:113-119
 
 ```python
 def import_result_line(report: ImportReport, mode: str) -> str:
@@ -854,9 +888,9 @@ RESULT 2
 
 `except` 에 `ValueError` 가 함께 적힌 것도 이유가 있습니다. 파일 객체가 **닫힌 뒤**에 `flush()` 를 부르면 파이썬은 `OSError` 가 아니라 `ValueError: I/O operation on closed file` 을 던집니다. 두 실패는 원인이 다르지만(끊김 / 닫힘) 여기서의 대응은 같으므로 튜플 하나로 묶었습니다.
 
-### 5.4 `setup_logging` — 로거를 붙이는 유일한 지점
+### 5.4 `setup_logging` — 로거를 붙이고 디버그 여부를 확정하는 유일한 지점
 
-budget_app/cli/output.py:74-100
+budget_app/cli/output.py:74-119
 
 ```python
 def _env_debug() -> bool:
@@ -864,21 +898,40 @@ def _env_debug() -> bool:
     return value not in config.FALSY_ENV_VALUES
 
 
+#: ``setup_logging`` 이 확정한 디버그 여부(``--debug`` 플래그 + 환경변수).
+#: ``handle_errors`` 가 "스택트레이스를 기록에 실을까"를 이 값 하나로 판단한다.
+_debug_enabled = False
+
+
+def debug_enabled() -> bool:
+    """디버그 모드가 켜져 있는가 — ``setup_logging`` 이 확정한 값.
+
+    ``handle_errors`` 는 로깅 설정을 직접 읽지 않는다. "디버그인가"의 정의가
+    ``--debug`` 와 환경변수 둘로 나뉘어 있어서, 그 합성을 아는 곳(여기)이
+    한 곳뿐이어야 두 경로의 동작이 갈라지지 않는다.
+    """
+    return _debug_enabled
+
+
 def setup_logging(debug: bool = False) -> bool:
     """루트 로거에 핸들러를 붙인다 — ``main()`` 에서 한 번만 호출한다.
 
-    이 호출이 없으면 ``logging.getLogger(...)`` 로 만든 로거에는 핸들러가 하나도
-    없고 유효 레벨도 WARNING 이라, ``logger.debug(..., exc_info=True)`` 로 보존한
-    스택트레이스가 **어디에도 남지 않는다**. "사용자에게는 감추고 로그로 보존한다"는
-    ``handle_errors`` 의 의도는 이 함수가 있어야 비로소 성립한다.
+    이 호출은 두 가지를 확정한다 — **레벨/포맷**과 **디버그 여부**(``debug_enabled``).
+    호출되지 않으면 로그 레벨이 기본값 WARNING 에 머무르고 디버그도 꺼진 것으로 간주되어,
+    ``--debug`` 로 요청한 스택트레이스가 어디에도 남지 않는다. "사용자에게는 감추고
+    ``--debug`` 일 때만 남긴다"는 ``handle_errors`` 의 정책은 이 함수가 있어야 성립한다.
 
     - ``debug=False`` → WARNING. 손상된 JSONL 줄 경고 등만 stderr 로 나온다.
+      예기치 못한 예외는 "unhandled error" 한 줄만 남고 **스택트레이스는 붙지 않는다**
+      (요구사항 Q2: 사용자 화면에는 스택트레이스 대신 원인 + 힌트).
     - ``debug=True``  → DEBUG. ``@log_call``/``@measure_time`` 의 호출 로그와
       예기치 못한 예외의 스택트레이스까지 stderr 로 나온다.
 
     반환: 실제로 디버그 모드가 켜졌는지 여부(플래그 또는 환경변수).
     """
+    global _debug_enabled
     enabled = bool(debug) or _env_debug()
+    _debug_enabled = enabled
     logging.basicConfig(
         level=logging.DEBUG if enabled else logging.WARNING,
         format=messages.LOG_FORMAT_DEBUG if enabled else messages.LOG_FORMAT,
@@ -903,6 +956,8 @@ if force:
 단순히 떼는 것이 아니라 **`close()` 까지** 부릅니다 — 파일 핸들러였다면 파일 디스크립터가 반납되고, 버퍼가 있었다면 비워집니다. `root.handlers[:]` 라는 슬라이스 사본을 도는 것도 필수입니다. `removeHandler` 가 원본 리스트를 줄이는데 그 리스트를 그대로 순회하면 항목을 건너뛰기 때문입니다.
 
 이 소스에서 `force=True` 가 필요한 이유는 주석대로 **재호출·테스트**입니다 — 한 프로세스 안에서 `main(["list"])`, `main(["--debug", "list"])` 를 연달아 부르는 테스트에서 두 번째 `--debug` 가 먹히려면 첫 번째 설정을 걷어내야 합니다. 또 `setup_logging` 이 붙이는 것은 **루트 로거**의 핸들러이고, `budget_app.*` 자식 로거들은 자기 핸들러 없이 레코드를 부모로 올려 보내(propagate) 여기서 처리됩니다. 그래서 "로거를 붙이는 지점이 하나"라는 말이 성립합니다.
+
+**이 함수가 확정하는 것이 하나 더 있습니다 — "지금 디버그인가".** `enabled` 를 모듈 변수 `_debug_enabled` 에 적어 두고, `debug_enabled()` 가 그것을 읽습니다. `handle_errors` 는 로깅 설정을 직접 들여다보지 않고 이 함수 하나만 물어 **스택트레이스를 기록에 실을지**를 정합니다(`logger.error(..., exc_info=output.debug_enabled())`). "디버그인가"의 정의가 `--debug` 플래그와 `BUDGET_APP_DEBUG` 환경변수 둘로 나뉘어 있으므로, 그 합성을 아는 곳이 한 곳뿐이어야 두 경로의 동작이 갈라지지 않습니다.
 
 **환경변수 처리의 함정.**
 
@@ -982,8 +1037,8 @@ budget_app/cli/app.py:84-94
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:
@@ -1062,7 +1117,7 @@ budget_app/context.py:42-57
 
 ### 6.5 기간 조건 조립
 
-budget_app/cli/handlers.py:153-157
+budget_app/cli/handlers.py:157-161
 
 ```python
 def cmd_export(ctx: AppContext, args: argparse.Namespace) -> int:
@@ -1216,7 +1271,7 @@ budget_app/cli/output.py:60-65
 
 **Q. 왜 프레젠터가 출력하지 않고 반환하나요?**
 
-채널 결정은 `output` 의 책임이라 프레젠터가 `print` 하면 두 모듈이 같은 책임을 나눠 갖게 됩니다. 또 반환값이 문자열이면 프로세스를 띄우지 않고 화면 형식을 검증할 수 있습니다. 제너레이터로 반환하는 것은 상류 스트리밍을 끊지 않기 위해서이며, `--limit` 에서 `break` 하면 상류가 더 이상 `next()` 를 받지 않아 그 자리에서 멈춥니다. 다만 `list` 경로에서 아껴지는 것은 나머지 줄의 문자열 조립·출력이지 파일 읽기가 아닙니다 — `stream_sorted` 가 정렬 때문에 이미 전체를 읽어 리스트로 모으기 때문입니다(§4.2).
+채널 결정은 `output` 의 책임이라 프레젠터가 `print` 하면 두 모듈이 같은 책임을 나눠 갖게 됩니다. 또 반환값이 문자열이면 프로세스를 띄우지 않고 화면 형식을 검증할 수 있습니다. 제너레이터로 반환하는 것은 상류 스트리밍을 끊지 않기 위해서이며, `--limit` 에서 `break` 하면 상류가 더 이상 `next()` 를 받지 않아 그 자리에서 멈춥니다. 다만 프레젠터의 `break` 로 아껴지는 것은 나머지 줄의 문자열 조립·출력이지 파일 읽기가 아닙니다 — 정렬은 어차피 전체를 훑어야 끝나기 때문입니다. 메모리를 잡는 것은 같은 `--limit` 을 받은 `stream_sorted` 쪽입니다(§4.2).
 
 ---
 

@@ -14,6 +14,7 @@
 | 준비 → 커밋 | 파일에 손대기 전에 전부 따져 두고(준비), 그다음 한 번에 반영하는(커밋) 두 단계. 준비 중 오류가 나왔을 때 커밋을 아예 건너뛸지, 통과한 것만 반영할지는 `--atomic` 이 정합니다 |
 | 원자적(`--atomic`) | 전부 되거나 전혀 안 되거나를 지향하는 모드. 절반만 반영된 상태를 거의 남기지 않습니다(완전히 없애지는 못하며, 그 한계는 §5.6 에 적어 두었습니다) |
 | 중복(`--on-duplicate`) | 이미 저장된 것과 **같은 id** 를 가진 행이 또 들어오는 일, 그리고 그것을 어떻게 할지. 내용이 같은지는 보지 않습니다 |
+| 미등록 카테고리(`--auto-category`) | CSV 의 `category` 가 카테고리 파일에 없는 일. 기본은 그 행을 거부하고, 이 플래그를 주면 등록하고 받습니다 |
 | 참조 무결성 | 누군가 가리키고 있는 것을 함부로 없애지 않는다는 규칙 |
 | 스트리밍 | 파일 전체를 한꺼번에 메모리에 올리지 않고 한 건씩 꺼내 처리하는 것 |
 
@@ -63,10 +64,10 @@ docstring 이 나열하는 네 개의 유스케이스 서비스에, 폴더 단�
 
 | 클래스 | 위치 | 담당 |
 |---|---|---|
-| `TransactionService` | `services/transactions.py:20-91` | 거래 추가/수정/삭제/조회 |
+| `TransactionService` | `services/transactions.py:27-112` | 거래 추가/수정/삭제/조회 |
 | `BudgetService` | `services/budgets.py:20-66` | 예산 설정 + 월별 요약 |
 | `CategoryService` | `services/categories.py:15-89` | 카테고리 추가/조회/삭제 (사용 중 보호) |
-| `ImportExportService` | `services/importexport.py:61-208` | CSV 가져오기/내보내기 정책 |
+| `ImportExportService` | `services/importexport.py:61-261` | CSV 가져오기/내보내기 정책 |
 | `BackupService` | `services/maintenance.py:29-37` | 데이터 폴더 백업 (얇은 위임) |
 
 여기에 준비 단계 누적 상태를 담는 `_Batch`(`services/importexport.py:30-58`)가 있습니다.
@@ -81,7 +82,7 @@ docstring 이 나열하는 네 개의 유스케이스 서비스에, 폴더 단�
 
 ### 2.1 `add` — 서비스가 판단하는 것은 하나뿐
 
-budget_app/services/transactions.py:27-35
+budget_app/services/transactions.py:34-42
 
 ```python
     @log_call
@@ -111,7 +112,7 @@ budget_app/services/transactions.py:27-35
 | `"2024-13-45"` 는 날짜인가 | 값 하나 | `validators` | `ValidationError` |
 | `"food"` 는 등록된 카테고리인가 | **저장된 상태** | 서비스 | `AppError` |
 
-budget_app/services/transactions.py:89-91
+budget_app/services/transactions.py:110-112
 
 ```python
     def _require_registered_category(self, name: str, *, hint: str) -> None:
@@ -132,7 +133,7 @@ budget_app/services/transactions.py:89-91
 
 ### 2.2 `update` — 조회 → 도메인 변환 → 저장
 
-budget_app/services/transactions.py:52-70
+budget_app/services/transactions.py:59-77
 
 ```python
     @log_call
@@ -170,7 +171,7 @@ budget_app/services/transactions.py:52-70
 
 ### 2.3 `delete` — 저장소의 bool 을 오류로 승격
 
-budget_app/services/transactions.py:72-76
+budget_app/services/transactions.py:79-83
 
 ```python
     @log_call
@@ -184,29 +185,43 @@ budget_app/services/transactions.py:72-76
 
 ### 2.4 `stream_sorted` — 정렬이 필요한 조회
 
-budget_app/services/transactions.py:79-87
+budget_app/services/transactions.py:86-108
 
 ```python
-    def stream_sorted(self, flt: SearchFilter | None = None) -> Iterator[Transaction]:
-        """최신순 정렬된 거래를 yield 한다.
+    def stream_sorted(
+        self, flt: SearchFilter | None = None, *, limit: int | None = None
+    ) -> Iterator[Transaction]:
+        """최신순 정렬된 거래를 yield 한다 — ``limit`` 이 있으면 **상위 N 만** 들고 있는다.
 
-        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).
-        그러나 메모리 사용량은 '필터 통과 항목'으로 제한된다.
+        파일이 시간순으로 정렬돼 있지 않으므로 어느 쪽이든 전체를 한 번은 **훑어야**
+        한다. 문제는 훑는 것이 아니라 **모으는 것**이었다: 이전 구현은 필터 통과분
+        전체를 리스트로 적재한 뒤 정렬해서, ``list --limit 1`` 인데도 20만 행 파일이
+        통째로 메모리에 올라왔다(피크 RSS 146MB). 요구사항 G2 의 "파일 전체를 한 번에
+        로드하지 않고"가 여기서 깨졌다 — 하류 제너레이터의 ``break`` 는 **이미 만들어진
+        리스트**를 자를 뿐이라 아무것도 아끼지 못했다.
+
+        ``heapq.nlargest`` 는 크기 ``limit`` 짜리 힙 하나만 유지하며 스트림을 흘려
+        보낸다. 메모리 상한이 파일 크기가 아니라 **O(limit)** 이 되고, 결과 순서는
+        전체 정렬과 같다(키가 같은 항목이 없으므로 — id 는 유일하다).
+
+        ``limit`` 이 없으면(``search`` 경로) 전체 정렬이 필요하므로 예전과 같다.
         """
-        items = [tx for tx in self.txs.stream() if flt is None or flt.matches(tx)]
-        items.sort(key=lambda t: (t.date, t.id), reverse=True)
-        yield from items
+        filtered = (tx for tx in self.txs.stream() if flt is None or flt.matches(tx))
+        if limit is not None:
+            yield from heapq.nlargest(limit, filtered, key=_sort_key)
+            return
+        yield from sorted(filtered, key=_sort_key, reverse=True)
 ```
 
-> **🔎 문법의 출처** — 세 줄에 세 시대의 문법이 있습니다. `[tx for tx in ... if ...]` 는 리스트 컴프리헨션(PEP 202, 파이썬 2.0)으로, `items = []` 뒤 `for`/`if`/`append` 세 줄을 한 식으로 접은 것입니다. `lambda t: (...)` 는 이름 없는 함수식이고, `yield from items`(PEP 380, 파이썬 3.3)는 이 자리에서는 `for v in items: yield v` 와 같습니다(PEP 380 이 더한 `send`·예외 위임 기능은 여기서 쓰이지 않습니다). → [12 §1-C](./12-syntax-and-stdlib.md)
+> **🔎 문법의 출처** — `(tx for tx in ... if ...)` 는 제너레이터 표현식(PEP 289, 파이썬 2.4)입니다. 대괄호였다면 그 자리에서 리스트를 다 만들지만, 소괄호는 **아직 아무것도 만들지 않은** 제너레이터를 돌려주고 `heapq.nlargest`/`sorted` 가 그것을 당겨 갑니다. `yield from ...`(PEP 380, 파이썬 3.3)은 이 자리에서는 `for v in ...: yield v` 와 같습니다(PEP 380 이 더한 `send`·예외 위임 기능은 여기서 쓰이지 않습니다). 정렬 키가 `lambda` 대신 모듈 함수 `_sort_key` 인 것은 두 갈래(`nlargest`/`sorted`)가 **같은 키를 쓴다**는 것을 이름으로 못박기 위해서입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
 > **⚙️ 내부 동작** — 함수 몸통에 `yield` 가 있으므로 `stream_sorted(...)` 를 **호출해도 한 줄도 실행되지 않습니다.** 파이썬은 컴파일 시점에 이 함수를 제너레이터 함수로 표시하고, 호출은 제너레이터 객체만 돌려줍니다. 정렬은 호출자가 첫 항목을 꺼내는 순간(`for` 문의 첫 `__next__`)에야 시작됩니다. 그래서 "정렬 때문에 전체를 읽는다"는 비용도 실제로 결과를 소비할 때 발생합니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
-> **⚙️ 내부 동작** — `items.sort(...)` 는 `sorted(items)` 와 달리 **새 리스트를 만들지 않고 제자리에서** 정렬하고 `None` 을 돌려줍니다. 방금 컴프리헨션으로 만든 리스트라 아무도 공유하지 않으므로 제자리 정렬이 안전하고 사본 하나를 아낍니다. `key` 함수는 비교할 때마다가 아니라 **항목당 정확히 한 번** 호출되어 결과가 따로 보관됩니다. 그리고 `(t.date, t.id)` 튜플 비교는 날짜가 같을 때 `t.id` 까지 내려가므로 `TransactionId` 에 순서 비교가 필요합니다 — 그래서 `domain/tx_id.py:51-52` 가 `@functools.total_ordering` + `@dataclass(frozen=True)` 로 `__lt__` 하나에서 나머지 비교 연산을 자동 생성해 둡니다. → [12 §1-B](./12-syntax-and-stdlib.md)
+> **⚙️ 내부 동작** — `heapq.nlargest(n, iterable, key)` 는 전체를 정렬하지 않습니다. 앞의 `n` 개로 크기 `n` 짜리 최소 힙을 만든 뒤, 나머지를 하나씩 흘려보내며 **힙의 최솟값보다 큰 것만** 밀어 넣고 최솟값을 버립니다. 그래서 메모리는 `O(n)`, 시간은 `O(N log n)` 이고, 마지막에 힙을 정렬해 내림차순으로 돌려주므로 결과 순서는 전체 정렬과 같습니다(키가 유일하므로 동점 처리 차이도 드러나지 않습니다 — id 는 유일합니다). `key` 함수는 비교할 때마다가 아니라 **항목당 정확히 한 번** 호출됩니다. 그리고 `(tx.date, tx.id)` 튜플 비교는 날짜가 같을 때 `tx.id` 까지 내려가므로 `TransactionId` 에 순서 비교가 필요합니다 — 그래서 `domain/tx_id.py:51-52` 가 `@functools.total_ordering` + `@dataclass(frozen=True)` 로 `__lt__` 하나에서 나머지 비교 연산을 자동 생성해 둡니다. → [12 §1-B](./12-syntax-and-stdlib.md)
 
-**정렬은 본질적으로 전체를 봐야 하는 연산**입니다. 스트리밍의 예외이며, docstring 이 그 사실과 완화책(필터 통과분만 모음)을 명시합니다.
+**정렬은 본질적으로 전체를 "훑어야" 하는 연산**입니다. 다만 훑는 것과 **모으는 것**은 다릅니다 — `limit` 이 있으면 상위 N 만 힙에 남기며 흘려보내므로 메모리는 파일 크기가 아니라 `O(limit)` 입니다. `limit` 이 없는 `search` 경로만 통과분 전체를 모읍니다. docstring 이 그 두 경로를 나눠 적고 있습니다.
 
-`list` 와 `search` 가 이 하나를 공유합니다 — `list` 는 `flt=None`, `search` 는 조건을 넘깁니다. 정렬 규칙(최신순)이 한 곳에만 있습니다.
+`list` 와 `search` 가 이 하나를 공유합니다 — `list` 는 `flt=None` 에 `limit` 을 넘기고, `search` 는 조건을 넘깁니다. 정렬 규칙(최신순)이 한 곳에만 있습니다.
 
 ---
 
@@ -409,7 +424,7 @@ class ImportExportService:
 
     1. 실패 정책   — 부분 성공(기본) vs 원자적 전수 롤백(``--atomic``)
     2. 중복 정책   — 이미 있는 id 를 만나면 건너뛸까/새로 발급할까/막을까
-    3. 부수 효과   — 처음 보는 카테고리는 자동 등록한다
+    3. 카테고리    — 미등록 카테고리 행은 거부(기본), ``--auto-category`` 면 등록하고 받는다
     """
 ```
 
@@ -437,7 +452,7 @@ budget_app/services/importexport.py:77-84
 
 > **🔎 문법의 출처** — `(tx for tx in ... if ...)` 는 **제너레이터 표현식**(PEP 289, 파이썬 2.4)입니다. 대괄호를 쓴 리스트 컴프리헨션(`[tx for tx in ...]`)과 글자 하나 차이지만 결과가 다릅니다 — 대괄호는 **리스트를 다 만들어** 돌려주고, 소괄호는 **아직 아무것도 만들지 않은 제너레이터 객체**를 돌려줍니다. 파이썬은 이것을 익명의 제너레이터 함수로 컴파일하며, 첫 `for ... in` 의 대상(`self.txs.stream()`)만 그 자리에서 평가하고 나머지는 소비 시점으로 미룹니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
-> **⚙️ 내부 동작** — 그 게으름이 계층을 넘어 유지되는 경로가 이 함수의 요점입니다. `csv_io.write_transactions`(`storage/csv_io.py:131-148`)의 인자 타입은 `Iterable[Transaction]` 이고 본문은 `for tx in txs:` 로 **한 건 꺼내 한 줄 쓰고 다시 꺼냅니다.** 그래서 파일 → `stream()` → 제너레이터 식 필터 → `csv.DictWriter.writerow` 가 한 줄짜리 파이프라인으로 이어지고, 거래가 10만 건이어도 메모리에 있는 `Transaction` 은 항상 한 건입니다. 만약 여기서 `rows = [tx for tx in ...]` 라고 대괄호를 썼다면 `write_transactions` 코드는 한 글자도 바뀌지 않은 채 **전 건이 리스트로 메모리에 올라갑니다** — 스트리밍이 깨지는 지점이 호출부 괄호 한 쌍이라는 뜻입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
+> **⚙️ 내부 동작** — 그 게으름이 계층을 넘어 유지되는 경로가 이 함수의 요점입니다. `csv_io.write_transactions`(`storage/csv_io.py:145-186`)의 인자 타입은 `Iterable[Transaction]` 이고 본문은 `for tx in txs:` 로 **한 건 꺼내 한 줄 쓰고 다시 꺼냅니다.** 그래서 파일 → `stream()` → 제너레이터 식 필터 → `csv.DictWriter.writerow` 가 한 줄짜리 파이프라인으로 이어지고, 거래가 10만 건이어도 메모리에 있는 `Transaction` 은 항상 한 건입니다. 만약 여기서 `rows = [tx for tx in ...]` 라고 대괄호를 썼다면 `write_transactions` 코드는 한 글자도 바뀌지 않은 채 **전 건이 리스트로 메모리에 올라갑니다** — 스트리밍이 깨지는 지점이 호출부 괄호 한 쌍이라는 뜻입니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
 `include_id=True` 가 기본인 이유가 이 리팩터의 출발점이었습니다(왕복 안전성 — 내보낸 파일을 그대로 다시 가져와도 원래대로 돌아오는 성질) — id 컬럼이 없으면 내보낸 CSV 를 다시 넣을 때 모든 행이 새 id 를 받아 같은 거래가 두 벌이 됩니다. 자세한 버그 재현은 [07 §8.2](./07-repository.md)에 있습니다.
 
@@ -446,7 +461,7 @@ budget_app/services/importexport.py:77-84
 > **💡 쉽게 말하면** — 장부에 옮겨 적기 전에 연습장에 전부 계산해 보는 것과 같습니다. 장부는 연습장을 다 채운 뒤에야 펴고, 그전까지는 한 글자도 쓰지 않습니다. 준비 단계가 연습장이고 커밋 단계가 장부입니다. 연습장에서 어긋난 줄을 만났을 때 그 줄만 빼고 나머지를 옮길지, 아예 장부를 펴지 않고 그만둘지는 `--atomic` 이 정합니다.
 > 다만 이 비유는 두 군데서 깨집니다 — 하나는 연습장이 무한하지 않다는 것으로, 준비 단계의 `_Batch` 는 메모리이므로 가져오는 CSV 가 클수록 커밋할 때까지 그만큼을 들고 있어야 합니다. 다른 하나는 "어긋나면 그만둔다"가 기본 동작이 아니라는 것으로, 아래 코드의 기본값이 `atomic: bool = False` 이고 그 모드에서는 어긋난 줄을 건너뛴 채 나머지가 그대로 장부에 옮겨집니다.
 
-budget_app/services/importexport.py:88-104
+budget_app/services/importexport.py:88-109
 
 ```python
     def import_csv(
@@ -455,31 +470,38 @@ budget_app/services/importexport.py:88-104
         *,
         atomic: bool = False,
         on_duplicate: str = config.DEFAULT_ON_DUPLICATE,
+        auto_category: bool = False,
     ) -> ImportReport:
         """CSV 거래 일괄 등록.
 
         준비 단계에서 모든 행을 검증·판정한 뒤에만 커밋 단계로 넘어간다. **ID 발급은
         준비 단계에서 끝난다** — ``_resolve_id`` 가 행마다 번호를 확정해 완성된
         ``Transaction`` 을 batch 에 담는다. 커밋 단계가 하는 일은 파일 반영뿐이고
-        (카테고리 자동 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
+        (카테고리 등록, 워터마크 기록, jsonl 쓰기), 그래서 원자 모드에서 준비 중
         중단되면 카테고리·거래 어느 쪽도 남지 않는다.
+
+        ``auto_category`` 는 **옵트인**이다. 이유는 ``_check_category`` 참조.
         """
-        batch = self._prepare(Path(in_path), atomic=atomic, on_duplicate=on_duplicate)
+        batch = self._prepare(
+            Path(in_path), atomic=atomic, on_duplicate=on_duplicate, auto_category=auto_category
+        )
         return self._commit(batch, atomic=atomic)
 ```
 
-> **🔎 문법의 출처** — `in_path` 다음에 홀로 선 `*` 가 `atomic` 과 `on_duplicate` 를 **키워드 전용**으로 만듭니다(PEP 3102). 그래서 호출부는 반드시 `import_csv(path, atomic=True, on_duplicate="new-id")` 라고 씁니다. 여기서 이 강제가 특히 값어치를 하는 이유는 `atomic` 이 **불리언 인자**이기 때문입니다 — `import_csv(path, True, "new-id")` 를 읽는 사람은 그 `True` 가 무엇의 스위치인지 알 수 없고("boolean trap"), 나중에 두 인자의 순서가 바뀌어도 조용히 컴파일됩니다. `*` 는 그 두 위험을 한꺼번에 없애면서, 덤으로 **인자 순서를 나중에 바꿔도 기존 호출부가 깨지지 않게** 만듭니다. 같은 패턴이 `export_csv(..., *, include_id=True)` 와 `_prepare(..., *, atomic, on_duplicate)` 에도 그대로 있습니다. → [12 §1-A](./12-syntax-and-stdlib.md)
+> **🔎 문법의 출처** — `in_path` 다음에 홀로 선 `*` 가 `atomic` 과 `on_duplicate` 를 **키워드 전용**으로 만듭니다(PEP 3102). 그래서 호출부는 반드시 `import_csv(path, atomic=True, on_duplicate="new-id")` 라고 씁니다. 여기서 이 강제가 특히 값어치를 하는 이유는 `atomic` 이 **불리언 인자**이기 때문입니다 — `import_csv(path, True, "new-id")` 를 읽는 사람은 그 `True` 가 무엇의 스위치인지 알 수 없고("boolean trap"), 나중에 두 인자의 순서가 바뀌어도 조용히 컴파일됩니다. `*` 는 그 두 위험을 한꺼번에 없애면서, 덤으로 **인자 순서를 나중에 바꿔도 기존 호출부가 깨지지 않게** 만듭니다. 같은 패턴이 `export_csv(..., *, include_id=True)` 와 `_prepare(..., *, atomic, on_duplicate, auto_category)` 에도 그대로 있습니다. → [12 §1-A](./12-syntax-and-stdlib.md)
 
-**본문이 두 줄**입니다. 리팩터 전 이 메서드는 80줄이었고, 파일 열기·헤더 검증·행 검증·오류 누적·두 실패 정책·카테고리 자동 등록·ID 발급·커밋 8가지를 담고 있었습니다.
+**본문이 두 줄**입니다. 리팩터 전 이 메서드는 80줄이었고, 파일 열기·헤더 검증·행 검증·오류 누적·두 실패 정책·카테고리 판정·ID 발급·커밋 8가지를 담고 있었습니다.
 
 이름이 곧 구조 설명이 됩니다 — **준비하고, 커밋한다.**
 
 ### 5.4 준비 단계
 
-budget_app/services/importexport.py:106-133
+budget_app/services/importexport.py:111-149
 
 ```python
-    def _prepare(self, in_path: Path, *, atomic: bool, on_duplicate: str) -> _Batch:
+    def _prepare(
+        self, in_path: Path, *, atomic: bool, on_duplicate: str, auto_category: bool
+    ) -> _Batch:
         batch = _Batch()
         allocator = self.txs.id_allocator()
         known_categories = self.cats.name_set()
@@ -497,14 +519,23 @@ budget_app/services/importexport.py:106-133
                 batch.note_error(lineno, exc)
                 continue
 
+            # 카테고리 판정을 **id 발급보다 먼저** 한다. 순서가 반대면 거부될 행이
+            # 번호를 한 개 먹고 사라져 id 에 구멍이 남는다.
+            if not self._check_category(
+                parsed.category,
+                lineno,
+                known_categories,
+                batch,
+                atomic=atomic,
+                auto_category=auto_category,
+            ):
+                continue
+
             tx_id = self._resolve_id(parsed.tx_id, lineno, allocator, on_duplicate, batch)
             if tx_id is None:
                 continue  # 중복 — 건너뛰기 정책
 
             batch.transactions.append(parsed.to_transaction(tx_id))
-            if parsed.category not in known_categories:
-                known_categories.add(parsed.category)
-                batch.new_categories.append(parsed.category)
 
         return batch
 ```
@@ -530,13 +561,64 @@ budget_app/services/importexport.py:106-133
 | `known_categories` | `set` | 빠른 소속 검사 (`in`) |
 | `batch.new_categories` | `list` | **등록 순서 유지** |
 
-> **⚙️ 내부 동작** — `parsed.category not in known_categories` 의 비용이 이 표의 전부입니다. `set` 은 해시 테이블이라 `in` 이 **평균 O(1)** 입니다 — 파이썬은 `hash(문자열)` 로 버킷을 바로 찾아가고, 후보와 `==` 를 한두 번 해 봅니다. 반면 `list` 에 대한 `in` 은 앞에서부터 하나씩 `==` 를 해 보는 **O(n)** 입니다. CSV 가 N 행이고 카테고리가 M 개일 때, `list` 였다면 N×M 번의 문자열 비교가 되지만 `set` 이면 N 번입니다. `set` 을 만든 `storage/repositories.py:240-242` 의 `{c.name for c in self.stream()}` 도 집합 컴프리헨션 한 줄이며, 여기 들어가는 값은 `str` 이라 이미 불변·해시 가능합니다(같은 이유로 `IdAllocator._taken` 은 `TransactionId` 의 집합인데, 그것이 `@dataclass(frozen=True)` 인 덕분에 파이썬이 `__hash__` 를 자동으로 만들어 줍니다).
+> **⚙️ 내부 동작** — `_check_category` 의 `name in known_categories` 가 이 표의 전부입니다. `set` 은 해시 테이블이라 `in` 이 **평균 O(1)** 입니다 — 파이썬은 `hash(문자열)` 로 버킷을 바로 찾아가고, 후보와 `==` 를 한두 번 해 봅니다. 반면 `list` 에 대한 `in` 은 앞에서부터 하나씩 `==` 를 해 보는 **O(n)** 입니다. CSV 가 N 행이고 카테고리가 M 개일 때, `list` 였다면 N×M 번의 문자열 비교가 되지만 `set` 이면 N 번입니다. `set` 을 만든 `storage/repositories.py:240-242` 의 `{c.name for c in self.stream()}` 도 집합 컴프리헨션 한 줄이며, 여기 들어가는 값은 `str` 이라 이미 불변·해시 가능합니다(같은 이유로 `IdAllocator._taken` 은 `TransactionId` 의 집합인데, 그것이 `@dataclass(frozen=True)` 인 덕분에 파이썬이 `__hash__` 를 자동으로 만들어 줍니다).
 >
 > 반대로 `new_categories` 가 `list` 인 이유도 같은 성질의 뒷면입니다. `set` 은 **순서를 보관하지 않으므로** 그것으로 커밋하면 카테고리 파일에 쓰이는 줄 순서가 실행마다 달라질 수 있습니다. "빠른 조회"와 "안정된 출력 순서"는 한 자료구조가 동시에 주지 않아서 둘을 나란히 씁니다. → [12 §1-B](./12-syntax-and-stdlib.md)
 
+**카테고리 판정이 id 발급보다 먼저** 있는 것도 우연이 아닙니다. 순서가 반대면 거부될 행이 번호를 한 개 먹고 사라져 id 에 구멍이 남습니다.
+
+budget_app/services/importexport.py:151-185
+
+```python
+    def _check_category(
+        self,
+        name: str,
+        lineno: int,
+        known_categories: set[str],
+        batch: _Batch,
+        *,
+        atomic: bool,
+        auto_category: bool,
+    ) -> bool:
+        """이 행의 카테고리를 받아들일지 판정한다 — ``False`` 면 이 행은 저장하지 않는다.
+
+        **기본은 거부다.** 요구사항 G13 이 CSV 의 ``category`` 를 "등록된 카테고리"로
+        규정하고, 같은 프로그램의 ``add``/``update`` 도 미등록이면 거부한다. 예전에는
+        가져오기만 규칙이 정반대여서 오타 하나(``fod``)가 경고 한 줄 없이 카테고리
+        마스터에 영구 등록됐다 — 그 뒤로는 요약·검색이 두 이름으로 갈린다.
+
+        자동 등록이 쓸모없다는 뜻은 아니다(외부 가계부에서 옮겨 올 때가 그렇다).
+        그래서 **없앤 것이 아니라 ``--auto-category`` 옵트인으로 옮겼다.** 부수 효과가
+        기본값이면 사고가 조용하지만, 플래그로 요청하면 의도가 된다.
+        """
+        if name in known_categories:
+            return True
+        if not auto_category:
+            reason = messages.ERR_IMPORT_CATEGORY_NOT_REGISTERED.format(name=name)
+            if atomic:
+                raise AppError(
+                    messages.ERR_ATOMIC_IMPORT_FAILED.format(lineno=lineno, reason=reason),
+                    hint=messages.HINT_IMPORT_CATEGORY,
+                )
+            batch.note_error(lineno, reason)
+            return False
+        known_categories.add(name)
+        batch.new_categories.append(name)
+        return True
+```
+
+**미등록 카테고리는 기본적으로 거부입니다.** 판정 결과는 실패 정책에 그대로 얹힙니다 — 기본(부분 성공) 모드에서는 그 행만 `skipped` 로 세고 사유를 남기며, `--atomic` 이면 다른 검증 실패와 똑같이 첫 줄에서 `AppError` 로 전수 롤백합니다.
+
+| 옵션 | 미등록 카테고리 행 | 카테고리 파일 |
+|---|---|---|
+| *(없음, 기본)* | 건너뛰고 `skipped` 로 집계 + 줄마다 사유 출력 | 변화 없음 |
+| `--auto-category` | 카테고리를 등록하고 그 행도 저장 | 새 이름이 추가되고 `[안내]` 한 줄로 알림 |
+
+**자동 등록을 없앤 것이 아니라 옵트인으로 옮겼다**는 점이 이 설계의 요지입니다. 외부 가계부에서 옮겨 올 때는 자동 등록이 쓸모 있지만, 그것이 **기본값**이면 오타 하나(`food` → `fod`)가 경고 없이 카테고리 마스터에 영구 등록됩니다 — 그 뒤로는 요약·검색이 두 이름으로 갈립니다. 부수 효과가 기본값이면 사고가 조용하고, 플래그로 요청하면 의도가 됩니다.
+
 ### 5.5 중복 정책 — `_resolve_id`
 
-budget_app/services/importexport.py:135-142
+budget_app/services/importexport.py:187-194
 
 ```python
     def _resolve_id(
@@ -572,13 +654,13 @@ csv_id 가 있고 이미 쓰였다  ── on_duplicate ──┬─ "new-id" �
 
 두 경우를 따로 처리하는 코드가 필요 없다는 것이 이 설계의 장점입니다.
 
-**`None` 반환이 "이 행은 저장하지 않는다"** 를 뜻한다는 계약이 반환 타입 `TransactionId | None` 과 docstring(`importexport.py:143`)에 명시되어 있습니다. 호출부(`importexport.py:125`)가 `if tx_id is None:` 으로 그 계약을 받습니다.
+**`None` 반환이 "이 행은 저장하지 않는다"** 를 뜻한다는 계약이 반환 타입 `TransactionId | None` 과 docstring(`importexport.py:195`)에 명시되어 있습니다. 호출부(`importexport.py:144`)가 `if tx_id is None:` 으로 그 계약을 받습니다.
 
 > **⚙️ 내부 동작** — 여기서 `== None` 이 아니라 `is None` 인 것이 관례가 아니라 정확성입니다. `is` 는 두 이름이 **같은 객체를 가리키는가**(CPython 에서는 주소 비교)를 묻고, `None` 은 인터프리터 전체에 **딱 하나만 존재하는 싱글턴**이라 이 비교가 항상 옳습니다. `==` 는 `__eq__` 를 부르므로 클래스가 그것을 재정의하면 `None` 과 같다고 우길 수 있습니다. `TransactionId` 는 dataclass 라 실제로 `__eq__` 가 자동 생성되어 있으므로, `is` 를 쓰는 편이 그 경로를 아예 지나지 않습니다. → [12 §1-B](./12-syntax-and-stdlib.md)
 
 ### 5.6 커밋 단계 — 모드에 따라 갈린다
 
-budget_app/services/importexport.py:170-179
+budget_app/services/importexport.py:222-232
 
 ```python
         imported = (
@@ -602,7 +684,7 @@ budget_app/services/importexport.py:170-179
 
 **원자 모드는 `UnitOfWork` 로 두 파일을 한 단위로 커밋합니다.** `UnitOfWork` 는 작업 단위, 즉 여러 파일에 걸친 변경을 하나로 묶어 되도록 전부 반영하거나 전부 취소하게 해 주는 장치입니다(되도록인 이유는 §5.6 에 있습니다).
 
-budget_app/services/importexport.py:190-208
+budget_app/services/importexport.py:243-261
 
 ```python
     def _commit_atomic(self, batch: _Batch) -> int:
@@ -713,6 +795,8 @@ class _Batch:
 | 실패 정책 | 데이터가 **잘못된** 줄 | `--atomic` |
 | 중복 정책 | 이미 **저장된** 거래 | `--on-duplicate` |
 
+카테고리 판정(§5.4)은 세 번째 축이 아니라 **실패 축에 얹힙니다** — 미등록 카테고리 행은 "데이터가 잘못된 줄"과 똑같이 취급되고, `--auto-category` 는 그 줄을 잘못된 것으로 볼지 말지를 정할 뿐입니다. 그래서 아래 6가지 조합에는 그 플래그가 등장하지 않습니다.
+
 조합이 6가지 가능하고, 전부 의미가 있습니다.
 
 | `--atomic` | `--on-duplicate` | 결과 |
@@ -750,7 +834,7 @@ class ImportReport:
 
 프레젠터도 둘을 구분해 보여 줍니다.
 
-budget_app/cli/presenter.py:118-141
+budget_app/cli/presenter.py:122-153
 
 ```python
 def import_problem_lines(report: ImportReport) -> list[str]:
@@ -758,6 +842,14 @@ def import_problem_lines(report: ImportReport) -> list[str]:
     ...
     """
     lines: list[str] = []
+    if report.new_categories:
+        # 마스터 데이터가 늘어난 것은 사용자가 알아야 할 부수 효과다
+        # (`--auto-category` 를 명시했을 때만 일어난다).
+        lines.append(
+            messages.MSG_IMPORT_NEW_CATEGORIES.format(
+                count=len(report.new_categories), names=", ".join(report.new_categories)
+            )
+        )
     if report.errors:
         lines.append(messages.MSG_IMPORT_ERROR_HEADER)
         lines.extend(
@@ -773,11 +865,11 @@ def import_problem_lines(report: ImportReport) -> list[str]:
     return lines
 ```
 
-여기 `lines.extend(... for e in report.errors)` 는 §5.2 와 같은 제너레이터 표현식입니다 — 인자가 하나뿐일 때는 함수 호출 괄호가 제너레이터 식의 괄호를 겸하므로 `extend((...))` 처럼 겹쳐 쓰지 않아도 되고, `list.extend` 가 그것을 순회하며 밀어 넣으므로 중간 리스트가 생기지 않습니다.
+맨 앞의 `report.new_categories` 분기가 **`--auto-category` 로 늘어난 마스터 데이터**를 알립니다 — 부수 효과는 조용히 일어나면 안 되기 때문입니다. 여기 `lines.extend(... for e in report.errors)` 는 §5.2 와 같은 제너레이터 표현식입니다 — 인자가 하나뿐일 때는 함수 호출 괄호가 제너레이터 식의 괄호를 겸하므로 `extend((...))` 처럼 겹쳐 쓰지 않아도 되고, `list.extend` 가 그것을 순회하며 밀어 넣으므로 중간 리스트가 생기지 않습니다.
 
 중복 목록 뒤에는 **"고칠 필요 없다"는 안내**가 붙습니다.
 
-budget_app/cli/messages.py:98-100
+budget_app/cli/messages.py:99-101
 
 ```python
 MSG_IMPORT_DUPLICATE_HINT = (
@@ -811,16 +903,19 @@ MSG_IMPORT_DUPLICATE_HINT = (
 
 > **⚙️ 내부 동작** — `os.replace` 는 POSIX 에서 `rename(2)`, Windows 에서 `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` 로 내려갑니다. 원자성은 **같은 파일시스템 안에서 디렉터리 엔트리를 교체하는 것**에 대해서만 보장되며, 내용이 디스크에 도달했다는 뜻은 아닙니다(그래서 앞에 `fsync` 가 필요합니다). 서비스 계층 코드에는 이 호출이 한 번도 등장하지 않는다는 점도 같이 보세요 — 원자성의 *정책*(언제 전부/전무인가)은 여기가 정하고, 그것을 실현하는 *기법*은 `storage` 안에 있습니다. → [12 §3](./12-syntax-and-stdlib.md)
 
-**부수 효과(본래 하려던 일에 딸려 함께 일어나는 변경)까지 롤백(했던 것을 없던 일로 되돌리기)됩니다.** 카테고리 자동 등록도 커밋 단계에 있으므로, 준비 중 실패하면 카테고리도 남지 않습니다. 실제로 검증한 결과:
+**부수 효과(본래 하려던 일에 딸려 함께 일어나는 변경)까지 롤백(했던 것을 없던 일로 되돌리기)됩니다.** `--auto-category` 로 요청한 카테고리 등록도 커밋 단계에 있으므로, 준비 중 실패하면 카테고리도 남지 않습니다. 실제로 검증한 결과:
 
 ```
-$ python -m budget_app import --from mixed.csv --atomic --data-dir ./d5
-[오류] 원자적 가져오기 실패 — line 3: ...  (반영된 항목 없음)
-$ wc -l < ./d5/transactions.jsonl
+$ python -m budget_app import --from mixed.csv --atomic --auto-category --data-dir ./d6
+[오류] 원자적 가져오기 실패 — line 4: 날짜 형식이 올바르지 않습니다 (YYYY-MM-DD). (반영된 항목 없음)
+[힌트] CSV 를 고쳐 다시 시도하거나, --atomic 없이 부분 가져오기를 사용하세요.
+$ wc -l < ./d6/transactions.jsonl
 0                                              ← 거래 0건
-$ python -m budget_app category list --data-dir ./d5 | wc -l
+$ python -m budget_app category list --data-dir ./d6 | wc -l
 5                                              ← 기본 5개 그대로 (mixed.csv 의 badcat 등록 안 됨)
 ```
+
+`--auto-category` 를 주지 않으면 그 `badcat` 행은 애초에 준비 단계에서 거부되므로, 커밋까지 갈 일 자체가 없습니다.
 
 ---
 
@@ -832,11 +927,11 @@ $ python -m budget_app category list --data-dir ./d5 | wc -l
 
 **Q. import CSV 에 일부 깨진 행이 섞이면 어떻게 처리하나요?**
 
-**두 축**으로 답합니다. 데이터가 잘못된 줄은 `--atomic` 이 없으면 그 줄만 건너뛰고(`skipped`), 있으면 첫 오류에서 전체를 중단합니다. 이미 저장된 거래(중복 id)는 `--on-duplicate` 로 정하며 기본은 건너뛰기(`duplicated`)입니다. **두 숫자를 나눠 보고하는 이유**는 사용자가 해야 할 일이 정반대이기 때문입니다 — `skipped` 는 CSV 를 고쳐야 하고 `duplicated` 는 아무것도 안 해도 됩니다.
+**두 축**으로 답합니다. 데이터가 잘못된 줄은 `--atomic` 이 없으면 그 줄만 건너뛰고(`skipped`), 있으면 첫 오류에서 전체를 중단합니다 — **미등록 카테고리 행도 같은 축**이라 기본은 `skipped`, `--atomic` 이면 전수 롤백이고, 받아들이려면 `--auto-category` 를 명시해야 합니다. 이미 저장된 거래(중복 id)는 `--on-duplicate` 로 정하며 기본은 건너뛰기(`duplicated`)입니다. **두 숫자를 나눠 보고하는 이유**는 사용자가 해야 할 일이 정반대이기 때문입니다 — `skipped` 는 CSV 를 고쳐야 하고 `duplicated` 는 아무것도 안 해도 됩니다.
 
 **Q. 원자적 가져오기(`--atomic`)를 어떻게 구현했나요?**
 
-준비와 커밋을 나눴습니다. 준비 단계는 파일을 읽기만 하고 모든 행을 검증·판정해 메모리(`_Batch`)에 모읍니다. 한 행이라도 실패하면 그 자리에서 예외를 던져 커밋 단계에 **도달하지 않습니다**. 커밋 자체도 `os.replace` 라 원자적입니다. 카테고리 자동 등록도 커밋 단계에 있어 부수 효과까지 함께 롤백됩니다.
+준비와 커밋을 나눴습니다. 준비 단계는 파일을 읽기만 하고 모든 행을 검증·판정해 메모리(`_Batch`)에 모읍니다. 한 행이라도 실패하면 그 자리에서 예외를 던져 커밋 단계에 **도달하지 않습니다**. 커밋 자체도 `os.replace` 라 원자적입니다. `--auto-category` 로 요청한 카테고리 등록도 커밋 단계에 있어 부수 효과까지 함께 롤백됩니다.
 
 **Q. export 한 파일을 다시 import 하면 어떻게 되나요?**
 

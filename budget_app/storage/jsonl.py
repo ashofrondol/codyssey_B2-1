@@ -168,6 +168,9 @@ class JsonlStore(Generic[T]):
         이전에는 엄격 디코딩이라 UTF-8 이 아닌 바이트 한 줄이 ``UnicodeDecodeError``
         로 **파일 전체 읽기를 죽였다** — JSON 이 깨진 줄은 격리하면서 바이트가 깨진
         줄은 격리하지 못하는, 같은 약속의 구멍이었다.
+
+        읽어 들인 뒤 그 줄을 **손상 줄로 판정하는 것**은 ``_parse_line`` 의 첫 검사다
+        (``_is_utf8_text``). 무손실로 읽되 조회 경로로는 내보내지 않는다.
         """
         if not self.path.exists():
             return
@@ -178,7 +181,26 @@ class JsonlStore(Generic[T]):
                     continue
                 yield self._parse_line(lineno, line)
 
+    @staticmethod
+    def _is_utf8_text(line: str) -> bool:
+        """이 줄이 UTF-8 로 다시 쓸 수 있는 문자열인가.
+
+        ``errors=surrogateescape`` 로 읽으면 UTF-8 이 아닌 바이트가 예외 대신 대리
+        문자로 들어온다(원문 보존이 목적이다). 그 줄이 **정상 거래로 통과하면**
+        엄격 UTF-8 로 쓰는 경로(``export``)가 나중에 ``UnicodeEncodeError`` 로 죽는다.
+        JSON 이 깨진 줄은 격리하면서 바이트가 깨진 줄은 통과시키는, 같은 약속의
+        구멍이었다. 여기서 걸러 **손상 줄로 격리**한다 — 파일 원문은 그대로 보존되고
+        (``plan_rewrite`` 가 text 를 그대로 다시 쓴다), 조회 경로에는 나가지 않는다.
+        """
+        try:
+            line.encode(config.FILE_ENCODING)
+        except UnicodeEncodeError:
+            return False
+        return True
+
     def _parse_line(self, lineno: int, line: str) -> RawLine:
+        if not self._is_utf8_text(line):
+            return RawLine(lineno=lineno, text=line, error=messages.ERR_LINE_NOT_UTF8)
         try:
             data = json.loads(line)
         except json.JSONDecodeError as exc:

@@ -41,7 +41,7 @@
 
 1. **횡단 관심사(cross-cutting concern)** 란 무엇이고 왜 데코레이터로 분리하는가
 2. 데코레이터 셋이 **두 파일로 나뉜 이유** — 관측 vs 표현
-3. `@handle_errors` 의 except 체인 11단과 **순서가 곧 정책**인 이유
+3. `@handle_errors` 의 except 체인 12단과 **순서가 곧 정책**인 이유
 4. 예외 하나가 발생해서 셸 종료 코드가 되기까지의 전체 경로
 
 ---
@@ -83,9 +83,9 @@ def add(self, date, type_, category, amount, memo="", tags=None):
 
 | 데코레이터 | 정의 위치 | 붙는 곳 | 목적 |
 | --- | --- | --- | --- |
-| `@log_call` | decorators.py:37-47 | `TransactionService.add`(transactions.py:27) / `update`(52) / `delete`(72) | 호출/반환 DEBUG 로그 |
+| `@log_call` | decorators.py:37-47 | `TransactionService.add`(transactions.py:34) / `update`(52) / `delete`(72) | 호출/반환 DEBUG 로그 |
 | `@measure_time` | decorators.py:50-66 | `BudgetService.monthly_summary`(budgets.py:30) | 실행 시간 DEBUG 로그 |
-| `@handle_errors` | **cli/error_handler.py:20-121** | **`cli/app.py:61` 의 `_dispatch` 단 한 곳** | 예외 → 메시지 + 종료 코드 |
+| `@handle_errors` | **cli/error_handler.py:20-128** | **`cli/app.py:61` 의 `_dispatch` 단 한 곳** | 예외 → 메시지 + 종료 코드 |
 
 적용 현황을 소스에서 확인하려면:
 
@@ -395,7 +395,7 @@ def handle_errors(func: Callable[..., int]) -> Callable[..., int]:
 > 없습니다. `== None` 은 상대 객체의 `__eq__` 를 부르므로 그 보장이 없습니다.
 > → [12 §1-B](./12-syntax-and-stdlib.md)
 
-### 5.2 except 체인 — 네 부류로 묶인 11단
+### 5.2 except 체인 — 네 부류로 묶인 12단
 
 `handle_errors` 의 docstring 이 순서 정책을 스스로 설명합니다.
 
@@ -412,9 +412,9 @@ budget_app/cli/error_handler.py:23-42
        ``ValidationError`` / ``AppError``
     3. **환경 상태** — 프로그램 밖(파일·권한·디스크·인코딩)의 상태 문제.
        ``FileNotFoundError`` / ``IsADirectoryError`` / ``NotADirectoryError`` /
-       ``PermissionError`` / ``UnicodeDecodeError`` / ``OSError``
+       ``PermissionError`` / ``UnicodeDecodeError`` / ``UnicodeEncodeError`` / ``OSError``
     4. **최후 방어선** — 위 어디에도 속하지 않는 버그.
-       ``Exception`` — 사용자에겐 스택트레이스를 감추고 로그에만 남긴다.
+       ``Exception`` — 사용자에겐 스택트레이스를 감추고, ``--debug`` 일 때만 로그에 남긴다.
 
     부류를 나눠도 지켜야 하는 상속 제약이 둘 있고, 지금 순서가 둘 다 만족한다:
 
@@ -584,7 +584,7 @@ budget_app/cli/error_handler.py:76-76
         # ---------- (3) 환경 상태 — 파일/권한/인코딩/디스크 ----------
 ```
 
-이 부류에는 절이 여섯 개 있습니다 — `FileNotFoundError` / `IsADirectoryError` / `NotADirectoryError` / `PermissionError` / `UnicodeDecodeError` / `OSError`. 앞의 넷은 전부 `OSError` 의 자식이라 **마지막 `OSError` 보다 위에 있어야** 합니다. 이것이 상속 제약입니다.
+이 부류에는 절이 일곱 개 있습니다 — `FileNotFoundError` / `IsADirectoryError` / `NotADirectoryError` / `PermissionError` / `UnicodeDecodeError` / `UnicodeEncodeError` / `OSError`. 앞의 넷은 전부 `OSError` 의 자식이라 **마지막 `OSError` 보다 위에 있어야** 합니다. 이것이 상속 제약입니다.
 
 > **🔎 문법의 출처 — `FileNotFoundError` 라는 이름 자체** — 예전에는 이런 구분이
 > 없어서 `except IOError as e:` 로 잡은 다음 `if e.errno == errno.ENOENT:` 로 직접
@@ -609,7 +609,7 @@ budget_app/cli/error_handler.py:76-76
 
 **`UnicodeDecodeError` 는 왜 여기 있나.** 이것은 `ValueError` 의 자손이지만, "사용자가 값을 고치면 되는 문제"가 아니라 **파일 자체의 상태 문제**입니다. 그래서 부류 3 에 넣고 전용 종료 코드(6)를 줍니다. 힌트도 구체적입니다.
 
-budget_app/cli/messages.py:115-116
+budget_app/cli/messages.py:116-117
 
 ```python
 MSG_ERR_ENCODING = "[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다)."
@@ -634,11 +634,22 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc7 in position 0: invalid 
 
 `exc.encoding`(`'utf-8'`) / `exc.object`(문제의 바이트열) / `exc.start`·`exc.end`(위치) / `exc.reason`(사유)이 전부 채워져 있습니다. 이 코드가 그 값들을 화면에 노출하지 않는 이유는 **사용자가 할 일이 "UTF-8 로 다시 저장"뿐**이기 때문입니다 — 바이트 오프셋을 알려 줘도 행동이 달라지지 않습니다.
 
+**`UnicodeEncodeError` 는 그 짝입니다.** 읽기(decode)가 아니라 **쓰기(encode)** 가 실패한 경우로, UTF-8 로 표현할 수 없는 문자가 데이터에 남아 있으면 `export` 나 백업이 여기로 옵니다. 같은 부류·같은 종료 코드(6)를 쓰되 문구만 쓰기 쪽으로 바꿉니다 — 분류해 두지 않으면 부류 4 로 떨어져 "예기치 못한 오류"가 됩니다.
+
+budget_app/cli/messages.py:118-121
+
+```python
+MSG_ERR_ENCODING_WRITE = "[오류] UTF-8 로 저장할 수 없는 문자가 있습니다 (손상된 바이트가 섞였습니다)."
+HINT_ENCODING_WRITE = (
+    "[힌트] 해당 값을 UTF-8 로 다시 입력해 주세요 (터미널·입력 파일 인코딩을 UTF-8 로 맞추세요)."
+)
+```
+
 **`OSError` 포괄 절**은 디스크 가득 참(ENOSPC), 파일 잠금 같은 나머지를 받습니다. 원자적 쓰기(임시 파일에 다 쓴 뒤 이름만 갈아 끼워, **대상 파일 하나가 반쯤 쓰인 모습으로는 보이지 않게** 하는 저장 방식 — 여기까지가 이 방식이 지켜 주는 범위이고, 남는 한계는 [07 문서](./07-repository.md)에 있습니다) 중 디스크가 차면 여기로 옵니다 — 그리고 임시 파일에 쓰던 중이므로 **원본은 무사합니다**.
 
 ### 5.6 부류 4 — 최후 방어선
 
-budget_app/cli/error_handler.py:105-109
+budget_app/cli/error_handler.py:112-116
 
 ```python
         # ---------- (4) 최후 방어선 — 분류 밖의 버그 ----------
@@ -648,10 +659,10 @@ budget_app/cli/error_handler.py:105-109
             output.err(messages.HINT_UNEXPECTED)
 ```
 
-budget_app/cli/error_handler.py:118-119
+budget_app/cli/error_handler.py:125-126
 
 ```python
-            logger.exception(messages.LOG_UNHANDLED)
+            logger.error(messages.LOG_UNHANDLED, exc_info=output.debug_enabled())
             return config.EXIT_ERROR
 ```
 
@@ -665,25 +676,33 @@ budget_app/cli/error_handler.py:118-119
 > `select = ["E", "F", "I", "UP", "B"]` 를 쓰므로, 이 주석은 규칙을 끄는 효과보다
 > **"이건 실수가 아니라 의도"라는 표시**로 읽는 편이 정확합니다.
 
-**`logger.exception(...)` 이 이 절의 핵심입니다.** 스택트레이스를 버리는 게 아니라 **로그로 옮깁니다.**
+**`exc_info=output.debug_enabled()` 가 이 절의 핵심입니다.** 스택트레이스를 버리는 게 아니라 **`--debug` 일 때만 로그에 싣습니다.**
 
-> **⚙️ 내부 동작 — `logger.exception(msg)`** — 이것은 `logger.error(msg, exc_info=True)`
-> 와 정확히 같습니다(`logging/__init__.py` 의 `Logger.exception` 이 한 줄로 그렇게
-> 위임합니다). `exc_info=True` 를 주면 로깅이 `sys.exc_info()` 를 읽어 그 3-튜플을
-> `LogRecord.exc_info` 에 담고, 포매터가 `formatException()` 에서 `traceback` 모듈로
-> **문자열화해 메시지 뒤에 덧붙입니다**(결과는 `record.exc_text` 에 캐시됩니다).
-> 그래서 반드시 **except 블록 안에서** 불러야 하며, 밖에서 부르면 붙일 예외가 없습니다.
+> **⚙️ 내부 동작 — `logger.error(msg, exc_info=...)`** — `exc_info` 가 참이면 로깅이
+> `sys.exc_info()` 를 읽어 그 3-튜플을 `LogRecord.exc_info` 에 담고, 포매터가
+> `formatException()` 에서 `traceback` 모듈로 **문자열화해 메시지 뒤에 덧붙입니다**
+> (결과는 `record.exc_text` 에 캐시됩니다). 그래서 반드시 **except 블록 안에서**
+> 불러야 하며, 밖에서 부르면 붙일 예외가 없습니다. `logger.exception(msg)` 는
+> `exc_info=True` 를 고정한 축약형이라(`logging/__init__.py` 의 `Logger.exception` 이
+> 한 줄로 그렇게 위임합니다) **끌 수가 없고**, 그래서 여기서는 쓰지 않습니다.
 > → [12 §2-B](./12-syntax-and-stdlib.md)
 
-**여기서 중요한 것은 레벨이 DEBUG 가 아니라 ERROR 라는 점입니다.** 소스 주석(error_handler.py:110-117)이 그 변경 이유를 직접 설명합니다 — 이전에는 `logger.debug(..., exc_info=True)` 였는데, 기본 로그 레벨이 WARNING 이라 **`--debug` 없이 실행하면 스택트레이스가 아무 데도 남지 않았습니다.** 여기까지 온 예외는 분류되지 않은 버그이고, 그 스택이 원인을 찾을 유일한 단서인데 말입니다.
+**레벨은 ERROR 이고, 스택트레이스만 스위치가 달렸습니다.** 소스 주석(error_handler.py:117-124)이 그 이유를 직접 설명합니다 — 바로 위 `HINT_UNEXPECTED` 가 "`--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다"라고 안내하는데, 이전 코드는 `logger.exception` 이라 `exc_info` 가 항상 참이었습니다. 기본 로그 레벨(WARNING)이 ERROR 레코드를 통과시키므로 **`--debug` 없이도 트레이스백이 화면에 뿌려졌고**, 안내와 동작이 정반대였습니다. 레벨을 ERROR 로 남겨 두는 것은 별개의 이유입니다 — 기본 실행에서도 "분류되지 않은 오류가 났다"는 사실 한 줄은 보여야, 사용자가 `--debug` 로 재현해 스택을 볼 단서가 됩니다.
 
-`logger.exception` 은 ERROR 로 기록하므로 WARNING 문턱을 넘습니다. 즉 **평소 실행에서도** 트레이스백이 stderr 에 남습니다. 실제 출력입니다.
+즉 **평소 실행에서는 기록 한 줄로 끝납니다.** 실제 출력입니다.
 
 ```
 $ python -m budget_app <버그를 밟는 명령>          # --debug 없이
 [오류] 예기치 못한 오류가 발생했습니다: 'nope'
 [힌트] `--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다.
 [ERROR] unhandled error
+```
+
+```
+$ python -m budget_app --debug <버그를 밟는 명령>
+[오류] 예기치 못한 오류가 발생했습니다: 'nope'
+[힌트] `--debug` 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다.
+[ERROR] 2026-01-01 00:00:00,000 budget_app:125 unhandled error
 Traceback (most recent call last):
   File ".../budget_app/cli/error_handler.py", line 50, in wrapper
     result = func(*args, **kwargs)
@@ -691,17 +710,19 @@ Traceback (most recent call last):
 KeyError: 'nope'
 ```
 
-**정책이 부류마다 다르다**는 것이 요점입니다. 사용자가 고칠 수 있는 앞의 세 부류(§5.3~§5.5)는 여전히 한두 줄로 끝나고 트레이스백이 없습니다. 마지막 부류만 "프로그램이 예상하지 못한 상태"이므로, 감추는 것보다 **신고할 수 있게 하는 편**을 택했습니다. 힌트 문구가 `--debug` 를 안내하는 것은 그때 `%(asctime)s %(name)s:%(lineno)d` 까지 붙은 상세 포맷(`LOG_FORMAT_DEBUG`)으로 바뀌고 다른 DEBUG 로그도 함께 보이기 때문입니다.
+**정책이 부류마다 같다**는 것이 요점입니다. 어느 부류든 사용자 화면에는 원인 한 줄과 힌트만 나가고 트레이스백이 없습니다(요구사항 Q2). 마지막 부류만 "프로그램이 예상하지 못한 상태"라 `[ERROR] unhandled error` 기록 한 줄이 더 붙을 뿐이고, 스택은 힌트가 안내하는 대로 `--debug` 를 켰을 때 비로소 나옵니다 — 그때 `%(asctime)s %(name)s:%(lineno)d` 까지 붙은 상세 포맷(`LOG_FORMAT_DEBUG`)으로 바뀌고 다른 DEBUG 로그도 함께 보입니다.
 
-**그리고 `setup_logging` 이 로그를 화면에 얹는 유일한 지점입니다.** `cli/app.py:87-88` 의 주석이 그 의존을 명시합니다 — `main()` 이 `output.setup_logging()` 을 부르지 않으면 로거에 핸들러가 하나도 붙지 않습니다.
+**그리고 `setup_logging` 이 "디버그인가"를 확정하는 유일한 지점입니다.** `cli/app.py:87-88` 의 주석이 그 의존을 명시합니다 — `main()` 이 `output.setup_logging()` 을 부르지 않으면 로거에 핸들러가 붙지 않고, `output.debug_enabled()` 도 계속 `False` 라 `--debug` 로 요청한 스택트레이스가 어디에도 남지 않습니다.
 
-> **⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나(주의: 소스 주석보다 이쪽이 현재 사실)**
-> — `logging.getLogger("budget_app")` 로 만든 로거는 처리를 부모(루트)에게 전파하는데,
-> 루트에도 핸들러가 없으면 `logging.lastResort` 라는 **최후 수단 핸들러**가 대신
-> 받습니다. 이것은 stderr 로 쓰는 핸들러이고 레벨이 WARNING 이라, ERROR 로 찍는
-> `logger.exception(...)` 은 `setup_logging` 없이도 (포맷 없이 맨 메시지 + 트레이스백
-> 형태로) 출력됩니다. 반면 DEBUG 레코드는 문턱을 못 넘어 사라집니다 —
-> `@log_call`/`@measure_time` 의 로그가 `--debug` 없이는 보이지 않는 이유가 이것입니다.
+> **⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나** — `logging.getLogger("budget_app")` 로
+> 만든 로거는 처리를 부모(루트)에게 전파하는데, 루트에도 핸들러가 없으면
+> `logging.lastResort` 라는 **최후 수단 핸들러**가 대신 받습니다. 이것은 stderr 로
+> 쓰는 핸들러이고 레벨이 WARNING 이라, ERROR 로 찍는 `logger.error(...)` 는
+> `setup_logging` 없이도 **포맷 없이 맨 메시지**(`unhandled error`)만 출력됩니다 —
+> `[ERROR]` 접두사는 `LOG_FORMAT` 이 붙이는 것이라 이때는 나오지 않고,
+> `exc_info` 도 `False` 라 트레이스백은 애초에 실리지 않습니다. 반면 DEBUG 레코드는
+> 문턱을 못 넘어 사라집니다 — `@log_call`/`@measure_time` 의 로그가 `--debug` 없이는
+> 보이지 않는 이유가 이것입니다.
 > → [12 §2-B](./12-syntax-and-stdlib.md)
 
 ```python
@@ -710,7 +731,7 @@ KeyError: 'nope'
 <_StderrHandler <stderr> (WARNING)>
 ```
 
-`cli/output.py:82-85` 와 `cli/app.py:87-88` 의 주석은 "`setup_logging` 이 없으면 스택트레이스가 어디에도 남지 않는다"고 적고 있는데, 이것은 이 절이 **`logger.debug(..., exc_info=True)` 였던 시절의 설명**입니다. ERROR 로 올린 지금은 `lastResort` 덕분에 살아남습니다. 그래도 `setup_logging` 이 하는 일은 그대로 남습니다 — 레벨을 정하고(`--debug` → DEBUG), 포맷을 붙이고, `force=True` 로 재호출 시에도 설정을 확정합니다(`cli/output.py:94-99`).
+`setup_logging` 이 하는 일은 셋입니다 — 레벨을 정하고(`--debug` → DEBUG), 포맷을 붙이고, `force=True` 로 재호출 시에도 설정을 확정합니다. 여기에 **디버그 여부를 모듈 상태로 확정하는 일**이 더해집니다(`cli/output.py:97-100`). `handle_errors` 가 로깅 설정을 직접 들여다보지 않고 `output.debug_enabled()`(`cli/output.py:84-91`) 하나만 묻는 이유가 이것입니다 — "디버그인가"의 정의가 `--debug` 플래그와 `BUDGET_APP_DEBUG` 환경변수 둘로 나뉘어 있어서, 그 합성을 아는 곳이 한 곳뿐이어야 두 경로의 동작이 갈라지지 않습니다.
 
 ---
 
@@ -734,7 +755,8 @@ BaseException
     ├── ValueError
     │   ├── ValidationError          (errors.py 정의)
     │   └── UnicodeError
-    │       └── UnicodeDecodeError
+    │       ├── UnicodeDecodeError
+    │       └── UnicodeEncodeError
     ├── AppError                     (errors.py 정의)
     │   └── InputAborted             (prompts.py 정의)
     └── KeyError, TypeError, ...
@@ -778,7 +800,7 @@ True
 ```python
 ORDER = [BrokenPipeError, KeyboardInterrupt, ValidationError, AppError,
          FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError,
-         UnicodeDecodeError, OSError, Exception]   # 소스와 같은 11개, 같은 순서
+         UnicodeDecodeError, UnicodeEncodeError, OSError, Exception]   # 소스와 같은 12개, 같은 순서
 
 for i, a in enumerate(ORDER):
     for b in ORDER[i + 1:]:
@@ -795,7 +817,7 @@ print("검증 완료")
 1) cli.cmd_delete(ctx, args)
        │  ctx.tx_service.delete("TX-999999")
        ▼
-2) services.TransactionService.delete                          [services/transactions.py:72-77]
+2) services.TransactionService.delete                          [services/transactions.py:79-84]
        │  if not self.txs.delete(tx_id):
        ▼
 3) repository.TransactionRepository.delete → False             [storage/repositories.py:150-171]
@@ -838,7 +860,7 @@ budget_app/storage/repositories.py:159-168
             return tx
 ```
 
-budget_app/services/transactions.py:72-76
+budget_app/services/transactions.py:79-83
 
 ```python
     @log_call
@@ -886,7 +908,7 @@ EXIT_INTERRUPT = 130
 | 3 | `EXIT_IO` | 파일 없음/디렉터리/권한/디스크 | `import --from nope.csv` |
 | 4 | `EXIT_APP` | `AppError` (+ `InputAborted`) | `delete --id TX-999999` |
 | 5 | `EXIT_NO_CATEGORY` | 카테고리 0개에서 `add` | 카테고리 파일을 비우고 `add` |
-| 6 | `EXIT_ENCODING` | `UnicodeDecodeError` | CP949 로 저장한 CSV 를 import |
+| 6 | `EXIT_ENCODING` | `UnicodeDecodeError` / `UnicodeEncodeError` | CP949 로 저장한 CSV 를 import / UTF-8 로 쓸 수 없는 값을 export |
 | 130 | `EXIT_INTERRUPT` | `KeyboardInterrupt` | 대화형 입력 중 Ctrl+C |
 
 **`EXIT_NO_CATEGORY`(5)만 예외 경로가 아닙니다.** 핸들러가 직접 반환합니다.
@@ -937,7 +959,7 @@ $LASTEXITCODE    # PowerShell → 4
 
 **Q. 스택트레이스를 감추면 디버깅은 어떻게 하나요?**
 
-부류를 나눠 답이 다릅니다. 사용자가 고칠 수 있는 앞의 세 부류는 한두 줄 메시지로 끝냅니다. 마지막 `except Exception` 절만은 `logger.exception(...)`(= `logger.error(..., exc_info=True)`)으로 트레이스백을 **ERROR 레벨로 남깁니다.** 기본 로그 레벨이 WARNING 이므로 이 기록은 `--debug` 없이도 stderr 에 나옵니다 — 이전 버전이 DEBUG 레벨을 써서 기본 실행에서는 스택이 아무 데도 남지 않던 것을 고친 자리입니다(error_handler.py:110-117 주석). `--debug`(또는 `BUDGET_APP_DEBUG` 환경변수)를 켜면 시각·모듈·줄 번호가 붙은 상세 포맷과 다른 DEBUG 로그까지 함께 보입니다.
+`--debug` 로 되살립니다. 어느 부류든 기본 실행에서는 원인 한 줄과 힌트로 끝내고, 마지막 `except Exception` 절만 `logger.error(..., exc_info=output.debug_enabled())` 로 `[ERROR] unhandled error` 기록 한 줄을 더 남깁니다 — "분류되지 않은 오류가 났다"는 사실은 남기되 스택은 붙이지 않는 것입니다. `--debug`(또는 `BUDGET_APP_DEBUG` 환경변수)를 켜면 그 레코드에 트레이스백이 실리고, 시각·모듈·줄 번호가 붙은 상세 포맷과 다른 DEBUG 로그까지 함께 보입니다. 이전 버전은 `logger.exception` 이라 `exc_info` 를 끌 수 없어 `--debug` 없이도 트레이스백이 화면에 나왔고, 바로 위 힌트 문구와 모순이었습니다(error_handler.py:117-124 주석).
 
 **Q. 왜 오류를 stdout 이 아니라 stderr 로 보내나요?**
 

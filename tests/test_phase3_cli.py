@@ -147,24 +147,49 @@ def test_update_patch_receives_list_not_string():
 # ============================================================
 
 
-def test_unexpected_exception_leaves_a_stacktrace_without_debug_flag(run, monkeypatch):
-    """스택트레이스가 DEBUG 로만 남으면 **기본 실행에서 증발**한다 — 사후 분석 불가.
-
-    ``caplog`` 로 확인할 수 없다: ``setup_logging`` 이 ``basicConfig(force=True)`` 로
-    루트 핸들러를 갈아 끼우면서 pytest 가 꽂아 둔 핸들러까지 떼어 낸다. 그래서
-    실제 사용자가 보는 것과 같은 **stderr 내용**을 직접 확인한다(더 강한 검증이다).
-    """
+def _explode(monkeypatch):
+    """``category list`` 를 분류 밖의 예외로 터뜨린다 — 최후 방어선 경로 진입용."""
     from budget_app.cli import handlers
 
     def _boom(*a, **kw):
         raise RuntimeError("의도적 폭발")
 
     monkeypatch.setattr(handlers.presenter, "category_lines", _boom)
+
+
+def test_unexpected_exception_hides_stacktrace_without_debug_flag(run, monkeypatch):
+    """요구사항 Q2 — 화면에는 **스택트레이스 대신** 원인 + 해결 힌트만 나간다.
+
+    이전에는 이 자리가 ``logger.exception`` 이라 ``exc_info`` 가 항상 참이었고,
+    비-디버그 로그 레벨(WARNING)이 ERROR 레코드를 통과시켜 **``--debug`` 없이도
+    트레이스백이 화면에 뿌려졌다.** 힌트는 "``--debug`` 를 붙이면 스택트레이스가
+    남습니다"라고 안내하는데 이미 뿌리고 있었으니 안내와 동작이 모순이었다.
+
+    ``caplog`` 로 확인할 수 없다: ``setup_logging`` 이 ``basicConfig(force=True)`` 로
+    루트 핸들러를 갈아 끼우면서 pytest 가 꽂아 둔 핸들러까지 떼어 낸다. 그래서
+    실제 사용자가 보는 것과 같은 **stderr 내용**을 직접 확인한다(더 강한 검증이다).
+    """
+    _explode(monkeypatch)
     result = run("category", "list")  # --debug 없이 실행
 
     assert result.code == cli_config.EXIT_ERROR
-    assert "[오류]" in result.err          # 사용자용 한 줄 요약은 그대로
-    assert "Traceback" in result.err       # 원인 추적용 스택은 남는다
+    assert "[오류]" in result.err          # 사용자용 한 줄 요약
+    assert "[힌트]" in result.err          # 그래서 뭘 하면 되는가
+    assert "Traceback" not in result.err   # 스택트레이스는 화면에 나가지 않는다
+    assert "RuntimeError" not in result.err
+
+
+def test_unexpected_exception_leaves_a_stacktrace_with_debug_flag(run, monkeypatch):
+    """반대 방향 — ``--debug`` 를 켜면 힌트가 안내한 대로 스택이 stderr 로 남는다.
+
+    감추기만 하고 어디에도 남지 않으면 "분류되지 않은 버그"의 원인을 찾을 단서가
+    사라진다. 두 테스트가 짝이어야 정책(감추되 버리지는 않는다)이 고정된다.
+    """
+    _explode(monkeypatch)
+    result = run("category", "list", "--debug")
+
+    assert result.code == cli_config.EXIT_ERROR
+    assert "Traceback" in result.err
     assert "RuntimeError" in result.err
 
 

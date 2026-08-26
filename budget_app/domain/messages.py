@@ -10,5 +10,9 @@ ERR_TYPE_INVALID = "type 은 {types} 중 하나여야 합니다."
 ERR_DATE_INVALID = "날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)."
 ERR_MONTH_INVALID = "월 형식이 올바르지 않습니다 (YYYY-MM)."
 ERR_CATEGORY_EMPTY = "카테고리명은 비어있을 수 없습니다."
+ERR_NOT_UTF8 = (
+    "UTF-8 로 표현할 수 없는 문자가 포함되어 있습니다 "
+    "(터미널·입력 파일의 인코딩을 UTF-8 로 맞춰 다시 입력해 주세요)."
+)
 ERR_TAG_HAS_SEPARATOR = "태그에 구분자 '{sep}' 를 쓸 수 없습니다 (CSV 왕복 시 쪼개집니다): {tag}"
 ERR_TX_ID_INVALID = "거래 id 형식이 올바르지 않습니다 (TX-000001 형식): {value}"

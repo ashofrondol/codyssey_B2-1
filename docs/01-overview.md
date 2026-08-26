@@ -147,7 +147,7 @@ codyssey_B2-1/
 | `services/transactions.py` | 거래 추가·수정·삭제·정렬 스트림. `open()` 이 하나도 없습니다. |
 | `services/budgets.py` | 예산 설정과 월별 요약 계산. |
 | `services/categories.py` | 카테고리 추가·삭제와 **참조 무결성**(사용 중 카테고리 보호). |
-| `services/importexport.py` | CSV 가져오기/내보내기 정책 — 실패 축(`--atomic`) × 중복 축(`--on-duplicate`). |
+| `services/importexport.py` | CSV 가져오기/내보내기 정책 — 실패 축(`--atomic`) × 중복 축(`--on-duplicate`), 그리고 미등록 카테고리 판정(`--auto-category`). |
 | `services/maintenance.py` | `BackupService` — 백업 유스케이스(저장소의 `backup_data_dir` 을 감쌉니다). |
 | `cli/__init__.py` | `main` 만 재수출합니다 — 이 패키지의 유일한 공개 심볼. |
 | `cli/config.py` · `cli/messages.py` | 한도·종료 코드 / 프롬프트·결과·오류 문구. |
@@ -219,8 +219,8 @@ budget_app/cli/app.py:84-94
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser_module.build_parser().parse_args(argv)
-        # 로거에 핸들러를 붙이는 유일한 지점. 이 호출이 없으면 handle_errors 가
-        # exc_info 로 보존한 스택트레이스가 아무 데도 출력되지 않는다.
+        # 로거에 핸들러를 붙이고 디버그 여부를 확정하는 유일한 지점. 이 호출이 없으면
+        # handle_errors 가 `--debug` 를 알 수 없어 스택트레이스가 아무 데도 남지 않는다.
         output.setup_logging(getattr(args, "debug", False))
         return _dispatch(args)
     except BrokenPipeError:
@@ -359,7 +359,7 @@ class AppContext:
         self._cats.seed_defaults()
 ```
 
-**생성자와 `prepare()` 가 나뉜 이유**를 눈여겨보세요. 객체를 만드는 것(`__init__`)과 환경을 준비하는 것(`prepare`)은 다른 일입니다. 저장소 생성자가 폴더를 만들고 파일을 건드리면, 객체를 만드는 것만으로 디스크가 바뀝니다. 그러면 오타 난 `--data-dir` 도 조용히 새 폴더를 만들고 기본 카테고리를 심어 버립니다. 지금은 `_dispatch()` 가 한 번만 `prepare()` 를 호출하고, `backup` 처럼 준비가 필요 없는 명령은 `needs_storage=False` 로 건너뜁니다(`cli/parser.py:239-243`. 기본값 `True` 는 최상위 파서 한 곳에 `set_defaults(needs_storage=True)` 로 있습니다 — `cli/parser.py:91`).
+**생성자와 `prepare()` 가 나뉜 이유**를 눈여겨보세요. 객체를 만드는 것(`__init__`)과 환경을 준비하는 것(`prepare`)은 다른 일입니다. 저장소 생성자가 폴더를 만들고 파일을 건드리면, 객체를 만드는 것만으로 디스크가 바뀝니다. 그러면 오타 난 `--data-dir` 도 조용히 새 폴더를 만들고 기본 카테고리를 심어 버립니다. 지금은 `_dispatch()` 가 한 번만 `prepare()` 를 호출하고, `backup` 처럼 준비가 필요 없는 명령은 `needs_storage=False` 로 건너뜁니다(`cli/parser.py:248-252`. 기본값 `True` 는 최상위 파서 한 곳에 `set_defaults(needs_storage=True)` 로 있습니다 — `cli/parser.py:91`).
 
 > **💡 쉽게 말하면** — `__init__` 은 조리대에 도구를 늘어놓는 일이고, `prepare()` 는 가스를 켜고 재료를 꺼내 두는 일입니다. 도구를 늘어놓는 것만으로 가스가 켜진다면, 문을 열어 본 사람이 불을 붙인 셈이 됩니다. 둘을 나눠서 얻는 것은, 폴더를 만들고 파일을 건드리는 일이 **객체를 만들 때마다**가 아니라 명령당 딱 한 번, 그것도 오류를 받아 주는 방패 안에서만 일어난다는 점입니다.
 > 다만 이 비유는 "그러면 오타는 걸러지겠네"에서 깨집니다 — 오타 난 `--data-dir` 은 지금도 그 자리에 폴더를 만들고 기본 카테고리를 심은 뒤 아무 일 없다는 듯 끝납니다. 준비를 아예 건너뛰는 `backup` 만은 폴더를 만드는 대신 종료 코드 3 으로 "그런 폴더가 없다"고 알려 줍니다(§4.11).
@@ -391,6 +391,15 @@ $ python -m budget_app add
 ```
 
 잘못된 값을 입력하면 `[오류] ...` 와 `[힌트] 다시 입력해 주세요.` 를 출력하고 재입력을 요구합니다(최대 10회, `cli/config.py:14` 의 `MAX_INPUT_RETRIES`). 카테고리는 등록된 것만 통과하며, 미등록이면 사용 가능한 목록을 함께 보여줍니다. 등록된 카테고리가 하나도 없으면 즉시 안내 후 종료 코드 5로 끝납니다.
+
+**여섯 항목 모두 재입력 대상입니다.** 빈 값이 허용되는 메모·태그도 거부되는 값이 따로 있기 때문입니다 — **UTF-8 로 표현할 수 없는 문자**와 구분자 `,` 를 품은 태그가 그것입니다. 저장 파일은 항상 유효한 UTF-8 이므로, 저장에 성공한 거래는 언제든 `export` 로 내보낼 수 있습니다.
+
+```text
+메모(선택): (UTF-8 이 아닌 바이트)
+[오류] UTF-8 로 표현할 수 없는 문자가 포함되어 있습니다 (터미널·입력 파일의 인코딩을 UTF-8 로 맞춰 다시 입력해 주세요).
+[힌트] 다시 입력해 주세요.
+메모(선택):
+```
 
 핸들러는 값을 받는 일을 `prompts` 에 통째로 위임합니다.
 
@@ -599,13 +608,14 @@ python -m budget_app delete --id TX-000005
 
 ### 4.9 import — CSV 일괄 가져오기
 
-CSV 파일의 거래들을 일괄 등록합니다. 필수 컬럼은 `date,type,category,amount` 이고, `id`·`memo`·`tags` 는 선택입니다. 미등록 카테고리는 자동 등록됩니다.
+CSV 파일의 거래들을 일괄 등록합니다. 필수 컬럼은 `date,type,category,amount` 이고, `id`·`memo`·`tags` 는 선택입니다. `category` 는 **등록된 카테고리**여야 합니다 — 미등록이면 그 행을 건너뛰고(`skipped`) 사유를 알려 줍니다. 자동 등록이 필요하면 `--auto-category` 를 명시하세요.
 
 | 옵션 | 의미 | 기본값 |
 | --- | --- | --- |
 | `--from` | 입력 CSV 경로 (필수) | — |
 | `--atomic` | 전수 롤백 모드 — 한 줄이라도 오류면 아무것도 저장하지 않음 | 꺼짐(부분 성공) |
 | `--on-duplicate` | 이미 있는 id 를 만났을 때의 정책: `skip` / `new-id` / `error` | `skip` |
+| `--auto-category` | CSV 의 미등록 카테고리를 자동 등록 | 꺼짐(미등록 행은 건너뜀) |
 
 **두 정책 축은 서로 독립입니다.** `--atomic`(원자적 — 전부 아니면 전무, 하다 만 중간 상태를 남기지 않음)은 "데이터가 **잘못된** 줄"을 어떻게 다룰지 정합니다. `--on-duplicate` 는 "이미 **저장된** 거래"를 어떻게 다룰지 정합니다. 두 옵션은 함께 쓸 수 있습니다.
 
@@ -622,6 +632,20 @@ CSV 파일의 거래들을 일괄 등록합니다. 필수 컬럼은 `date,type,c
 | `skip` (기본) | 건너뛰고 `duplicated` 로 집계 |
 | `new-id` | 새 id 를 발급해 별도 거래로 추가 |
 | `error` | `AppError` 로 중단 (아무것도 저장 안 됨, 종료 코드 4) |
+
+| `--auto-category` | 미등록 카테고리 행을 만났을 때 |
+| --- | --- |
+| 없음 (기본) | 그 행을 건너뛰고 `skipped` 로 집계 + 줄마다 사유 출력. 카테고리 파일은 그대로 |
+| 있음 | 카테고리를 등록하고 그 행도 저장. `[안내] 새 카테고리 N개를 등록했습니다: ...` 출력 |
+
+미등록 카테고리는 "데이터가 잘못된 줄"과 같은 축이라 `--atomic` 과 함께 쓰면 **첫 줄에서 전수 롤백**(종료 코드 4)입니다. 기본을 거부로 둔 이유는 `add`/`update` 도 미등록 카테고리를 거부하기 때문입니다 — 가져오기만 규칙이 반대이면 오타 하나(`food` → `fod`)가 경고 없이 카테고리 마스터에 영구 등록되고, 그 뒤로는 요약·검색이 두 이름으로 갈립니다.
+
+```text
+$ python -m budget_app import --from typo.csv
+[완료] mode=부분 성공, imported=0, duplicated=0, skipped=1
+[오류 라인 일부]
+  - line 2: 등록되지 않은 카테고리입니다: fod (`category add --name fod` 으로 등록하거나 `--auto-category` 를 쓰세요)
+```
 
 ```bash
 python -m budget_app import --from import.csv
@@ -659,7 +683,7 @@ python -m budget_app import --from import.csv --atomic
 
 기간 필수 규칙은 핸들러 코드에서 직접 확인할 수 있습니다.
 
-budget_app/cli/handlers.py:160-173
+budget_app/cli/handlers.py:164-177
 
 ```python
 def _export_filter(args: argparse.Namespace) -> SearchFilter:
@@ -692,7 +716,7 @@ python -m budget_app export --out plain.csv --month 2024-01 --no-id
 [완료] export.csv (5 records)
 ```
 
-출력 CSV 는 UTF-8(BOM 없음), 헤더 포함이며 기본적으로 `id` 컬럼을 포함합니다.
+출력 CSV 는 UTF-8(BOM 없음), 헤더 포함이며 기본적으로 `id` 컬럼을 포함합니다. 쓰기는 임시 파일에 전부 쓴 뒤 `os.replace` 로 갈아 끼우므로, 도중에 실패해도 **헤더만 남은 반쪽 CSV** 가 생기지 않습니다 — 결과는 "완전한 새 파일" 또는 "손대지 않은 기존 파일" 둘 중 하나입니다.
 
 ```csv
 id,date,type,category,amount,memo,tags
@@ -730,7 +754,7 @@ python -m budget_app backup
 > **💡 쉽게 말하면** — 공책 한 줄에 영수증 한 장씩 옮겨 적는 것과 같습니다. 새 영수증은 맨 아래 줄에 이어 적으면 그만이고, 줄 하나가 커피에 젖어 못 읽게 돼도 위아래 줄은 멀쩡합니다. 칸을 맞춘 표에 적었다면 칸 하나가 밀릴 때 그 뒤가 전부 어긋납니다 — 줄마다 독립이라는 것이 이 형식의 값어치입니다.
 > 다만 이 비유는 **고치는 일**에서 깨집니다 — 공책은 중간 줄을 지우고 다시 쓸 수 있지만, 여기서는 한 건만 수정·삭제해도 파일 전체를 새로 써서 통째로 갈아 끼웁니다(§4.9·[07](./07-repository.md)). 이어 쓰기만 값싸고, 나머지는 그렇지 않습니다.
 
-> **🔎 문법의 출처** — JSONL 은 **공식 표준이 아닙니다.** JSON 자체는 RFC 8259 로 표준화돼 있지만, "줄바꿈으로 JSON 값을 잇는다"는 규약은 표준 문서 없이 굳어진 **관행**이고 `jsonlines.org` 라는 비공식 문서와 `.jsonl` 확장자로 통용됩니다(`ndjson` 이라는 다른 이름도 같은 것을 가리킵니다). 그래서 파이썬 표준 라이브러리에는 `jsonl` 모듈이 없고, 이 프로젝트도 `json.dumps` 한 줄과 `"\n"` 로 직접 만듭니다(`storage/jsonl.py:207-208`). 규약이 이렇게 단순하기 때문에 **줄 하나가 깨져도 나머지 줄은 멀쩡**하고, 그것이 이 프로젝트가 손상 줄을 격리해 살려 두는 설계의 전제입니다. → [12 §2-A](./12-syntax-and-stdlib.md)
+> **🔎 문법의 출처** — JSONL 은 **공식 표준이 아닙니다.** JSON 자체는 RFC 8259 로 표준화돼 있지만, "줄바꿈으로 JSON 값을 잇는다"는 규약은 표준 문서 없이 굳어진 **관행**이고 `jsonlines.org` 라는 비공식 문서와 `.jsonl` 확장자로 통용됩니다(`ndjson` 이라는 다른 이름도 같은 것을 가리킵니다). 그래서 파이썬 표준 라이브러리에는 `jsonl` 모듈이 없고, 이 프로젝트도 `json.dumps` 한 줄과 `"\n"` 로 직접 만듭니다(`storage/jsonl.py:229-230`). 규약이 이렇게 단순하기 때문에 **줄 하나가 깨져도 나머지 줄은 멀쩡**하고, 그것이 이 프로젝트가 손상 줄을 격리해 살려 두는 설계의 전제입니다. → [12 §2-A](./12-syntax-and-stdlib.md)
 
 | 파일 | 내용 | 실제 예시 줄 |
 | --- | --- | --- |
@@ -738,11 +762,11 @@ python -m budget_app backup
 | `data/categories.jsonl` | 카테고리 목록 | `{"name": "food"}` |
 | `data/budgets.jsonl` | 월별 예산 | `{"month": "2024-01", "amount": 500000}` |
 
-파일명은 `TX_FILE_NAME` / `CATEGORY_FILE_NAME` / `BUDGET_FILE_NAME`(`storage/config.py:17-19`)으로 중앙 관리됩니다. 거래 id 는 `TX-000001` 처럼 `TX-` 뒤에 6자리 연번이 붙는 형식(`domain/config.py:26` 의 `TX_ID_FORMAT = "TX-{:06d}"`)이며, 저장소가 자동 발급합니다. 발급한 번호는 같은 폴더의 `id_counter`(`ID_COUNTER_FILE_NAME` — `storage/config.py:21`)에 남습니다. 이 파일만은 JSONL 이 아니라 "지금까지 발급한 최대 번호" 숫자 한 줄이고, 거래가 처음 저장될 때 만들어집니다 — 삭제된 id 를 재사용하지 않게 막는 근거라 백업에도 함께 들어갑니다(§4.11). 왜 내부 저장을 CSV 가 아닌 JSONL 로 했는지(타입 보존, append O(1), 스트리밍, 손상 격리)는 README.md 8절과 [07. 저장소 계층](./07-repository.md)에서 다룹니다.
+파일명은 `TX_FILE_NAME` / `CATEGORY_FILE_NAME` / `BUDGET_FILE_NAME`(`storage/config.py:17-19`)으로 중앙 관리됩니다. 거래 id 는 `TX-000001` 처럼 `TX-` 뒤에 6자리 연번이 붙는 형식(`domain/config.py:30` 의 `TX_ID_FORMAT = "TX-{:06d}"`)이며, 저장소가 자동 발급합니다. 발급한 번호는 같은 폴더의 `id_counter`(`ID_COUNTER_FILE_NAME` — `storage/config.py:21`)에 남습니다. 이 파일만은 JSONL 이 아니라 "지금까지 발급한 최대 번호" 숫자 한 줄이고, 거래가 처음 저장될 때 만들어집니다 — 삭제된 id 를 재사용하지 않게 막는 근거라 백업에도 함께 들어갑니다(§4.11). 왜 내부 저장을 CSV 가 아닌 JSONL 로 했는지(타입 보존, append O(1), 스트리밍, 손상 격리)는 README.md 8절과 [07. 저장소 계층](./07-repository.md)에서 다룹니다.
 
 위 예시 줄에서 한글 메모가 `\uc810\uc2ec` 같은 이스케이프가 아니라 `점심` 그대로 보이는 것도 우연이 아닙니다.
 
-budget_app/storage/jsonl.py:207-208
+budget_app/storage/jsonl.py:229-230
 
 ```python
     def _encode(self, entity: T) -> str:
@@ -829,10 +853,10 @@ EXIT_INTERRUPT = 130
 | 3 | `EXIT_IO` | 파일 입출력 오류 | 파일 없음, 디렉터리 지정, 권한 없음, 디스크 오류 |
 | 4 | `EXIT_APP` | 애플리케이션 오류 (`AppError`) | 없는 id, 미등록 카테고리, `--atomic` import 실패, `--on-duplicate error` |
 | 5 | `EXIT_NO_CATEGORY` | 카테고리 미등록 상태에서 `add` 시도 | 카테고리 파일을 모두 비운 특수 상황 |
-| 6 | `EXIT_ENCODING` | 파일 인코딩 오류 (UTF-8 아님) | CP949 로 저장된 CSV import |
+| 6 | `EXIT_ENCODING` | 인코딩 오류 (읽을 파일이 UTF-8 아님 / UTF-8 로 쓸 수 없는 값) | CP949 로 저장된 CSV import, UTF-8 로 쓸 수 없는 값 export |
 | 130 | `EXIT_INTERRUPT` | 사용자 Ctrl+C 중단 | 대화형 입력 중 `KeyboardInterrupt` |
 
-예외를 어느 코드로 매핑할지는 `cli/error_handler.py:20-121` 의 `@handle_errors` 데코레이터가 한곳에서 결정합니다(예: `ValidationError → EXIT_VALIDATION`, `FileNotFoundError → EXIT_IO`). 자세한 원리는 [06. 횡단 관심사와 예외 처리](./06-decorators.md)에서 설명합니다.
+예외를 어느 코드로 매핑할지는 `cli/error_handler.py:20-128` 의 `@handle_errors` 데코레이터가 한곳에서 결정합니다(예: `ValidationError → EXIT_VALIDATION`, `FileNotFoundError → EXIT_IO`). 자세한 원리는 [06. 횡단 관심사와 예외 처리](./06-decorators.md)에서 설명합니다.
 
 > **🔎 관례의 출처 (130 = 128 + 2)** — 이것은 파이썬 규칙이 아니라 **셸의 관례**입니다. POSIX 셸은 자식 프로세스가 신호로 죽으면 `$?` 를 `128 + 신호번호` 로 보고합니다. `Ctrl+C` 가 보내는 SIGINT 의 번호가 2 이므로 `128 + 2 = 130` 입니다. 그래서 유닉스 도구들이 Ctrl+C 중단을 130 으로 알리고, 이 프로그램도 같은 숫자를 씁니다 — 실제로 신호에 죽는 것이 아니라 `KeyboardInterrupt` 를 잡아 130 을 **직접 반환**하는데, 호출자 입장에서 구분할 필요가 없는 값을 굳이 다르게 할 이유가 없기 때문입니다. 참고로 이 프로그램에서 신호는 하나도 직접 다루지 않습니다(`signal` 모듈을 import 하는 곳이 없습니다) — `Ctrl+C` 는 파이썬 런타임이 `KeyboardInterrupt` 예외로 바꿔 주고, 그 예외를 `handle_errors` 가 잡습니다. → [12 §3](./12-syntax-and-stdlib.md)
 
@@ -920,7 +944,7 @@ Ruff 는 여러 기존 린터의 규칙을 하나로 통합한 고속 린터/포
 - `target-version = "py310"`: `UP` 규칙이 "3.10 에서 쓸 수 있는 최신 문법"을 기준으로 판단하게 합니다.
 - `quote-style = "double"`: 포매터가 문자열 따옴표를 큰따옴표로 통일합니다.
 
-참고로 소스의 `# noqa` 주석(`cli/error_handler.py:106` 의 `except Exception as exc:  # noqa: BLE001`)은 특정 줄에서 특정 린트 규칙을 의도적으로 끄는 표기입니다.
+참고로 소스의 `# noqa` 주석(`cli/error_handler.py:113` 의 `except Exception as exc:  # noqa: BLE001`)은 특정 줄에서 특정 린트 규칙을 의도적으로 끄는 표기입니다.
 
 > **🔎 표기의 출처** — `# noqa` 는 파이썬 문법이 아니라 **그냥 주석**입니다. 인터프리터는 이 줄을 완전히 무시하고, 린터만 소스를 텍스트로 읽으며 이 주석을 봅니다. 이름은 "**no** **q**uality **a**ssurance" 에서 왔고 flake8 계열이 굳힌 관례를 Ruff 가 그대로 따릅니다. 콜론 뒤에 규칙 코드를 적으면(`# noqa: BLE001`) **그 규칙만** 끄고, 코드 없이 `# noqa` 만 쓰면 그 줄의 모든 규칙이 꺼집니다 — 후자는 나중에 진짜 문제가 생겨도 조용해지므로 코드를 명시하는 편이 낫습니다. `BLE001` 은 flake8-blind-except 계열의 "포괄적 `except Exception`" 경고인데, `handle_errors` 의 (4)번 최후 방어선은 **의도적으로** 모든 예외를 잡는 자리라 이 줄에서만 껐습니다.
 
@@ -966,7 +990,7 @@ pyproject.toml:1-5
 
 - budget_app 은 **표준 라이브러리만으로 만든 파일 기반 가계부 콘솔 앱**이며, 과제 명세에 따라 생성된 코드를 학습·설명하는 것이 이 문서 시리즈의 목적입니다.
 - 실행은 `python -m budget_app` 으로 하며, `runpy` 가 패키지를 import 한 뒤 `__main__.py` → `cli/app.py` 의 `main()` → `_dispatch()`(오류 방패) → `AppContext` 조립 → `HANDLERS[args.handler]` → 종료 코드 반환의 흐름입니다. `sys.exit()` 은 그 정수를 담은 `SystemExit` 예외를 던지는 함수입니다.
-- 명령은 11종: `add`(대화형), `list`, `search`, `summary`, `budget set`, `category add/list/remove`, `update`(옵션 방식 고정), `delete`, `import`(`--atomic`·`--on-duplicate`), `export`(기간 필수, `--no-id`), `backup`.
+- 명령은 11종: `add`(대화형), `list`, `search`, `summary`, `budget set`, `category add/list/remove`, `update`(옵션 방식 고정), `delete`, `import`(`--atomic`·`--on-duplicate`·`--auto-category`), `export`(기간 필수, `--no-id`), `backup`.
 - 데이터는 JSONL 파일 3종에 저장되고, 거래를 처음 추가하면 발급 번호를 기억하는 `id_counter` 파일이 같은 폴더에 하나 더 생깁니다. 카테고리 파일이 비어 있으면 기본 5종이 자동 시드됩니다.
 - CSV 교환 스키마는 `id` 를 **선택 컬럼**으로 포함합니다. 내보내기는 기본 포함, 가져오기는 있으면 복원·없으면 발급이라 왕복해도 중복이 생기지 않습니다.
 - 종료 코드 8종은 `cli/config.py` 의 `EXIT_*` 상수로 정의되고 `@handle_errors` 가 매핑합니다. 다만 argparse 가 거절한 인자의 2번은 `SystemExit`(= `BaseException`) 이라 그 방패를 **지나지 않습니다**.

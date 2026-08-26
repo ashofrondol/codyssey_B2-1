@@ -90,7 +90,7 @@
 </blockquote>
 <hr>
 <h2 id="1-dataclass-완전-해설">1. dataclass 완전 해설</h2>
-<p>이 프로젝트는 dataclass 를 <strong>네 가지 목적</strong>으로 씁니다. 목적마다 옵션(<code>frozen</code>)과 구성이 달라지므로, 그 대응 관계를 아는 것이 이 장의 핵심입니다.</p>
+<p>이 프로젝트는 dataclass 를 <strong>여섯 가지 목적</strong>으로 씁니다. 목적마다 옵션(<code>frozen</code>)과 구성이 달라지므로, 그 대응 관계를 아는 것이 이 장의 핵심입니다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -156,7 +156,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">x</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">y</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Point(x=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="si">!r}</span><span class="s2">, y=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Point(x=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="si">!r}</span><span class="s2">, y=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="si">!r}</span><span class="s2">)"</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
 
@@ -172,12 +172,12 @@
 <p><strong>실제 코드.</strong> 이 프로젝트의 핵심 모델 <code>Transaction</code> 이 정확히 이 방식으로 선언되어 있습니다.</p>
 <p>budget_app/domain/entities.py:28-54</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Transaction</span><span class="p">:</span>
-    <span class="s2">&quot;&quot;&quot;단일 거래 내역.</span>
+    <span class="s2">"""단일 거래 내역.</span>
 
 <span class="s2">    필드 계약:</span>
 <span class="s2">        id       : ``TransactionId`` 값 객체 (``TX-000001`` 형식)</span>
-<span class="s2">        type     : &quot;income&quot; 또는 &quot;expense&quot;</span>
-<span class="s2">        date     : &quot;YYYY-MM-DD&quot;</span>
+<span class="s2">        type     : "income" 또는 "expense"</span>
+<span class="s2">        date     : "YYYY-MM-DD"</span>
 <span class="s2">        amount   : 양의 정수</span>
 <span class="s2">        category : 카테고리명(공백 정규화됨)</span>
 <span class="s2">        memo     : 자유 문자열 (없으면 빈 문자열)</span>
@@ -190,7 +190,7 @@
 
 <span class="s2">    ## ``frozen=True`` 인 이유</span>
 
-<span class="s2">    이 클래스의 docstring 은 오래전부터 &quot;생성자가 유일한 불변식 강제 지점&quot;이라고</span>
+<span class="s2">    이 클래스의 docstring 은 오래전부터 "생성자가 유일한 불변식 강제 지점"이라고</span>
 <span class="s2">    말해 왔는데, 정작 만들어진 뒤에 ``tx.amount = -1`` 이 그냥 됐다. 생성자가</span>
 <span class="s2">    유일한 강제 지점이 되려면 **생성자 이후에 바꿀 수 없어야** 한다.</span>
 
@@ -207,7 +207,7 @@
     <span class="n">date</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">amount</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">category</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">memo</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">memo</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
     <span class="n">tags</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
 </code></pre></div>
 
@@ -230,8 +230,8 @@
     <span class="n">tags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">tags</span>
 
-<span class="n">add_tag</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">)</span>   <span class="c1"># [&#39;a&#39;]</span>
-<span class="n">add_tag</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)</span>   <span class="c1"># [&#39;a&#39;, &#39;b&#39;]  ← 새 리스트가 아니라 아까 그 리스트!</span>
+<span class="n">add_tag</span><span class="p">(</span><span class="s2">"a"</span><span class="p">)</span>   <span class="c1"># ['a']</span>
+<span class="n">add_tag</span><span class="p">(</span><span class="s2">"b"</span><span class="p">)</span>   <span class="c1"># ['a', 'b']  ← 새 리스트가 아니라 아까 그 리스트!</span>
 </code></pre></div>
 
 <p>dataclass 에서 <code>tags: List[str] = []</code> 라고 쓰면 모든 인스턴스가 태그 리스트 하나를 공유하는 대형 버그가 되므로, <strong>dataclass 는 이 표기 자체를 <code>ValueError: mutable default ... use default_factory</code> 로 거부</strong>합니다. 대신 <code>field(default_factory=list)</code> 를 쓰면 "인스턴스가 만들어질 때마다 <code>list()</code> 를 호출해 <strong>새 리스트</strong>를 만들어라"는 의미가 됩니다.</p>
@@ -239,11 +239,11 @@
 <p>budget_app/services/importexport.py:30-39</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">_Batch</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;가져오기 준비 단계의 누적 상태.</span>
+<span class="w">    </span><span class="sd">"""가져오기 준비 단계의 누적 상태.</span>
 
 <span class="sd">    준비(prepare)와 커밋(commit)을 나누는 것이 원자성의 뼈대다. 파일에 손대기</span>
-<span class="sd">    전에 모든 행의 판정이 끝나 있어야 &quot;전혀 반영 안 됨&quot;이 가능하다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    전에 모든 행의 판정이 끝나 있어야 "전혀 반영 안 됨"이 가능하다.</span>
+<span class="sd">    """</span>
 
     <span class="n">transactions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">new_categories</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
@@ -285,9 +285,9 @@ dataclass 는 <code>eq=True</code>(기본) <strong>와</strong> <code>frozen=Tru
 <p>budget_app/domain/entities.py:127-142</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">TransactionPatch</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 부분 수정 요청 — ``None`` 인 필드는 &quot;변경 없음&quot;을 뜻한다.</span>
+<span class="w">    </span><span class="sd">"""거래 부분 수정 요청 — ``None`` 인 필드는 "변경 없음"을 뜻한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">date</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
@@ -298,7 +298,7 @@ dataclass 는 <code>eq=True</code>(기본) <strong>와</strong> <code>frozen=Tru
 </code></pre></div>
 
 <p><strong>설계 의도.</strong> <code>TransactionPatch</code> 는 "이 필드들을 이 값으로 바꿔라"라는 <strong>명령서</strong>입니다. 명령서가 전달 도중에 바뀌면 CLI 가 만든 것과 저장소가 받는 것이 달라질 수 있습니다. <code>frozen=True</code> 는 그 가능성을 언어 차원에서 없앱니다.</p>
-<p>같은 이유로 결과 모델도 전부 frozen 입니다 — <code>MonthlySummary</code>(domain/results.py:22-55), <code>ImportReport</code>(domain/results.py:74-97), <code>RawLine</code>(storage/jsonl.py:95-111), <code>ParsedRow</code>(storage/csv_io.py:39-64), <code>TransactionInput</code>(cli/prompts.py:40-49). <strong>"이미 계산이 끝난 값"과 "아직 확정되지 않은 값"을 타입 선언만으로 구분</strong>할 수 있게 됩니다.</p>
+<p>같은 이유로 결과 모델도 전부 frozen 입니다 — <code>MonthlySummary</code>(domain/results.py:22-55), <code>ImportReport</code>(domain/results.py:74-97), <code>RawLine</code>(storage/jsonl.py:95-111), <code>ParsedRow</code>(storage/csv_io.py:40-65), <code>TransactionInput</code>(cli/prompts.py:40-49). <strong>"이미 계산이 끝난 값"과 "아직 확정되지 않은 값"을 타입 선언만으로 구분</strong>할 수 있게 됩니다.</p>
 <p><strong>엔티티도 지금은 frozen 입니다.</strong> <code>Transaction</code>/<code>Budget</code>/<code>Category</code>, 그리고 값 객체 <code>TransactionId</code> 까지 전부 <code>@dataclass(frozen=True)</code> 이고(domain/entities.py:27, 157, 176 / domain/tx_id.py:52), <code>__post_init__</code> 은 대입 대신 <code>object.__setattr__</code> 로 정규화합니다(§1.4).</p>
 <p>frozen 이 <strong>아닌</strong> dataclass 는 둘뿐입니다 — 질의 조건 <code>SearchFilter</code>(domain/queries.py:32)와 가져오기 누적 상태 <code>_Batch</code>(services/importexport.py:30). <code>_Batch</code> 는 행을 훑으며 값이 계속 쌓이는 객체라 당연합니다. <code>SearchFilter</code> 는 <code>spec: specs.Spec = field(init=False, repr=False)</code>(domain/queries.py:52)라는 <strong>생성자 인자가 아닌 파생 필드</strong>를 두고 <code>__post_init__</code> 에서 <code>self.spec = self._build_spec()</code> 로 평범하게 대입하는데, frozen 이면 이 대입도 <code>FrozenInstanceError</code> 가 되어 <code>object.__setattr__</code> 로 우회해야 합니다.</p>
 <blockquote>
@@ -326,13 +326,13 @@ __post_init__            ← 검증·정규화 (여기서 실패하면 객체 �
         <span class="c1"># frozen 이라 대입 대신 object.__setattr__ 로 정규화한다 — 생성자가 끝나는</span>
         <span class="c1"># 순간 객체는 검증·정규화가 끝난 상태로 굳는다.</span>
         <span class="n">_set</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="n">TransactionId</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">date</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;amount&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;memo&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">))</span>
-        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;tags&quot;</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tags</span><span class="p">)))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">,</span> <span class="n">TransactionId</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"type"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"date"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_date</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">date</span><span class="p">))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"amount"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"memo"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">))</span>
+        <span class="n">_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"tags"</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tags</span><span class="p">)))</span>
 </code></pre></div>
 
 <p>각 줄은 "검증하며 정규화한 값으로 필드를 덮어쓰기" 합니다.</p>
@@ -355,8 +355,8 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 <p><code>Budget</code> 과 <code>Category</code> 도 같은 패턴입니다.</p>
 <p>budget_app/domain/entities.py:164-166</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;month&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_month</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">month</span><span class="p">))</span>
-        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;amount&quot;</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"month"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_month</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">month</span><span class="p">))</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"amount"</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">))</span>
 </code></pre></div>
 
 <p><strong>설계 의도.</strong> 이것이 이 프로젝트의 핵심 설계인 <strong>"생성자 불변식(constructor invariant)"</strong> 입니다. 거래 객체가 만들어지는 경로는 최소 네 가지입니다 — (1) CLI 대화형 입력 → 서비스의 <code>add</code>, (2) JSONL 파일에서 읽는 <code>from_dict</code>, (3) CSV import, (4) 수정 시 <code>with_patch</code>. 검증을 각 경로에 흩어 놓으면 한 경로를 빠뜨리는 순간 불량 데이터가 들어옵니다. <code>__post_init__</code> 하나에 모아 두면 <strong>어떤 경로로 만들어져도 반드시 이 지점을 통과</strong>하므로, "검증을 깜빡한 경로"라는 것이 존재할 수 없습니다.</p>
@@ -369,9 +369,9 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 <p>budget_app/domain/queries.py:32-55</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SearchFilter</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 검색 조건 — CLI 옵션 묶음을 명세로 번역한다.</span>
+<span class="w">    </span><span class="sd">"""거래 검색 조건 — CLI 옵션 묶음을 명세로 번역한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">date_from</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># YYYY-MM-DD</span>
     <span class="n">date_to</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
@@ -390,13 +390,13 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 <p>모든 필드가 <code>X | None = None</code> 이므로 "지정 안 한 조건은 통과"라는 의미가 자연스럽게 표현됩니다. 판정 자체는 <code>matches</code> 안에 없습니다 — <code>__post_init__</code> 이 지정된 조건만 골라 명세(<code>specs</code>)로 조립해 두고, <code>matches</code> 는 그 명세에 물어보기만 합니다(<a href="#101-specification--검색-조건이-and-로-고정돼-있던-문제">§10.1</a>).</p>
 <p>budget_app/domain/queries.py:80-82</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx</span><span class="p">:</span> <span class="n">Transaction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;조립해 둔 명세에 판정을 위임한다.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""조립해 둔 명세에 판정을 위임한다."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">spec</span><span class="o">.</span><span class="n">is_satisfied_by</span><span class="p">(</span><span class="n">tx</span><span class="p">)</span>
 </code></pre></div>
 
 <p>세 가지를 눈여겨보세요.</p>
 <ol>
-<li><strong>정규화는 명세의 생성자가 합니다.</strong> <code>SearchFilter</code> 자신은 값을 손대지 않고 <code>_build_spec</code> 이 <code>specs.DateFrom(self.date_from)</code> 처럼 넘기는데, <code>DateFrom.__init__</code> 이 <code>validators.parse_date</code> 를 부릅니다(domain/specs.py:175-176). 그래서 잘못된 날짜를 주면 <strong><code>SearchFilter</code> 를 만드는 순간</strong> <code>ValidationError</code> 가 나고, CLI 는 날짜를 미리 검증할 필요가 없습니다(cli/handlers.py:58-69 의 <code>cmd_search</code> 가 인자를 그대로 넘기기만 하는 이유).</li>
+<li><strong>정규화는 명세의 생성자가 합니다.</strong> <code>SearchFilter</code> 자신은 값을 손대지 않고 <code>_build_spec</code> 이 <code>specs.DateFrom(self.date_from)</code> 처럼 넘기는데, <code>DateFrom.__init__</code> 이 <code>validators.parse_date</code> 를 부릅니다(domain/specs.py:175-176). 그래서 잘못된 날짜를 주면 <strong><code>SearchFilter</code> 를 만드는 순간</strong> <code>ValidationError</code> 가 나고, CLI 는 날짜를 미리 검증할 필요가 없습니다(cli/handlers.py:62-73 의 <code>cmd_search</code> 가 인자를 그대로 넘기기만 하는 이유).</li>
 <li><strong><code>for_month</code> 는 대체 생성자(classmethod)입니다.</strong> "월 전체"라는 자주 쓰는 조건을 이름 있는 생성 방법으로 제공합니다. <code>summary</code> 와 <code>export</code> 가 이 하나를 공유하므로 "이 달에 속하는가"의 정의가 프로그램 전체에 하나뿐입니다.</li>
 <li><strong>명세는 거래마다 다시 만들지 않습니다.</strong> <code>spec</code> 이 <code>field(init=False)</code> 인 파생 필드라 조립은 필터 생성 시 딱 한 번이고, 10만 건을 훑는 동안에는 이미 만들어진 객체 트리에 <code>is_satisfied_by</code> 만 반복해서 묻습니다.</li>
 </ol>
@@ -415,27 +415,27 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 "인스턴스 <code>__dict__</code> → 클래스" 순서로 이름을 찾다가 클래스에서 디스크립터를 만나면
 값을 돌려주는 대신 <code>__get__</code> 을 호출합니다. 그래서 <code>summary.usage_pct</code> 라고 쓰면
 그 자리에서 함수가 실행됩니다 — <strong>저장된 값이 아니라 매번 계산된 값</strong>입니다.
-<code>setter</code> 를 정의하지 않았으므로 셋 다 읽기 전용이고, 대입하면 <code>AttributeError</code> 입니다.
+<code>setter</code> 를 정의하지 않았으므로 넷 다 읽기 전용이고, 대입하면 <code>AttributeError</code> 입니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
 <p><strong>실제 코드.</strong></p>
 <p>budget_app/domain/results.py:22-55</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">MonthlySummary</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;월별 요약 — 집계 원자료만 담고 파생값은 property 로 계산한다.</span>
+<span class="w">    </span><span class="sd">"""월별 요약 — 집계 원자료만 담고 파생값은 property 로 계산한다.</span>
 
-<span class="sd">    ``usage_pct`` 가 ``None`` 인 경우가 둘(&quot;예산 미설정&quot; / &quot;예산이 0&quot;)인데,</span>
+<span class="sd">    ``usage_pct`` 가 ``None`` 인 경우가 둘("예산 미설정" / "예산이 0")인데,</span>
 <span class="sd">    화면에서는 둘 다 ``N/A`` 로 같게 보인다. 그 판단 근거를 모델에 두면</span>
 <span class="sd">    프레젠터는 ``None`` 여부만 보면 되고 규칙을 몰라도 된다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;보여줄 것이 아무것도 없는가 — 거래도 예산도 없을 때만 참.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""보여줄 것이 아무것도 없는가 — 거래도 예산도 없을 때만 참."""</span>
         <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_data</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="ow">is</span> <span class="kc">None</span>
 </code></pre></div>
 
 <p><strong>설계 의도.</strong> <code>balance</code> 는 <code>income - expense</code> 이므로 저장하면 <strong>같은 정보를 두 번 갖게 되고, 둘이 어긋날 수 있습니다</strong>. property 로 두면 언제 읽어도 일관됩니다.</p>
 <p>더 중요한 것은 <strong>계산 규칙의 소속</strong>입니다. 리팩터 전에는 서비스가 문자열 키 dict 를 만들어 <code>result["usage_pct"]</code> 를 채웠고, "예산이 없으면 N/A" 같은 해석을 CLI 가 했습니다. 지금은 서비스가 <strong>원자료만</strong> 담아 넘기고, 파생값은 모델이 계산하며, 프레젠터는 <code>None</code> 인지만 봅니다.</p>
-<p>budget_app/cli/presenter.py:81-88</p>
+<p>budget_app/cli/presenter.py:85-92</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_budget_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="n">MonthlySummary</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="n">usage</span> <span class="o">=</span> <span class="n">summary</span><span class="o">.</span><span class="n">usage_pct</span>
     <span class="n">usage_str</span> <span class="o">=</span> <span class="p">(</span>
@@ -451,20 +451,20 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 <p><strong><code>asdict</code> 는 이 코드에 없습니다 — 그것이 요점입니다.</strong> <code>dataclasses.asdict</code> 는 인스턴스의 모든 필드를 <code>{필드명: 값}</code> dict 로 바꿔 주는 편의 함수인데, <strong>중첩된 dataclass 를 만나면 그것까지 재귀적으로 dict 로 풉니다.</strong> 그래서 <code>Transaction</code> 에는 쓸 수 없습니다.</p>
 <p>budget_app/domain/entities.py:82-97</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;JSONL 한 줄이 될 dict.</span>
+<span class="w">        </span><span class="sd">"""JSONL 한 줄이 될 dict.</span>
 
 <span class="sd">        ``asdict()`` 를 쓸 수 없다 — ``TransactionId`` 가 dataclass 라</span>
-<span class="sd">        ``{&quot;id&quot;: {&quot;value&quot;: &quot;TX-000001&quot;}}`` 처럼 중첩돼 저장 형식이 깨진다.</span>
+<span class="sd">        ``{"id": {"value": "TX-000001"}}`` 처럼 중첩돼 저장 형식이 깨진다.</span>
 <span class="sd">        값 객체는 **경계에서 원시 값으로 풀어** 내보낸다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="p">{</span>
-            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
-            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
-            <span class="s2">&quot;date&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">date</span><span class="p">,</span>
-            <span class="s2">&quot;amount&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">,</span>
-            <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span>
-            <span class="s2">&quot;memo&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">,</span>
-            <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tags</span><span class="p">),</span>
+            <span class="s2">"id"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="s2">"date"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">date</span><span class="p">,</span>
+            <span class="s2">"amount"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">amount</span><span class="p">,</span>
+            <span class="s2">"category"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span>
+            <span class="s2">"memo"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">memo</span><span class="p">,</span>
+            <span class="s2">"tags"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tags</span><span class="p">),</span>
         <span class="p">}</span>
 </code></pre></div>
 
@@ -478,7 +478,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <p><strong><code>fields</code></strong> 는 dataclass 의 필드 메타데이터 목록을 돌려줍니다.</p>
 <p>budget_app/domain/entities.py:144-151</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">changed_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;``None`` 이 아닌 필드만 골라 dict 로 준다.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""``None`` 이 아닌 필드만 골라 dict 로 준다."""</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
@@ -500,9 +500,9 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <h3 id="18-with_patch-불변-갱신-관용구">1.8 <code>with_patch</code> — 불변 갱신 관용구</h3>
 <p>budget_app/domain/entities.py:113-124</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">with_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="n">TransactionPatch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Transaction</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;부분 변경을 적용한 **새 Transaction** 을 만든다.</span>
+<span class="w">        </span><span class="sd">"""부분 변경을 적용한 **새 Transaction** 을 만든다.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">Transaction</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="o">**</span><span class="n">patch</span><span class="o">.</span><span class="n">changed_fields</span><span class="p">()})</span>
 </code></pre></div>
 
@@ -555,7 +555,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <td><code>@staticmethod</code></td>
 <td>없음</td>
 <td>둘 다 접근 불가 (그냥 함수)</td>
-<td><strong>이 프로젝트에는 남아 있지 않습니다</strong></td>
+<td><code>TransactionRepository._scan_id</code>, <code>._as_id</code>(storage/repositories.py:39, 93) — 다만 <strong>검증기</strong> staticmethod 는 전부 모듈 함수로 내렸습니다(§2.2)</td>
 </tr>
 </tbody>
 </table></div>
@@ -581,13 +581,13 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
         <span class="c1"># 필수 키는 하드 접근(누락 시 KeyError → 저장소가 손상 줄로 처리).</span>
         <span class="c1"># 검증·정규화는 __post_init__ 이 일괄 수행하므로 여기서는 형태만 넘긴다.</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
-            <span class="nb">id</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span>
-            <span class="nb">type</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span>
-            <span class="n">date</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">],</span>
-            <span class="n">amount</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;amount&quot;</span><span class="p">],</span>
-            <span class="n">category</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;category&quot;</span><span class="p">],</span>
-            <span class="n">memo</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memo&quot;</span><span class="p">),</span>
-            <span class="n">tags</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tags&quot;</span><span class="p">),</span>
+            <span class="nb">id</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
+            <span class="nb">type</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"type"</span><span class="p">],</span>
+            <span class="n">date</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"date"</span><span class="p">],</span>
+            <span class="n">amount</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"amount"</span><span class="p">],</span>
+            <span class="n">category</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"category"</span><span class="p">],</span>
+            <span class="n">memo</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"memo"</span><span class="p">),</span>
+            <span class="n">tags</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tags"</span><span class="p">),</span>
         <span class="p">)</span>
 </code></pre></div>
 
@@ -598,9 +598,9 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 </code></pre></div>
 
 <p><strong>설계 의도.</strong> <code>from_dict</code> 가 인스턴스 메서드일 수는 없습니다 — 객체를 <strong>만들기 전</strong>이니 <code>self</code> 가 없기 때문입니다. 모듈 함수로 둘 수도 있지만, classmethod 로 클래스에 붙이면 "Transaction 을 만드는 방법"이 클래스 안에 응집되고 <code>cls(...)</code> 호출이 <code>__post_init__</code> 검증까지 자동으로 태웁니다.</p>
-<p>필수 키(<code>data["id"]</code> 등)는 대괄호 하드 접근이라 누락 시 <code>KeyError</code> 가 나는데, 이는 버그가 아니라 <strong>의도된 신호</strong>입니다 — 저장소의 <code>_parse_line</code>(storage/jsonl.py:181-191)이 <code>_LINE_ERRORS</code> 튜플로 그 <code>KeyError</code> 를 "손상된 줄"로 잡기 때문입니다(storage/jsonl.py:38-40). 선택 키(<code>memo</code>, <code>tags</code>)는 <code>.get()</code> 으로 <code>None</code> 을 허용하고, <code>parse_memo(None) → ""</code>, <code>parse_tags(None) → []</code> 가 이를 정상값으로 정규화합니다.</p>
+<p>필수 키(<code>data["id"]</code> 등)는 대괄호 하드 접근이라 누락 시 <code>KeyError</code> 가 나는데, 이는 버그가 아니라 <strong>의도된 신호</strong>입니다 — 저장소의 <code>_parse_line</code>(storage/jsonl.py:201-213)이 <code>_LINE_ERRORS</code> 튜플로 그 <code>KeyError</code> 를 "손상된 줄"로 잡기 때문입니다(storage/jsonl.py:38-40). 선택 키(<code>memo</code>, <code>tags</code>)는 <code>.get()</code> 으로 <code>None</code> 을 허용하고, <code>parse_memo(None) → ""</code>, <code>parse_tags(None) → []</code> 가 이를 정상값으로 정규화합니다.</p>
 <p><strong><code>cls</code> 라서 얻는 것 — 제네릭 저장소.</strong> <code>JsonlStore</code> 는 어떤 엔티티를 다루는지 모른 채 한 줄을 세웁니다.</p>
-<p>budget_app/storage/jsonl.py:186-187</p>
+<p>budget_app/storage/jsonl.py:208-209</p>
 <div class="codehilite"><pre><span></span><code>        <span class="k">try</span><span class="p">:</span>
             <span class="n">entity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 </code></pre></div>
@@ -619,20 +619,26 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <p>주석이 스스로 문제를 고백하고 있습니다. <strong>실질이 없는 위임 메서드가 존재하는 유일한 이유가 "CLI 가 이런 모양으로 부르고 싶어서"</strong> 였습니다. 같은 규칙이 세 형태(모듈 함수 / staticmethod 위임 / 클래스별 staticmethod)로 존재했고, 어느 것을 불러야 하는지 코드만 봐서는 알 수 없었습니다.</p>
 <p>지금은 규칙이 전부 <code>validators.py</code> 의 모듈 함수입니다.</p>
 <p>budget_app/domain/validators.py:1-2 (모듈 docstring)</p>
-<div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;필드 규칙 — &quot;이 값이 유효한가&quot;를 판단하는 단 하나의 정의처.</span>
+<div class="codehilite"><pre><span></span><code><span class="s2">"""필드 규칙 — "이 값이 유효한가"를 판단하는 단 하나의 정의처.</span>
 </code></pre></div>
 
 <p><strong>모듈 함수도 콜러블(괄호를 붙여 부를 수 있는 것)입니다.</strong> staticmethod 가 제공하던 "인스턴스 없이 참조해서 넘길 수 있다"는 성질은 모듈 함수가 더 잘 만족합니다.</p>
-<p>budget_app/cli/prompts.py:112-121</p>
+<p>budget_app/cli/prompts.py:112-127</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask_transaction</span><span class="p">(</span><span class="n">cat_service</span><span class="p">:</span> <span class="n">CategoryService</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionInput</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 한 건에 필요한 값을 순서대로 받아 온다.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""거래 한 건에 필요한 값을 순서대로 받아 온다.</span>
+
+<span class="sd">    메모·태그도 ``ask_until`` 을 지난다. 빈 값이 허용되는 필드라 예전에는 ``ask``</span>
+<span class="sd">    한 번으로 끝냈지만, 그 검증기들도 거부하는 값이 있다(UTF-8 로 쓸 수 없는 문자,</span>
+<span class="sd">    구분자를 품은 태그). 그때 재입력 기회 없이 명령이 끝나면 이 모듈이 선언한</span>
+<span class="sd">    "모든 대화형 입력은 ``ask_until`` 을 지난다"가 사실이 아니게 된다.</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">TransactionInput</span><span class="p">(</span>
         <span class="n">date</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_DATE</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_date</span><span class="p">),</span>
         <span class="nb">type</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_TYPE</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_type</span><span class="p">),</span>
         <span class="n">category</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_CATEGORY</span><span class="p">,</span> <span class="n">registered_category_validator</span><span class="p">(</span><span class="n">cat_service</span><span class="p">)),</span>
         <span class="n">amount</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_AMOUNT</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_amount</span><span class="p">),</span>
-        <span class="n">memo</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">(</span><span class="n">ask</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_MEMO</span><span class="p">)),</span>
-        <span class="n">tags</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">(</span><span class="n">ask</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_TAGS</span><span class="p">)),</span>
+        <span class="n">memo</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_MEMO</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_memo</span><span class="p">),</span>
+        <span class="n">tags</span><span class="o">=</span><span class="n">ask_until</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">PROMPT_TAGS</span><span class="p">,</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_tags</span><span class="p">),</span>
     <span class="p">)</span>
 </code></pre></div>
 
@@ -643,7 +649,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <p>budget_app/domain/queries.py:74-78</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">for_month</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">extra</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchFilter</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;월 전체를 덮는 필터 — 요약과 내보내기가 같은 경계를 쓰게 한다.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""월 전체를 덮는 필터 — 요약과 내보내기가 같은 경계를 쓰게 한다."""</span>
         <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">month_range</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">date_from</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">date_to</span><span class="o">=</span><span class="n">end</span><span class="p">,</span> <span class="o">**</span><span class="n">extra</span><span class="p">)</span>
 </code></pre></div>
@@ -658,7 +664,7 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <li><strong>상태 보존</strong>: <code>yield</code> 에서 멈출 때 지역 변수·파일 위치·루프 진행 상태가 그대로 얼어붙었다가, 다음 요청 때 그 지점부터 재개됩니다.</li>
 <li><strong>1회성 소진</strong>: 한 번 끝까지 소비한 제너레이터는 재사용할 수 없습니다. 다시 순회하려면 제너레이터 함수를 다시 호출해 새 객체를 만들어야 합니다.</li>
 </ol>
-<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 책을 통째로 복사해 가방에 넣는 대신, 열람실에서 한 장씩 넘겨 보는 것입니다. 찾던 대목이 나오면 거기서 덮고 나오면 되고, 뒷장은 아예 펼치지도 않습니다. 그래서 거래가 10만 건이어도 <code>stream()</code> 이 한 번에 손에 들고 있는 것은 한 줄뿐입니다(전체 정렬이 필요한 <code>stream_sorted</code> 와 파일을 다시 쓰는 <code>rewrite</code> 는 예외라 모아 두는 부분이 있습니다 — §3.3·§3.5).
+<blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 책을 통째로 복사해 가방에 넣는 대신, 열람실에서 한 장씩 넘겨 보는 것입니다. 찾던 대목이 나오면 거기서 덮고 나오면 되고, 뒷장은 아예 펼치지도 않습니다. 그래서 거래가 10만 건이어도 <code>stream()</code> 이 한 번에 손에 들고 있는 것은 한 줄뿐입니다(한도 없는 정렬이 필요한 <code>stream_sorted</code> 와 파일을 다시 쓰는 <code>rewrite</code> 는 예외라 모아 두는 부분이 있습니다 — §3.3·§3.5).
 다만 이 비유는 책이라면 앞으로 되돌려 다시 볼 수 있다는 데서 깨집니다 — 제너레이터는 한 번 끝까지 넘기면 그것으로 끝이라, 다시 보려면 처음부터 새로 빌려 와야 합니다(위의 세 번째 성질).</p>
 </blockquote>
 <p>타입 표기 <code>Iterator[T]</code> 는 "T 를 하나씩 내놓는 반복자"라는 뜻으로, 제너레이터 함수의 반환 타입 표기로 관례처럼 쓰입니다.</p>
@@ -679,11 +685,11 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <h3 id="32-읽기-경로가-둘-iter_raw-와-stream">3.2 읽기 경로가 둘 — <code>iter_raw()</code> 와 <code>stream()</code></h3>
 <p>리팩터의 가장 중요한 변화가 여기 있습니다. 이전에는 읽기 제너레이터가 <code>stream()</code> 하나였고, 그것이 파싱 실패 줄을 건너뛰었습니다. 그런데 <strong>파일을 다시 쓰는 작업도 같은 <code>stream()</code> 을 재료로 썼기 때문에</strong>, 무관한 거래 하나를 지우면 손상된 줄이 디스크에서 영구 삭제됐습니다.</p>
 <p>지금은 둘로 나뉘어 있습니다.</p>
-<p>budget_app/storage/jsonl.py:162-179</p>
+<p>budget_app/storage/jsonl.py:162-182</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">iter_raw</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">RawLine</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.</span>
+<span class="w">        </span><span class="sd">"""모든 줄을 원문과 함께 yield 한다 — 어떤 줄도 버리지 않는다.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ENCODING</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">FILE_ERRORS</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -705,11 +711,11 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 <p>budget_app/storage/jsonl.py:95-111</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">RawLine</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;파일의 한 줄 — 원문과 해석 결과를 함께 들고 다닌다.</span>
+<span class="w">    </span><span class="sd">"""파일의 한 줄 — 원문과 해석 결과를 함께 들고 다닌다.</span>
 
 <span class="sd">    상태가 셋이다: 원문만 있음(JSON 아님) / dict 까지 됨(도메인 규칙 위반) /</span>
 <span class="sd">    도메인 객체까지 됨(정상). 재작성 시 앞의 둘은 ``text`` 를 그대로 다시 쓴다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span>
@@ -723,13 +729,13 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 </code></pre></div>
 
 <p>그 위에 얹힌 <code>stream()</code> 은 "유효한 것만" 걸러 내보내는 얇은 층입니다.</p>
-<p>budget_app/storage/jsonl.py:193-203</p>
+<p>budget_app/storage/jsonl.py:215-225</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">T</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;검증을 통과한 도메인 객체만 yield 한다 — 조회 전용 경로.</span>
+<span class="w">        </span><span class="sd">"""검증을 통과한 도메인 객체만 yield 한다 — 조회 전용 경로.</span>
 
 <span class="sd">        손상된 줄은 건너뛰되 조용히 버리지 않고 경고 로그로 남긴다(사용자가</span>
 <span class="sd">        데이터 이상을 인지할 수 있도록). 파일 자체는 손대지 않는다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_raw</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">raw</span><span class="o">.</span><span class="n">is_valid</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">raw</span><span class="o">.</span><span class="n">entity</span>
@@ -749,16 +755,30 @@ list/tuple/dict 면 원소마다 같은 처리를 한 뒤 <strong><code>copy.dee
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="33-제너레이터-체인-stream-searchfilter-정렬-yield">3.3 제너레이터 체인: stream → SearchFilter → 정렬 → yield</h3>
-<p>budget_app/services/transactions.py:79-87</p>
-<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">stream_sorted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flt</span><span class="p">:</span> <span class="n">SearchFilter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;최신순 정렬된 거래를 yield 한다.</span>
+<p>budget_app/services/transactions.py:86-108</p>
+<div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">stream_sorted</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">flt</span><span class="p">:</span> <span class="n">SearchFilter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""최신순 정렬된 거래를 yield 한다 — ``limit`` 이 있으면 **상위 N 만** 들고 있는다.</span>
 
-<span class="sd">        주의: 정렬을 위해 한 번은 전체를 읽어야 한다(파일이 정렬되어 있지 않으므로).</span>
-<span class="sd">        그러나 메모리 사용량은 &#39;필터 통과 항목&#39;으로 제한된다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">tx</span> <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">()</span> <span class="k">if</span> <span class="n">flt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">)]</span>
-        <span class="n">items</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">date</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">yield from</span> <span class="n">items</span>
+<span class="sd">        파일이 시간순으로 정렬돼 있지 않으므로 어느 쪽이든 전체를 한 번은 **훑어야**</span>
+<span class="sd">        한다. 문제는 훑는 것이 아니라 **모으는 것**이었다: 이전 구현은 필터 통과분</span>
+<span class="sd">        전체를 리스트로 적재한 뒤 정렬해서, ``list --limit 1`` 인데도 20만 행 파일이</span>
+<span class="sd">        통째로 메모리에 올라왔다(피크 RSS 146MB). 요구사항 G2 의 "파일 전체를 한 번에</span>
+<span class="sd">        로드하지 않고"가 여기서 깨졌다 — 하류 제너레이터의 ``break`` 는 **이미 만들어진</span>
+<span class="sd">        리스트**를 자를 뿐이라 아무것도 아끼지 못했다.</span>
+
+<span class="sd">        ``heapq.nlargest`` 는 크기 ``limit`` 짜리 힙 하나만 유지하며 스트림을 흘려</span>
+<span class="sd">        보낸다. 메모리 상한이 파일 크기가 아니라 **O(limit)** 이 되고, 결과 순서는</span>
+<span class="sd">        전체 정렬과 같다(키가 같은 항목이 없으므로 — id 는 유일하다).</span>
+
+<span class="sd">        ``limit`` 이 없으면(``search`` 경로) 전체 정렬이 필요하므로 예전과 같다.</span>
+<span class="sd">        """</span>
+        <span class="n">filtered</span> <span class="o">=</span> <span class="p">(</span><span class="n">tx</span> <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">()</span> <span class="k">if</span> <span class="n">flt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">heapq</span><span class="o">.</span><span class="n">nlargest</span><span class="p">(</span><span class="n">limit</span><span class="p">,</span> <span class="n">filtered</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_sort_key</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">yield from</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">filtered</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_sort_key</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
 
 <p>데이터가 흐르는 전체 사슬을 그리면 다음과 같습니다.</p>
@@ -771,10 +791,11 @@ JsonlStore.iter_raw()        ── 제너레이터: 줄 → RawLine (모든 줄
 JsonlStore.stream()          ── 제너레이터: 유효한 것만 통과, 나머지는 경고 로그
       │  한 건씩
       ▼
-SearchFilter.matches(tx)     ── 통과한 것만 items 리스트에 축적
-      │
+SearchFilter.matches(tx)     ── 통과한 것만 다음 단계로
+      │  한 건씩
       ▼
-items.sort(...)              ── (date, id) 역순 = 최신순 정렬
+heapq.nlargest(limit, ...)   ── limit 이 있으면(list): 크기 limit 힙만 유지
+sorted(..., reverse=True)    ── limit 이 없으면(search): 통과분 전체를 모아 정렬
       │  한 건씩 (yield from)
       ▼
 presenter.tx_table           ── limit 건수에 도달하면 break
@@ -783,14 +804,18 @@ presenter.tx_table           ── limit 건수에 도달하면 break
 output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
-<p><strong>정렬은 본질적으로 전체를 봐야 하는 연산</strong>이라 이 함수는 리스트를 한 번 만듭니다. 그러나 리스트에 들어가는 것은 "필터를 통과한 항목뿐"이므로, 조건이 좁은 검색일수록 메모리 사용이 줄어듭니다. 정렬이 끝난 뒤 다시 <code>yield from</code> 으로 내보내는 이유는 소비자가 <code>limit</code> 에 도달하면 <code>break</code> 할 수 있도록 <strong>출구를 다시 스트림 형태로 유지</strong>하기 위해서입니다.</p>
-<p>budget_app/cli/presenter.py:42-55</p>
+<p><strong>정렬은 본질적으로 전체를 "훑어야" 하는 연산</strong>입니다. 다만 훑는 것과 <strong>모으는 것</strong>은 다릅니다. <code>limit</code> 이 있으면 <code>heapq.nlargest</code> 가 크기 <code>limit</code> 짜리 힙 하나만 유지하며 스트림을 흘려보내므로 메모리 상한이 파일 크기가 아니라 <code>O(limit)</code> 이고, <code>limit</code> 이 없는 <code>search</code> 경로만 통과분 전체를 모읍니다(그때도 담기는 것은 "필터를 통과한 항목뿐"이라 조건이 좁을수록 줄어듭니다). 정렬이 끝난 뒤 다시 <code>yield from</code> 으로 내보내는 이유는 소비자가 <code>limit</code> 에 도달하면 <code>break</code> 할 수 있도록 <strong>출구를 다시 스트림 형태로 유지</strong>하기 위해서입니다.</p>
+<p>budget_app/cli/presenter.py:42-59</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tx_table</span><span class="p">(</span><span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.</span>
+<span class="w">    </span><span class="sd">"""거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.</span>
 
 <span class="sd">    제너레이터인 이유: 상류(``stream_sorted``)가 제너레이터이므로 여기서 리스트로</span>
-<span class="sd">    모으면 스트리밍이 끊긴다. ``limit`` 이 걸리면 그 지점에서 상류 소비도 멈춘다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    모으면 스트리밍이 끊긴다.</span>
+
+<span class="sd">    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가</span>
+<span class="sd">    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은</span>
+<span class="sd">    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.</span>
+<span class="sd">    """</span>
     <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">count</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
@@ -819,7 +844,7 @@ output.out_lines             ── stdout 으로 출력
 </blockquote>
 <h3 id="34-제너레이터를-인자로-넘기기-rewrite-와-append_all">3.4 제너레이터를 인자로 넘기기 — <code>rewrite</code> 와 <code>append_all</code></h3>
 <p>리팩터 전에는 <code>append_many</code> 안에 중첩 제너레이터 함수 <code>_rows</code> 를 정의해 "기존 행 + 신규 행"을 이어 붙였습니다. 지금은 그 역할이 <code>rewrite(transform, *, extra=...)</code> 로 일반화되었습니다.</p>
-<p>budget_app/storage/jsonl.py:264-268</p>
+<p>budget_app/storage/jsonl.py:286-290</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">plan_rewrite</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">transform</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">T</span><span class="p">],</span> <span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span>
@@ -829,7 +854,7 @@ output.out_lines             ── stdout 으로 출력
 
 <p><code>transform</code> 이 <strong>콜백</strong>, <code>extra</code> 가 <code>Iterable[T]</code> 라는 것이 요점입니다. <code>Iterable</code> 로 받으므로 호출자는 리스트를 줘도 되고 제너레이터를 줘도 됩니다.</p>
 <p>다만 <code>plan_rewrite</code> 본문은 <code>extra</code> 를 의도적으로 <strong>리스트로 한 번에 펼칩니다.</strong></p>
-<p>budget_app/storage/jsonl.py:304-307</p>
+<p>budget_app/storage/jsonl.py:326-329</p>
 <div class="codehilite"><pre><span></span><code>        <span class="n">extra_lines</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">extra</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">extra_lines</span><span class="p">:</span>
             <span class="n">changed</span> <span class="o">=</span> <span class="kc">True</span>
@@ -840,18 +865,18 @@ output.out_lines             ── stdout 으로 출력
 <p><code>append_all</code> 은 반대로 <code>Iterable</code> 을 그대로 흘려보내므로 제너레이터 식을 그냥 넘길 수 있습니다.</p>
 <p>budget_app/storage/repositories.py:226-235</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">seed_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;비어 있을 때만 기본 카테고리를 심는다. 심은 개수를 반환.</span>
+<span class="w">        </span><span class="sd">"""비어 있을 때만 기본 카테고리를 심는다. 심은 개수를 반환.</span>
 
-<span class="sd">        &quot;파일을 만드는 일&quot;(``ensure_ready``)과 &quot;초기 데이터를 넣는 일&quot;은 다른 작업이라</span>
+<span class="sd">        "파일을 만드는 일"(``ensure_ready``)과 "초기 데이터를 넣는 일"은 다른 작업이라</span>
 <span class="sd">        메서드를 나눴다. 둘 다 생성자가 아니라 명시적 호출인 이유는 부트스트랩이</span>
 <span class="sd">        *한 번* 일어나야 하는 일이지 객체를 만들 때마다 일어날 일이 아니기 때문이다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
             <span class="k">return</span> <span class="mi">0</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">append_all</span><span class="p">(</span><span class="n">Category</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_CATEGORIES</span><span class="p">)</span>
 </code></pre></div>
 
-<p>마지막 줄의 인자가 제너레이터 식입니다 — 함수 호출의 <strong>유일한 인자</strong>일 때는 소괄호를 생략할 수 있습니다. (<code>append_all</code> 자신은 첫 줄에서 <code>entities = list(entities)</code> 로 즉시 펼칩니다(storage/jsonl.py:213-218) — 여기서도 "비었는가"와 "몇 건인가"를 둘 다 알아야 하기 때문입니다.)</p>
+<p>마지막 줄의 인자가 제너레이터 식입니다 — 함수 호출의 <strong>유일한 인자</strong>일 때는 소괄호를 생략할 수 있습니다. (<code>append_all</code> 자신은 첫 줄에서 <code>entities = list(entities)</code> 로 즉시 펼칩니다(storage/jsonl.py:235-240) — 여기서도 "비었는가"와 "몇 건인가"를 둘 다 알아야 하기 때문입니다.)</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 제너레이터 식은 PEP 289 로 파이썬 2.4 에 들어왔습니다.
 리스트 컴프리헨션(PEP 202, 2.0)이 먼저 있었고, 그 대괄호를 소괄호로 바꾸면
 <strong>리스트를 만들지 않고 하나씩 흘려보내는</strong> 형태가 됩니다. "유일한 인자면 괄호 생략"은
@@ -860,7 +885,7 @@ output.out_lines             ── stdout 으로 출력
 </blockquote>
 <h3 id="35-왜-제너레이터인가-메모리-o1-스트리밍">3.5 왜 제너레이터인가 — 메모리 O(1) 스트리밍</h3>
 <p>budget_app/storage/jsonl.py:1-18 (모듈 docstring)</p>
-<div class="codehilite"><pre><span></span><code><span class="sd">&quot;&quot;&quot;JSONL 파일 포맷을 다루는 공통 층 — 어떤 엔티티인지 모른 채 동작한다.</span>
+<div class="codehilite"><pre><span></span><code><span class="sd">"""JSONL 파일 포맷을 다루는 공통 층 — 어떤 엔티티인지 모른 채 동작한다.</span>
 
 <span class="sd">여기 있는 것 셋:</span>
 
@@ -877,14 +902,14 @@ output.out_lines             ── stdout 으로 출력
 
 <span class="sd">- ``iter_raw()`` — 모든 줄을 원문과 함께 준다. 재작성 경로와 ID 스캔이 쓴다.</span>
 <span class="sd">- ``stream()``   — 검증을 통과한 도메인 객체만 준다. 조회 경로가 쓴다.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 </code></pre></div>
 
 <p><strong>설계 의도 정리.</strong> 거래가 10만 건이어도 <code>stream()</code> 이 동시에 들고 있는 것은 "현재 줄 하나 + 객체 하나" 뿐이므로 읽기 자체는 메모리 O(1)입니다.</p>
 <ul>
 <li><code>monthly_summary</code>(services/budgets.py:30-66)처럼 합계만 누적하는 소비자는 끝까지 O(1)</li>
 <li><code>category_in_use</code>(storage/repositories.py:121-124)처럼 <code>any(tx.category == target for tx in self.stream())</code> 로 조기 종료하는 소비자는 지연 평가 덕분에 파일 뒷부분을 아예 읽지 않음</li>
-<li>전체 정렬이 필요한 <code>stream_sorted</code> 만 예외적으로 필터 통과분을 모음</li>
+<li>한도 없는 전체 정렬(<code>search</code> 경로의 <code>stream_sorted</code>)만 예외적으로 필터 통과분을 모음 — <code>list --limit N</code> 은 <code>heapq.nlargest</code> 로 상위 N 만 유지</li>
 <li><code>rewrite</code> 는 재작성이 목적이라 줄들을 모을 수밖에 없지만, <strong>문자열 상태</strong>로만 들고 있습니다(객체가 아니라)</li>
 </ul>
 <hr>
@@ -911,7 +936,7 @@ output.out_lines             ── stdout 으로 출력
 <h3 id="42-log_call-func-log_callfunc-해체">4.2 <code>@log_call</code> == <code>func = log_call(func)</code> 해체</h3>
 <p>budget_app/decorators.py:37-47</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_call</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;함수 호출/반환을 DEBUG 로그로 남긴다.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""함수 호출/반환을 DEBUG 로그로 남긴다."""</span>
 
     <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -923,7 +948,7 @@ output.out_lines             ── stdout 으로 출력
     <span class="k">return</span> <span class="n">wrapper</span>
 </code></pre></div>
 
-<p><code>@</code> 문법은 순전히 설탕(syntactic sugar — 의미는 그대로 두고 표기만 짧고 읽기 좋게 만든 문법)입니다. <code>@log_call</code> 이 붙은 <code>TransactionService.add</code>(services/transactions.py:27-28)는 클래스 본문이 실행될 때 다음과 <strong>완전히 동일</strong>합니다.</p>
+<p><code>@</code> 문법은 순전히 설탕(syntactic sugar — 의미는 그대로 두고 표기만 짧고 읽기 좋게 만든 문법)입니다. <code>@log_call</code> 이 붙은 <code>TransactionService.add</code>(services/transactions.py:34-35)는 클래스 본문이 실행될 때 다음과 <strong>완전히 동일</strong>합니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — @ 없이 풀어 쓴 동등 코드</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
     <span class="o">...</span>
@@ -938,18 +963,21 @@ output.out_lines             ── stdout 으로 출력
 <strong>의미는 완전히 동일</strong>합니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 겹쳐 쓰면 순서는 아래에서 위로</strong> — 데코레이터를 두 개 쌓으면
 <code>f = A(B(f))</code> 로 풀립니다. <strong>적용은 <code>def</code> 에 가장 가까운(아래) 것부터, 실행은 가장 바깥(위)
-것부터</strong>입니다. <em>(일반론 예시 — 이 소스에는 겹쳐 쓴 자리가 없습니다. 서비스 메서드는
-<code>@log_call</code> 셋(services/transactions.py:27, 52, 72)과 <code>@measure_time</code> 하나
-(services/budgets.py:30)로 전부 단독 사용이고, <code>@handle_errors</code> 도 <code>cli/app.py:61</code> 의
-<code>_dispatch</code> 한 곳에만 붙습니다.)</em> 그래서 이 프로젝트에서는 순서 문제를 고민할 필요가
-없는데, <strong>그 자체가 설계 결과</strong>입니다 — 관측과 오류 처리를 서로 다른 계층에 두었기
-때문에 한 함수에 둘이 겹칠 일이 생기지 않았습니다(§4.4).
+것부터</strong>입니다. 이 소스에서 겹쳐 쓴 자리는 <code>TransactionId</code>(domain/tx_id.py:51-52)
+하나뿐인데, 그마저 <code>@dataclass</code> 가 먼저 돌아 <code>__eq__</code> 를 만들어야
+<code>@functools.total_ordering</code> 이 나머지 비교 메서드를 채울 수 있으므로 <strong>아래에서 위로</strong>
+라는 규칙이 그대로 적용됩니다(§3.3). 커스텀 데코레이터 셋은 전부 단독 사용입니다 —
+서비스 메서드는 <code>@log_call</code> 셋(services/transactions.py:34, 52, 72)과 <code>@measure_time</code>
+하나(services/budgets.py:30)뿐이고, <code>@handle_errors</code> 도 <code>cli/app.py:61</code> 의
+<code>_dispatch</code> 한 곳에만 붙습니다. 그래서 이 프로젝트에서는 <strong>커스텀</strong> 데코레이터끼리
+순서를 고민할 필요가 없는데, <strong>그 자체가 설계 결과</strong>입니다 — 관측과 오류 처리를 서로
+다른 계층에 두었기 때문에 한 함수에 둘이 겹칠 일이 생기지 않았습니다(§4.4).
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="43-functoolswraps-가-없으면-생기는-문제">4.3 <code>functools.wraps</code> 가 없으면 생기는 문제</h3>
 <p><code>wrapper</code> 는 원본과 다른 별개의 함수 객체이므로, 그냥 반환하면 함수의 <strong>메타데이터가 wrapper 의 것으로 바뀝니다</strong>.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 일반론 예시 — wraps 가 없을 때</span>
-<span class="n">add</span><span class="o">.</span><span class="vm">__name__</span>      <span class="c1"># &#39;wrapper&#39;   ← &#39;add&#39; 가 아니다!</span>
+<span class="n">add</span><span class="o">.</span><span class="vm">__name__</span>      <span class="c1"># 'wrapper'   ← 'add' 가 아니다!</span>
 <span class="n">add</span><span class="o">.</span><span class="vm">__doc__</span>       <span class="c1"># wrapper 의 docstring (None)</span>
 </code></pre></div>
 
@@ -988,7 +1016,7 @@ output.out_lines             ── stdout 으로 출력
 <td>decorators.py:37-47</td>
 <td>호출 전/후 DEBUG 로그</td>
 <td>순차 실행</td>
-<td>서비스 3곳 (transactions.py:27, 52, 72)</td>
+<td>서비스 3곳 (transactions.py:34, 52, 72)</td>
 </tr>
 <tr>
 <td><code>measure_time</code></td>
@@ -999,7 +1027,7 @@ output.out_lines             ── stdout 으로 출력
 </tr>
 <tr>
 <td><code>handle_errors</code></td>
-<td><strong>cli/error_handler.py:20-121</strong></td>
+<td><strong>cli/error_handler.py:20-128</strong></td>
 <td>예외 → 메시지 + 종료 코드</td>
 <td>다단 <code>except</code></td>
 <td>CLI 진입점 1곳 (app.py:61 <code>_dispatch</code>)</td>
@@ -1008,7 +1036,7 @@ output.out_lines             ── stdout 으로 출력
 </table></div>
 <p><strong>세 개가 한 파일에 있다가 두 파일로 나뉜 것이 리팩터의 핵심 중 하나입니다.</strong></p>
 <p>budget_app/decorators.py:1-2 (모듈 docstring)</p>
-<div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;횡단 관심사 데코레이터 — 관측(로그/실행시간)만 담당한다.</span>
+<div class="codehilite"><pre><span></span><code><span class="s2">"""횡단 관심사 데코레이터 — 관측(로그/실행시간)만 담당한다.</span>
 </code></pre></div>
 
 <p><strong>과제 방어 포인트</strong>: "데코레이터로 분리한 공통 기능이 무엇이며, 왜 분리가 필요했는가"라는 질문에는 두 층으로 답할 수 있습니다.</p>
@@ -1020,9 +1048,9 @@ output.out_lines             ── stdout 으로 출력
 <p>데코레이터가 아니어도 "함수를 만들어 돌려주는 함수"는 유용합니다.</p>
 <p>budget_app/cli/prompts.py:77-109</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">registered_category_validator</span><span class="p">(</span><span class="n">cat_service</span><span class="p">:</span> <span class="n">CategoryService</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;등록된 카테고리만 통과시키는 검증기 (미등록이면 ``ValidationError`` → 재입력).</span>
+<span class="w">    </span><span class="sd">"""등록된 카테고리만 통과시키는 검증기 (미등록이면 ``ValidationError`` → 재입력).</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_validate</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">name</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
@@ -1030,7 +1058,7 @@ output.out_lines             ── stdout 으로 출력
             <span class="k">return</span> <span class="n">name</span>
         <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span>
             <span class="n">service_messages</span><span class="o">.</span><span class="n">ERR_CATEGORY_NOT_REGISTERED</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
-            <span class="o">+</span> <span class="n">messages</span><span class="o">.</span><span class="n">FMT_AVAILABLE_SUFFIX</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">available</span><span class="o">=</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cat_service</span><span class="o">.</span><span class="n">list_names</span><span class="p">()))</span>
+            <span class="o">+</span> <span class="n">messages</span><span class="o">.</span><span class="n">FMT_AVAILABLE_SUFFIX</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">available</span><span class="o">=</span><span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cat_service</span><span class="o">.</span><span class="n">list_names</span><span class="p">()))</span>
         <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">_validate</span>
@@ -1042,11 +1070,11 @@ output.out_lines             ── stdout 으로 출력
 <p><code>rewrite</code> 는 <code>transform</code> 콜백을 받습니다(§3.4). 그런데 호출자는 "몇 건이 바뀌었는지" 같은 정보도 알아야 합니다. 그 다리 역할을 클로저와 <code>nonlocal</code> 이 합니다.</p>
 <p>budget_app/storage/repositories.py:194-214</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">reassign_category</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;old → new 카테고리 일괄 재지정. 변경된 건수 반환.</span>
+<span class="w">        </span><span class="sd">"""old → new 카테고리 일괄 재지정. 변경된 건수 반환.</span>
 
 <span class="sd">        두 이름 모두 정규화한다. ``old`` 는 비교 대상이라(저장된 값은 정규형),</span>
-<span class="sd">        ``new`` 는 &quot;바뀐 게 없는데 바뀌었다고 세는&quot; 일을 막기 위해서다.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        ``new`` 는 "바뀐 게 없는데 바뀌었다고 세는" 일을 막기 위해서다.</span>
+<span class="sd">        """</span>
         <span class="n">source</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
         <span class="n">destination</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_category</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
         <span class="n">changed</span> <span class="o">=</span> <span class="mi">0</span>
@@ -1087,30 +1115,30 @@ output.out_lines             ── stdout 으로 출력
 <h3 id="51-사용자-정의-예외-설계">5.1 사용자 정의 예외 설계</h3>
 <p>리팩터에서 두 예외가 <code>errors.py</code> 한 곳으로 모였습니다. 그 이유가 모듈 docstring 에 있습니다.</p>
 <p>budget_app/errors.py:1-2 (발췌)</p>
-<div class="codehilite"><pre><span></span><code><span class="s2">&quot;&quot;&quot;예외 계층 — 애플리케이션이 직접 정의하는 오류를 한곳에 모은다.</span>
+<div class="codehilite"><pre><span></span><code><span class="s2">"""예외 계층 — 애플리케이션이 직접 정의하는 오류를 한곳에 모은다.</span>
 </code></pre></div>
 
 <p><strong>ValidationError — 왜 ValueError 를 상속하는가.</strong></p>
 <p>budget_app/errors.py:33-38</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ValidationError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;입력값이 필드 규칙을 위반했다 — CLI 단에서 사용자 친화 메시지로 변환된다.</span>
+<span class="w">    </span><span class="sd">"""입력값이 필드 규칙을 위반했다 — CLI 단에서 사용자 친화 메시지로 변환된다.</span>
 
-<span class="sd">    ``ValueError`` 를 상속하는 이유: 의미상 &quot;값이 잘못됨&quot;이 맞고, 이 예외를 모르는</span>
+<span class="sd">    ``ValueError`` 를 상속하는 이유: 의미상 "값이 잘못됨"이 맞고, 이 예외를 모르는</span>
 <span class="sd">    호출자도 ``except ValueError`` 로 자연스럽게 받을 수 있다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div>
 
 <p>의미상 "값이 잘못됨"은 파이썬 내장 <code>ValueError</code> 의 관할입니다. 이를 상속하면 (1) <strong>is-a 관계가 정확</strong>해지고, (2) 이 앱의 예외를 모르는 외부 코드가 <code>except ValueError</code> 로 잡아도 자연스럽게 포섭되며, (3) 앱 내부에서는 <code>except ValidationError</code> 로 <strong>내장 ValueError 와 구분해서</strong> 더 정밀하게 잡을 수 있습니다. 본문이 docstring 뿐인 "빈 서브클래스"지만, 예외에서는 <strong>타입 자체가 정보</strong>이므로 이것으로 충분합니다.</p>
 <p><strong>AppError — message + hint 구조.</strong></p>
 <p>budget_app/errors.py:41-51</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AppError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;사용자에게 보여줄 메시지를 가진 애플리케이션 오류.</span>
+<span class="w">    </span><span class="sd">"""사용자에게 보여줄 메시지를 가진 애플리케이션 오류.</span>
 
 <span class="sd">    스택트레이스 대신 message + hint 형태로 출력된다.</span>
-<span class="sd">    ``hint`` 는 &quot;그래서 뭘 하면 되는가&quot;를 한 줄로 답하는 자리다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    ``hint`` 는 "그래서 뭘 하면 되는가"를 한 줄로 답하는 자리다.</span>
+<span class="sd">    """</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="n">message</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hint</span> <span class="o">=</span> <span class="n">hint</span>
@@ -1129,12 +1157,12 @@ output.out_lines             ── stdout 으로 출력
 <p><strong>InputAborted — 상속만으로 처리 경로를 얻는다.</strong></p>
 <p>budget_app/cli/prompts.py:28-37</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">InputAborted</span><span class="p">(</span><span class="n">AppError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;대화형 입력이 EOF(Ctrl+D)/스트림 종료로 중단됨.</span>
+<span class="w">    </span><span class="sd">"""대화형 입력이 EOF(Ctrl+D)/스트림 종료로 중단됨.</span>
 
 <span class="sd">    ``handle_errors`` 가 ``AppError`` 로 처리하므로 스택트레이스 없이 깔끔히 끝난다.</span>
 <span class="sd">    이 예외가 없으면 파이프로 입력을 주다가 EOF 가 나는 순간 ``ask`` 가 빈 문자열을</span>
 <span class="sd">    돌려주고, 검증기가 이를 거부하며 루프가 영원히 돈다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">ERR_INPUT_ABORTED</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_INPUT_ABORTED</span><span class="p">)</span>
@@ -1147,7 +1175,7 @@ output.out_lines             ── stdout 으로 출력
 <p><strong>실제 코드.</strong> EOF(저수준 입력 이벤트)를 앱 도메인 예외로 번역하는 <code>ask</code>:</p>
 <p>budget_app/cli/prompts.py:52-57</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;대화형 한 줄 입력. EOF 는 무한 대기/무한 루프 대신 즉시 중단으로 처리한다.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""대화형 한 줄 입력. EOF 는 무한 대기/무한 루프 대신 즉시 중단으로 처리한다."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">input</span><span class="p">(</span><span class="n">prompt</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">EOFError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
@@ -1155,12 +1183,12 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p>날짜 파싱 실패(<code>ValueError</code>)를 검증 오류로 번역하는 <code>parse_date</code>:</p>
-<p>budget_app/domain/validators.py:80-99</p>
+<p>budget_app/domain/validators.py:103-122</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parse_date</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;날짜를 검증하고 **정규형 ``YYYY-MM-DD`` 로 재직렬화**한다.</span>
+<span class="w">    </span><span class="sd">"""날짜를 검증하고 **정규형 ``YYYY-MM-DD`` 로 재직렬화**한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">v</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<span class="sd">    """</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">DATE_FORMAT</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
@@ -1168,8 +1196,8 @@ output.out_lines             ── stdout 으로 출력
     <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">DATE_FORMAT</span><span class="p">)</span>
 </code></pre></div>
 
-<p>같은 패턴이 <code>parse_month</code>(domain/validators.py:112 — 역시 <code>strptime</code> 의 <code>ValueError</code> 를 번역)와 원자 모드 가져오기 실패(services/importexport.py:115-118 — <code>ValidationError</code>/<code>KeyError</code> 를 <code>AppError</code> 로 번역)에도 반복됩니다.</p>
-<p>반면 <code>parse_amount</code> 는 <code>from</code> 을 쓰지 <strong>않습니다</strong> — 그 함수는 잡을 하부 예외가 애초에 없기 때문입니다. <code>int()</code> 에 맡기는 대신 정규식 <code>_INTEGER</code> 로 먼저 판정하고 스스로 <code>raise ValidationError(...)</code> 하므로(domain/validators.py:65-69), 연결할 원인 예외가 존재하지 않습니다. <strong><code>from</code> 은 "번역"할 때만 쓰는 것</strong>이지 예외를 던질 때마다 붙이는 장식이 아니라는 대비가 여기서 보입니다.</p>
+<p>같은 패턴이 <code>parse_month</code>(domain/validators.py:135 — 역시 <code>strptime</code> 의 <code>ValueError</code> 를 번역)와 원자 모드 가져오기 실패(services/importexport.py:122-125 — <code>ValidationError</code>/<code>KeyError</code> 를 <code>AppError</code> 로 번역)에도 반복됩니다.</p>
+<p>반면 <code>parse_amount</code> 는 <code>from</code> 을 쓰지 <strong>않습니다</strong> — 그 함수는 잡을 하부 예외가 애초에 없기 때문입니다. <code>int()</code> 에 맡기는 대신 정규식 <code>_INTEGER</code> 로 먼저 판정하고 스스로 <code>raise ValidationError(...)</code> 하므로(domain/validators.py:88-92), 연결할 원인 예외가 존재하지 않습니다. <strong><code>from</code> 은 "번역"할 때만 쓰는 것</strong>이지 예외를 던질 때마다 붙이는 장식이 아니라는 대비가 여기서 보입니다.</p>
 <p><strong>설계 의도</strong>: 바깥 계층은 <code>ValidationError</code>/<code>AppError</code> 라는 도메인 어휘만 다루면 되고, 디버깅할 때는 <code>__cause__</code> 사슬을 따라 "실제로는 strptime 이 실패했다"는 근본 원인까지 추적할 수 있습니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 예외 연쇄(<code>raise B from A</code>, <code>__cause__</code>/<code>__context__</code>)는 PEP 3134 로
 파이썬 3.0 에 들어왔습니다. 파이썬 2 에는 연쇄 자체가 없어서, 저수준 예외를 도메인
@@ -1201,7 +1229,8 @@ output.out_lines             ── stdout 으로 출력
     ├── ValueError
     │   ├── ValidationError          (errors.py 정의)
     │   └── UnicodeError
-    │       └── UnicodeDecodeError
+    │       ├── UnicodeDecodeError
+    │       └── UnicodeEncodeError
     ├── AppError                     (errors.py 정의)
     │   └── InputAborted             (prompts.py 정의)
     └── KeyError, TypeError, ...
@@ -1210,21 +1239,21 @@ output.out_lines             ── stdout 으로 출력
 <p><strong>실제 코드.</strong> <code>handle_errors</code> 의 docstring 이 순서 정책을 직접 설명합니다.</p>
 <p>budget_app/cli/error_handler.py:20-40 (docstring)</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_errors</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-    <span class="s2">&quot;&quot;&quot;CLI 핸들러 공용 — 예외를 잡아 [오류]/[힌트] 를 **stderr** 로 내보내고 종료 코드를 반환한다.</span>
+    <span class="s2">"""CLI 핸들러 공용 — 예외를 잡아 [오류]/[힌트] 를 **stderr** 로 내보내고 종료 코드를 반환한다.</span>
 
 <span class="s2">    여기서 잡는 예외는 성격이 네 부류로 갈리고, except 절도 그 순서대로 묶여 있다.</span>
-<span class="s2">    파이썬은 &#39;먼저 일치하는 절&#39;을 실행하므로 except 순서가 곧 정책이고, 그래서</span>
-<span class="s2">    같은 부류끼리 붙여 두어야 &quot;왜 이 순서인가&quot;가 코드에서 읽힌다.</span>
+<span class="s2">    파이썬은 '먼저 일치하는 절'을 실행하므로 except 순서가 곧 정책이고, 그래서</span>
+<span class="s2">    같은 부류끼리 붙여 두어야 "왜 이 순서인가"가 코드에서 읽힌다.</span>
 
-<span class="s2">    1. **종료 신호** — 오류가 아니다. 사용자나 하류 프로세스가 &quot;그만&quot;이라고 알린 것.</span>
+<span class="s2">    1. **종료 신호** — 오류가 아니다. 사용자나 하류 프로세스가 "그만"이라고 알린 것.</span>
 <span class="s2">       ``BrokenPipeError`` / ``KeyboardInterrupt``</span>
 <span class="s2">    2. **입력 오류** — 사용자가 값을 고치면 해결된다.</span>
 <span class="s2">       ``ValidationError`` / ``AppError``</span>
 <span class="s2">    3. **환경 상태** — 프로그램 밖(파일·권한·디스크·인코딩)의 상태 문제.</span>
 <span class="s2">       ``FileNotFoundError`` / ``IsADirectoryError`` / ``NotADirectoryError`` /</span>
-<span class="s2">       ``PermissionError`` / ``UnicodeDecodeError`` / ``OSError``</span>
+<span class="s2">       ``PermissionError`` / ``UnicodeDecodeError`` / ``UnicodeEncodeError`` / ``OSError``</span>
 <span class="s2">    4. **최후 방어선** — 위 어디에도 속하지 않는 버그.</span>
-<span class="s2">       ``Exception`` — 사용자에겐 스택트레이스를 감추고 로그에만 남긴다.</span>
+<span class="s2">       ``Exception`` — 사용자에겐 스택트레이스를 감추고, ``--debug`` 일 때만 로그에 남긴다.</span>
 
 <span class="s2">    부류를 나눠도 지켜야 하는 상속 제약이 둘 있고, 지금 순서가 둘 다 만족한다:</span>
 
@@ -1254,40 +1283,44 @@ output.out_lines             ── stdout 으로 출력
 이 코드가 그 셋 중 <code>KeyboardInterrupt</code> 만 따로 잡는 것은, 잡아서 무시하려는 것이 아니라
 <strong>종료 코드를 130 으로 정해 주기 위해서</strong>입니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
-<h3 id="54-loggerexception-스택트레이스를-어디에-남길-것인가">5.4 <code>logger.exception</code> — 스택트레이스를 어디에 남길 것인가</h3>
-<p>마지막 안전망에서 스택트레이스를 <strong>버리는 것이 아니라 로그로 옮겨 둡니다</strong>.</p>
-<p>budget_app/cli/error_handler.py:106-119</p>
+<h3 id="54-exc_info-스택트레이스를-어디에-남길-것인가">5.4 <code>exc_info</code> — 스택트레이스를 어디에 남길 것인가</h3>
+<p>마지막 안전망에서 스택트레이스를 <strong>버리는 것도, 늘 뿌리는 것도 아니고 <code>--debug</code> 일 때만 로그에 싣습니다</strong>.</p>
+<p>budget_app/cli/error_handler.py:113-126</p>
 <div class="codehilite"><pre><span></span><code>        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 — 어떤 예외도 트레이스백으로 끝내지 않기 위함</span>
             <span class="c1"># 사용자용 한 줄 요약을 먼저 내고, 그다음에 원인 추적용 기록을 남긴다.</span>
             <span class="n">output</span><span class="o">.</span><span class="n">err</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">MSG_ERR_UNEXPECTED</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="n">exc</span><span class="p">))</span>
             <span class="n">output</span><span class="o">.</span><span class="n">err</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_UNEXPECTED</span><span class="p">)</span>
-            <span class="c1"># ERROR 인 이유: 이전에는 DEBUG 였고, 기본 로그 레벨이 WARNING 이라</span>
-            <span class="c1"># **기본 실행에서는 스택트레이스가 아무 데도 남지 않았다.** 여기까지 온</span>
-            <span class="c1"># 예외는 분류되지 않은 버그이고, 그 스택은 나중에 원인을 찾을 유일한</span>
-            <span class="c1"># 단서다. `--debug` 를 켜고 재현할 수 있는 상황이 아닐 수도 있다.</span>
+            <span class="c1"># **스택트레이스는 `--debug` 일 때만 붙인다.** 요구사항 Q2 가 "스택트레이스</span>
+            <span class="c1"># 대신 원인 + 해결 힌트"를 요구하고, 바로 위 힌트도 "`--debug` 를 붙이면</span>
+            <span class="c1"># 남는다"고 안내한다. 이전 코드는 `logger.exception` 이라 exc_info 가 항상</span>
+            <span class="c1"># 참이었고, 기본 로그 레벨(WARNING)이 ERROR 레코드를 통과시키므로</span>
+            <span class="c1"># **`--debug` 없이도 트레이스백이 화면에 뿌려졌다** — 안내와 동작이 모순이었다.</span>
             <span class="c1">#</span>
-            <span class="c1"># 트레이스백이 화면에 보이게 되는 것은 감수한다. 이 자리는 &quot;프로그램이</span>
-            <span class="c1"># 예상하지 못한 상태&quot;이고, 그때는 감추는 것보다 신고할 수 있게 하는 편이</span>
-            <span class="c1"># 낫다 — 앞선 세 부류(사용자가 고칠 수 있는 오류)는 여전히 한 줄로 끝난다.</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UNHANDLED</span><span class="p">)</span>
+            <span class="c1"># 레벨은 ERROR 로 남긴다. 기본 실행에서도 "분류되지 않은 오류가 났다"는</span>
+            <span class="c1"># 사실 한 줄은 남아야, 나중에 `--debug` 로 재현해 스택을 볼 단서가 된다.</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UNHANDLED</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">debug_enabled</span><span class="p">())</span>
             <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_ERROR</span>
 </code></pre></div>
 
-<p><code>logger.exception(...)</code> 은 <code>logger.error(..., exc_info=True)</code> 의 축약으로, "현재 처리 중인 예외의 전체 트레이스백을 이 로그 레코드에 첨부하라"는 뜻입니다.</p>
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>exc_info=True</code> 를 만나면 logging 은 <code>sys.exc_info()</code> 를 불러
+<p><code>exc_info</code> 는 "현재 처리 중인 예외의 전체 트레이스백을 이 로그 레코드에 첨부하라"는 스위치입니다. 여기서는 그 자리에 <code>output.debug_enabled()</code> 를 넣어 <strong>디버그일 때만 참</strong>이 되게 했습니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>exc_info</code> 가 참이면 logging 은 <code>sys.exc_info()</code> 를 불러
 <strong>지금 처리 중인 예외 3종 세트</strong>(타입/값/트레이스백)를 가져와 <code>LogRecord.exc_info</code> 에
 담습니다. 문자열 변환은 그때가 아니라 포매터가 <code>Formatter.formatException</code> 을 부를 때
 (내부적으로 <code>traceback.print_exception</code>) 일어납니다. 두 가지가 따라옵니다 —
 (1) <code>except</code> 블록 <strong>밖</strong>에서 부르면 <code>sys.exc_info()</code> 가 <code>(None, None, None)</code> 이라
 트레이스백이 안 붙고, (2) 이 로거가 그 레벨에서 꺼져 있으면 트레이스백 포매팅 비용
-자체가 발생하지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+자체가 발생하지 않습니다. <code>logger.exception(msg)</code> 은 <code>exc_info=True</code> 를 고정한
+축약형이라 <strong>끌 수가 없고</strong>, 그래서 이 자리에서는 쓰지 않습니다.
+→ <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
-<p><strong>레벨이 DEBUG 에서 ERROR 로 올라간 것이 이 자리의 리팩터입니다.</strong> 이전에는 <code>logger.debug(..., exc_info=True)</code> 였는데, 기본 로그 레벨이 WARNING 이라 <strong>평소 실행에서는 스택트레이스가 아무 데도 남지 않았습니다.</strong> "감춘 것"이 아니라 "없앤 것"이었던 셈입니다.</p>
-<p>트레이스백이 화면에 보이게 되는 것은 감수합니다. 여기까지 온 예외는 앞의 세 부류 어디에도 속하지 않는 <strong>분류되지 않은 버그</strong>이고, 그때는 감추는 것보다 신고할 수 있게 하는 편이 낫습니다. 사용자가 고칠 수 있는 오류(값 오류·상황 오류·입출력 오류)는 여전히 한 줄로 끝납니다.</p>
+<p><strong><code>logger.exception</code> 을 <code>logger.error(..., exc_info=...)</code> 로 바꾼 것이 이 자리의 리팩터입니다.</strong> 이전에는 <code>exc_info</code> 가 항상 참이었고, ERROR 레코드는 기본 로그 레벨(WARNING)을 그대로 통과하므로 <strong><code>--debug</code> 없이도 트레이스백이 화면에 뿌려졌습니다.</strong> 바로 위에서 출력하는 힌트가 "<code>--debug</code> 를 붙여 다시 실행하면 stderr 로그에 스택트레이스가 남습니다"라고 안내하는데, 안내와 동작이 정반대였던 셈입니다.</p>
+<p>레벨은 그대로 ERROR 입니다. 기본 실행에서도 <code>[ERROR] unhandled error</code> 한 줄은 남아야, 사용자가 "분류되지 않은 오류가 났다"는 사실을 알고 <code>--debug</code> 로 재현해 스택을 볼 수 있기 때문입니다. 화면에 나가는 것은 어느 부류든 원인 한 줄과 힌트뿐이라는 점에서 <strong>정책이 부류마다 같아졌습니다</strong>.</p>
 <h3 id="55-예외를-값으로-바꾸기-오류가-흐름-제어가-아닐-때">5.5 예외를 "값"으로 바꾸기 — 오류가 흐름 제어가 아닐 때</h3>
 <p>예외가 항상 정답은 아닙니다. <strong>한 줄이 깨졌다고 전체를 멈출 이유가 없을 때</strong>는 예외 대신 값으로 표현하는 편이 낫습니다.</p>
-<p>budget_app/storage/jsonl.py:181-191</p>
+<p>budget_app/storage/jsonl.py:201-213</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">line</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RawLine</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_utf8_text</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">RawLine</span><span class="p">(</span><span class="n">lineno</span><span class="o">=</span><span class="n">lineno</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">line</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">ERR_LINE_NOT_UTF8</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
         <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
@@ -1302,7 +1335,7 @@ output.out_lines             ── stdout 으로 출력
 
 <p>이 함수는 <strong>예외를 던지지 않습니다.</strong> 세 가지 결과(원문만/dict 까지/객체까지)를 전부 <code>RawLine</code> 이라는 한 타입으로 돌려주고, 호출자가 <code>raw.is_valid</code> 로 분기합니다.</p>
 <p><strong>왜 이렇게 하는가</strong>: 파일을 읽는 도중 예외가 올라오면 반복이 중단됩니다. 그런데 "손상된 줄 하나"는 나머지 줄을 못 읽을 이유가 되지 않습니다. 예외를 값으로 바꾸면 반복이 계속되면서도 정보(줄 번호, 원문, 오류 내용)를 잃지 않습니다.</p>
-<p>같은 판단이 <code>_resolve_id</code> 에도 있습니다(services/importexport.py:133-164) — 중복 id 는 정책에 따라 예외일 수도(<code>error</code>), 값(<code>None</code> = 건너뜀)일 수도 있습니다.</p>
+<p>같은 판단이 <code>_resolve_id</code> 에도 있습니다(services/importexport.py:187-218) — 중복 id 는 정책에 따라 예외일 수도(<code>error</code>), 값(<code>None</code> = 건너뜀)일 수도 있습니다.</p>
 <hr>
 <h2 id="6-제네릭-typevar-와-generic">6. 제네릭 — TypeVar 와 Generic</h2>
 <p><strong>개념.</strong> "리스트든 집합이든, 담긴 것의 타입을 그대로 유지하는" 표기를 직접 만들 수 있게 해 주는 것이 제네릭입니다. <code>TypeVar</code> 는 "아직 정해지지 않은 타입"을 가리키는 자리표시자입니다. 클래스가 <code>Generic[T]</code> 를 상속하면, 그 자리표시자를 밖에서 받아 쓰겠다고 선언하는 것이 됩니다.</p>
@@ -1311,17 +1344,17 @@ output.out_lines             ── stdout 으로 출력
 </blockquote>
 <p><strong>실제 코드.</strong></p>
 <p>budget_app/cli/prompts.py:25</p>
-<div class="codehilite"><pre><span></span><code><span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
+<div class="codehilite"><pre><span></span><code><span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">"T"</span><span class="p">)</span>
 </code></pre></div>
 
 <p>budget_app/storage/jsonl.py:131-146</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JsonlStore</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;JSONL 파일 하나를 다루는 공통 동작.</span>
+<span class="w">    </span><span class="sd">"""JSONL 파일 하나를 다루는 공통 동작.</span>
 
 <span class="sd">    세 저장소가 열기/스트리밍/원자적 재작성 코드를 각자 복사해 갖고 있었다.</span>
-<span class="sd">    &quot;파일 포맷을 다루는 법&quot;은 여기 한 번만 두고, 하위 클래스는 **엔티티별 규칙**</span>
+<span class="sd">    "파일 포맷을 다루는 법"은 여기 한 번만 두고, 하위 클래스는 **엔티티별 규칙**</span>
 <span class="sd">    (어떤 dataclass 인가, 무엇이 유일 키인가)만 갖는다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="c1">#: 하위 클래스가 지정 — 줄 하나를 세울 dataclass</span>
     <span class="n">entity_cls</span><span class="p">:</span> <span class="nb">type</span>
@@ -1336,7 +1369,7 @@ output.out_lines             ── stdout 으로 출력
 <p>하위 클래스는 대괄호로 T 를 채웁니다.</p>
 <p>budget_app/storage/repositories.py:27-34</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TransactionRepository</span><span class="p">(</span><span class="n">JsonlStore</span><span class="p">[</span><span class="n">Transaction</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;transactions.jsonl 의 CRUD + 스트리밍 조회.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""transactions.jsonl 의 CRUD + 스트리밍 조회."""</span>
 
     <span class="n">entity_cls</span> <span class="o">=</span> <span class="n">Transaction</span>
     <span class="n">FILE_NAME</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">TX_FILE_NAME</span>
@@ -1391,7 +1424,7 @@ output.out_lines             ── stdout 으로 출력
 <p><strong>개념.</strong> <code>__future__</code> 는 "미래 버전의 동작을 미리 켜는" 특수 모듈입니다. <code>from __future__ import annotations</code>(PEP 563)를 모듈 최상단에 쓰면, 그 모듈의 <strong>모든 타입 어노테이션이 실행 시점에 평가되지 않고 문자열로만 저장</strong>됩니다. 효과는 두 가지입니다.</p>
 <ol>
 <li><strong>전방 참조(forward reference) 허용</strong>: 아직 정의가 끝나지 않은 이름을 어노테이션에 쓸 수 있습니다.</li>
-<li><strong>신 문법의 하위 호환</strong>: <code>tuple[int, dict[str, str]]</code> 같은 내장 제네릭 표기(storage/csv_io.py:72)를 어노테이션 자리에 써도 런타임에 평가되지 않으므로 구버전 파이썬에서도 import 가 실패하지 않습니다.</li>
+<li><strong>신 문법의 하위 호환</strong>: <code>tuple[int, dict[str, str]]</code> 같은 내장 제네릭 표기(storage/csv_io.py:73)를 어노테이션 자리에 써도 런타임에 평가되지 않으므로 구버전 파이썬에서도 import 가 실패하지 않습니다.</li>
 </ol>
 <p><strong>실제 코드.</strong> 이 프로젝트의 모든 구현 모듈이 첫 import 로 이것을 둡니다.</p>
 <p>budget_app/context.py:20</p>
@@ -1427,11 +1460,11 @@ output.out_lines             ── stdout 으로 출력
 <p>이 프로젝트는 과제 제약상 <strong>표준 라이브러리만</strong> 사용합니다.</p>
 <h3 id="81-re-정규식-컴파일과-두-가지-패턴이-필요한-이유">8.1 re — 정규식 컴파일과, "두 가지 패턴이 필요한 이유"</h3>
 <p>거래 ID 형식은 config 에 정규식 문자열로 정의되어 있습니다.</p>
-<p>budget_app/domain/config.py:24-27</p>
+<p>budget_app/domain/config.py:28-31</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 거래 ID — 형식·검증·발굴 세 패턴이 값 객체(tx_id.TransactionId)와 짝을 이룬다</span>
-<span class="n">TX_ID_PATTERN</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;^TX-(\d+)$&quot;</span>
-<span class="n">TX_ID_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;TX-</span><span class="si">{:06d}</span><span class="s2">&quot;</span>
-<span class="n">TX_ID_SCAN_PATTERN</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;&quot;id&quot;\s*:\s*&quot;(TX-\d+)&quot;&#39;</span>
+<span class="n">TX_ID_PATTERN</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">"^TX-(\d+)$"</span>
+<span class="n">TX_ID_FORMAT</span> <span class="o">=</span> <span class="s2">"TX-</span><span class="si">{:06d}</span><span class="s2">"</span>
+<span class="n">TX_ID_SCAN_PATTERN</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">'"id"\s*:\s*"(TX-\d+)"'</span>
 </code></pre></div>
 
 <p>패턴이 <strong>둘</strong>인 것이 리팩터의 산물입니다.</p>
@@ -1459,7 +1492,7 @@ output.out_lines             ── stdout 으로 출력
 </tr>
 </tbody>
 </table></div>
-<p>세 상수 모두 <code>r"..."</code>(raw 문자열)인 것은 백슬래시를 파이썬이 아니라 <code>re</code> 에게 넘기기 위해서이고, <code>TX_ID_SCAN_PATTERN</code> 만 작은따옴표 <code>r'...'</code> 인 것은 패턴 <strong>안에</strong> 큰따옴표(<code>"id"</code>)가 들어 있기 때문입니다. 문자열 리터럴 표기는 <a href="02-python-basics.html">02 §4</a>에서 다룹니다.</p>
+<p>두 <strong>정규식</strong> 상수가 <code>r"..."</code>(raw 문자열)인 것은 백슬래시를 파이썬이 아니라 <code>re</code> 에게 넘기기 위해서이고(<code>TX_ID_FORMAT</code> 은 정규식이 아니라 <code>str.format</code> 템플릿이라 raw 가 아닙니다), <code>TX_ID_SCAN_PATTERN</code> 만 작은따옴표 <code>r'...'</code> 인 것은 패턴 <strong>안에</strong> 큰따옴표(<code>"id"</code>)가 들어 있기 때문입니다. 문자열 리터럴 표기는 <a href="02-python-basics.html">02 §4</a>에서 다룹니다.</p>
 <p>컴파일은 모듈 로드 시 한 번만 합니다.</p>
 <p>budget_app/domain/tx_id.py:44-48</p>
 <div class="codehilite"><pre><span></span><code><span class="c1">#: 전체가 이 형식이어야 한다 — 검증용</span>
@@ -1474,8 +1507,8 @@ output.out_lines             ── stdout 으로 출력
 <p>budget_app/domain/tx_id.py:104-107</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionId</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;검증하며 만든다. 실패는 ``ValidationError``.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+<span class="w">        </span><span class="sd">"""검증하며 만든다. 실패는 ``ValidationError``."""</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
 </code></pre></div>
 
 <p>budget_app/storage/repositories.py:36-48</p>
@@ -1483,14 +1516,14 @@ output.out_lines             ── stdout 으로 출력
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_scan_id</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="n">RawLine</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransactionId</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;한 줄에서 거래 id 를 최대한 건져낸다.</span>
+<span class="w">        </span><span class="sd">"""한 줄에서 거래 id 를 최대한 건져낸다.</span>
 
 <span class="sd">        검증에 실패한 줄에도 id 는 들어 있을 수 있고, 그 번호는 **이미 쓰인 번호**다.</span>
 <span class="sd">        놓치면 재발급으로 중복 id 가 생긴다. dict 까지 해석된 줄은 키에서, JSON 조차</span>
 <span class="sd">        아닌 줄은 원문 정규식으로 찾는다(``TransactionId.scan``).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">raw</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">candidate</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+            <span class="n">candidate</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"id"</span><span class="p">)</span>
 </code></pre></div>
 
 <p><strong><code>match</code> 와 <code>search</code> 의 차이</strong>가 여기서 실질적입니다. <code>match</code> 는 문자열 <strong>시작부터</strong> 매칭을 시도하고, <code>search</code> 는 <strong>어디서든</strong> 찾습니다. 검증은 "전체가 이 형식이어야" 하므로 <code>match</code> + <code>^...$</code>, 발굴은 "줄 어딘가에 있으면 됨"이므로 <code>search</code> 입니다. <code>m.group(1)</code> 이 괄호로 잡은 캡처 그룹을 꺼냅니다.</p>
@@ -1509,11 +1542,11 @@ output.out_lines             ── stdout 으로 출력
 <h3 id="82-logging-지연-포맷팅과-로거-계층">8.2 logging — %-지연 포맷팅과 로거 계층</h3>
 <p><strong>로거 계층.</strong> 로거 이름의 점(<code>.</code>)은 부모-자식 관계를 만듭니다.</p>
 <p>budget_app/config.py:25</p>
-<div class="codehilite"><pre><span></span><code><span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="s2">&quot;budget_app&quot;</span>
+<div class="codehilite"><pre><span></span><code><span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="s2">"budget_app"</span>
 </code></pre></div>
 
 <p>budget_app/storage/config.py:11</p>
-<div class="codehilite"><pre><span></span><code><span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">app_config</span><span class="o">.</span><span class="n">LOGGER_NAME</span><span class="si">}</span><span class="s2">.storage&quot;</span>
+<div class="codehilite"><pre><span></span><code><span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">app_config</span><span class="o">.</span><span class="n">LOGGER_NAME</span><span class="si">}</span><span class="s2">.storage"</span>
 </code></pre></div>
 
 <p>이 프로젝트에 로거는 <strong>두 이름</strong>만 있고, 만들어지는 곳은 다섯 군데입니다.</p>
@@ -1528,7 +1561,7 @@ output.out_lines             ── stdout 으로 출력
 <tbody>
 <tr>
 <td><code>budget_app</code></td>
-<td><code>config.LOGGER_NAME</code>(config.py:25)</td>
+<td><code>config.LOGGER_NAME</code>(config.py:29)</td>
 <td><code>decorators.py:34</code>, <code>cli/error_handler.py:17</code></td>
 </tr>
 <tr>
@@ -1551,7 +1584,7 @@ output.out_lines             ── stdout 으로 출력
 <code>setup_logging</code> 한 곳에서만 붙일 수 있는 근거가 이것입니다.
 → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
-<p><strong>%-지연 포맷팅.</strong> <a href="02-python-basics.html">02 §4.2</a>에서 다룬 내용이 그대로 적용됩니다. <code>logger.debug(config.LOG_CALL, func.__name__)</code> 처럼 <strong>템플릿과 인자를 분리해서</strong> 넘기면 문자열 결합이 <strong>그 로그가 실제로 출력될 때만</strong> 수행됩니다.</p>
+<p><strong>%-지연 포맷팅.</strong> <a href="02-python-basics.html">02 §4.2</a>에서 다룬 내용이 그대로 적용됩니다. <code>logger.debug(LOG_CALL, func.__name__)</code>(decorators.py:42) 처럼 <strong>템플릿과 인자를 분리해서</strong> 넘기면 문자열 결합이 <strong>그 로그가 실제로 출력될 때만</strong> 수행됩니다.</p>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — "출력될 때만"의 정확한 경로</strong> — <code>logger.debug(msg, *args)</code> 는 가장 먼저
 <code>self.isEnabledFor(DEBUG)</code> 를 확인하고, <strong>거짓이면 그 자리에서 반환</strong>합니다.
 참일 때만 <code>LogRecord</code> 를 만드는데, 이때도 <code>record.msg = msg</code>, <code>record.args = args</code> 로
@@ -1564,11 +1597,11 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 적어 둔 것이 이 뜻입니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong>핸들러는 한 곳에서만 붙입니다.</strong></p>
-<p>budget_app/cli/output.py:79-100</p>
+<p>budget_app/cli/output.py:94-119</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">setup_logging</span><span class="p">(</span><span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;루트 로거에 핸들러를 붙인다 — ``main()`` 에서 한 번만 호출한다.</span>
+<span class="w">    </span><span class="sd">"""루트 로거에 핸들러를 붙인다 — ``main()`` 에서 한 번만 호출한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">enabled</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">debug</span><span class="p">)</span> <span class="ow">or</span> <span class="n">_env_debug</span><span class="p">()</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
         <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span> <span class="k">if</span> <span class="n">enabled</span> <span class="k">else</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span>
@@ -1595,9 +1628,9 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </blockquote>
 <h3 id="84-datetimestrptime-strftime-파싱이-곧-검증이되-정규형으로-되찍는다">8.4 datetime.strptime + strftime — "파싱이 곧 검증"이되, 정규형으로 되찍는다</h3>
 <p><code>datetime.strptime(문자열, 형식)</code> 은 형식에 맞지 않으면 <code>ValueError</code> 를 던집니다. 이 프로젝트는 그 성질을 이용해 <strong>파싱 성공 여부 자체를 검증으로</strong> 씁니다.</p>
-<p>그런데 <strong>검증만 하고 원문을 돌려주면 안 됩니다.</strong> <code>parse_date</code>(domain/validators.py:80-99)의 마지막 줄이 <code>return dt.strftime(config.DATE_FORMAT)</code> 인 것 — 즉 파싱한 datetime 으로 <strong>다시 찍어서</strong> 돌려주는 것 — 이 이 함수의 핵심입니다.</p>
+<p>그런데 <strong>검증만 하고 원문을 돌려주면 안 됩니다.</strong> <code>parse_date</code>(domain/validators.py:103-122)의 마지막 줄이 <code>return dt.strftime(config.DATE_FORMAT)</code> 인 것 — 즉 파싱한 datetime 으로 <strong>다시 찍어서</strong> 돌려주는 것 — 이 이 함수의 핵심입니다.</p>
 <p>이유를 소스 docstring 이 직접 설명합니다. <code>strptime</code> 은 <strong>검증기이지 정규화기가 아닙니다.</strong> <code>%Y-%m-%d</code> 로 <code>"2024-1-5"</code> 를 오류 없이 받아 줍니다. 검증만 하고 원문을 그대로 저장하면 같은 날이 파일에 <code>"2024-1-5"</code> 와 <code>"2024-01-05"</code> 두 표기로 공존하게 되고, 이 프로그램은 날짜를 <strong>문자열로 비교</strong>하므로 그 순간 전제가 깨집니다.</p>
-<div class="codehilite"><pre><span></span><code>&quot;2024-1-5&quot; &lt;= &quot;2024-01-31&quot;   →   False
+<div class="codehilite"><pre><span></span><code>"2024-1-5" &lt;= "2024-01-31"   →   False
 </code></pre></div>
 
 <p>즉 1월 5일 거래가 1월 요약·검색·내보내기에서 <strong>조용히 사라집니다.</strong> <code>strftime</code> 으로 되찍으면 표기가 하나로 강제되고, 기존 파일에 남아 있던 비정규 표기도 <strong>읽는 순간 <code>__post_init__</code> 을 다시 지나므로 자동으로 치유</strong>됩니다(§1.4).</p>
@@ -1614,25 +1647,25 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 → <a href="12-syntax-and-stdlib.html">12 §2-A</a></p>
 </blockquote>
 <p>형식 상수는 config 에 있습니다.</p>
-<p>budget_app/domain/config.py:21-22</p>
-<div class="codehilite"><pre><span></span><code><span class="n">DATE_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">&quot;</span>
-<span class="n">MONTH_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;%Y-%m&quot;</span>
+<p>budget_app/domain/config.py:25-26</p>
+<div class="codehilite"><pre><span></span><code><span class="n">DATE_FORMAT</span> <span class="o">=</span> <span class="s2">"%Y-%m-</span><span class="si">%d</span><span class="s2">"</span>
+<span class="n">MONTH_FORMAT</span> <span class="o">=</span> <span class="s2">"%Y-%m"</span>
 </code></pre></div>
 
 <p>출력 방향으로는 백업 폴더명 타임스탬프가 <code>strftime</code> 을 씁니다 — <code>(now or datetime.now()).strftime(config.BACKUP_TS_FORMAT)</code>(storage/backup.py:28).</p>
 <h3 id="85-calendarmonthrange-그-달의-실제-말일">8.5 calendar.monthrange — 그 달의 실제 말일</h3>
 <p>budget_app/domain/periods.py:20-30</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">month_range</span><span class="p">(</span><span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;``&#39;YYYY-MM&#39;`` → ``(&#39;YYYY-MM-01&#39;, &#39;YYYY-MM-&lt;그 달의 말일&gt;&#39;)``.</span>
+<span class="w">    </span><span class="sd">"""``'YYYY-MM'`` → ``('YYYY-MM-01', 'YYYY-MM-&lt;그 달의 말일&gt;')``.</span>
 
 <span class="sd">    모든 달을 31일로 가정하면 2월·30일 달에서 범위가 어긋난다. ``calendar`` 로</span>
 <span class="sd">    실제 말일을 구한다. 검색·요약·내보내기가 모두 이 함수 하나를 쓰므로</span>
-<span class="sd">    &quot;이 달에 속하는가&quot;의 정의가 프로그램 전체에서 하나다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    "이 달에 속하는가"의 정의가 프로그램 전체에서 하나다.</span>
+<span class="sd">    """</span>
     <span class="n">normalized</span> <span class="o">=</span> <span class="n">validators</span><span class="o">.</span><span class="n">parse_month</span><span class="p">(</span><span class="n">month</span><span class="p">)</span>
     <span class="n">dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">normalized</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">MONTH_FORMAT</span><span class="p">)</span>
     <span class="n">last_day</span> <span class="o">=</span> <span class="n">calendar</span><span class="o">.</span><span class="n">monthrange</span><span class="p">(</span><span class="n">dt</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">dt</span><span class="o">.</span><span class="n">month</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
-    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">normalized</span><span class="si">}</span><span class="s2">-01&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">normalized</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">last_day</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">normalized</span><span class="si">}</span><span class="s2">-01"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">normalized</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">last_day</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">"</span>
 </code></pre></div>
 
 <p><code>calendar.monthrange(연, 월)</code> 은 <code>(그 달 1일의 요일, 그 달의 일수)</code> 튜플을 반환하며 <code>[1]</code> 로 일수만 취합니다. 윤년 2월(29일)까지 정확히 처리됩니다.</p>
@@ -1640,59 +1673,98 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 <p><strong>리팩터 포인트 — 위치가 바뀌었습니다.</strong> 이전에는 이 함수가 <code>cli.py</code> 에 <code>_month_bounds</code> 라는 이름으로 있었습니다. 달력 계산은 <strong>도메인 규칙</strong>이지 화면 처리가 아니므로 도메인 계층으로 내렸고(지금은 <code>domain/periods.py</code> 단독 모듈), 그 결과 요약(<code>summary</code>)과 내보내기(<code>export</code>)가 같은 정의를 공유하게 됐습니다.</p>
 <h3 id="86-csvdictreader-dictwriter-헤더-기반-csv-입출력">8.6 csv.DictReader / DictWriter — 헤더 기반 CSV 입출력</h3>
 <p>가져오기는 <code>DictReader</code> 로 각 행을 <code>{헤더명: 값}</code> dict 로 받고, 시작 전에 필수 컬럼 존재를 검사합니다.</p>
-<p>budget_app/storage/csv_io.py:72-87</p>
+<p>budget_app/storage/csv_io.py:73-101</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_rows</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;CSV 를 읽어 ``(줄번호, 원시 dict)`` 를 yield 한다.</span>
+<span class="w">    </span><span class="sd">"""CSV 를 읽어 ``(줄번호, 원시 dict)`` 를 yield 한다.</span>
 
 <span class="sd">    헤더 검증은 첫 행을 읽는 시점에 한 번만 한다. 필수 컬럼은 예전과 동일하며</span>
 <span class="sd">    ``id`` 는 요구하지 않는다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+
+<span class="sd">    ``csv.Error`` 를 ``AppError`` 로 바꾸는 이유: 파서가 던지는 이 예외는 **일반</span>
+<span class="sd">    사용자 조작만으로** 닿는다(한 필드가 128KB 를 넘거나, 따옴표가 닫히지 않아 파일</span>
+<span class="sd">    끝까지 한 필드로 읽히는 CSV). 그대로 흘려보내면 CLI 의 최후 방어선까지 올라가</span>
+<span class="sd">    "예기치 못한 오류"로 표시된다 — 원인도 해결 방법도 알 수 있는 오류인데</span>
+<span class="sd">    분류되지 않은 버그처럼 보이는 것은 요구사항 Q2(원인 + 해결 힌트)에 어긋난다.</span>
+<span class="sd">    """</span>
     <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
         <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
 
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_READ_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_READ_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-        <span class="n">_check_header</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">fieldnames</span><span class="p">)</span>
-        <span class="c1"># ``yield from`` 이라 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고,</span>
-        <span class="c1"># 파일은 마지막 행을 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).</span>
-        <span class="k">yield from</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_DATA_START_LINE</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># ``fieldnames`` 조회가 첫 행을 실제로 읽으므로 이것도 try 안에 둔다.</span>
+            <span class="n">_check_header</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">fieldnames</span><span class="p">)</span>
+            <span class="c1"># 이 함수가 소비되는 동안 ``with`` 블록이 살아 있고, 파일은 마지막 행을</span>
+            <span class="c1"># 꺼낸 뒤에 닫힌다(제너레이터라 그 시점이 호출자에 달렸다).</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_DATA_START_LINE</span><span class="p">):</span>
+                <span class="k">yield</span> <span class="n">item</span>
+        <span class="k">except</span> <span class="n">csv</span><span class="o">.</span><span class="n">Error</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">AppError</span><span class="p">(</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">ERR_CSV_PARSE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="n">exc</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="n">messages</span><span class="o">.</span><span class="n">HINT_CSV_PARSE</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
 </code></pre></div>
 
-<p>인덱스(<code>row[3]</code>) 대신 이름(<code>row["amount"]</code>)으로 접근하므로 <strong>컬럼 순서가 달라도 동작</strong>하고, 그래서 <code>id</code> 컬럼을 <strong>선택</strong>으로 추가할 수 있었습니다. <code>_check_header</code>(storage/csv_io.py:90-104)의 <code>reader.fieldnames or []</code> 는 빈 파일(fieldnames 가 <code>None</code>)에서도 안전하게 검사하기 위한 방어 표현입니다.</p>
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>yield from</code> 이 넘기는 것은 값만이 아닙니다</strong> — <code>read_rows</code> 의 마지막 줄
-<code>yield from enumerate(reader, ...)</code> 는 "그 반복자가 끝날 때까지 값을 그대로 통과시켜라"라는
-<strong>위임(delegation)</strong> 입니다(PEP 380, 3.3). <code>for x in it: yield x</code> 와 값 흐름은 같지만,
-여기서 실제로 중요한 것은 <strong><code>with</code> 블록이 이 <code>yield from</code> 위에서 계속 살아 있다</strong>는
-사실입니다. 제너레이터는 값을 하나 내놓을 때마다 멈춰 있고 프레임이 보존되므로,
-<code>with open(...)</code> 의 <code>__exit__</code> 는 소비자가 마지막 행을 꺼내거나 제너레이터를 버릴 때까지
-실행되지 않습니다. <strong>즉 파일의 수명이 호출자에게 넘어갑니다</strong> — 소스 주석이 바로 그 말을
-하고 있고, 그래서 <code>read_rows</code> 의 결과를 저장해 두었다가 나중에 소비하면
-그동안 파일 핸들이 열려 있게 됩니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p>인덱스(<code>row[3]</code>) 대신 이름(<code>row["amount"]</code>)으로 접근하므로 <strong>컬럼 순서가 달라도 동작</strong>하고, 그래서 <code>id</code> 컬럼을 <strong>선택</strong>으로 추가할 수 있었습니다. <code>_check_header</code>(storage/csv_io.py:104-118)의 <code>reader.fieldnames or []</code> 는 빈 파일(fieldnames 가 <code>None</code>)에서도 안전하게 검사하기 위한 방어 표현입니다.</p>
+<p><strong><code>csv.Error</code> 를 <code>AppError</code> 로 번역합니다.</strong> 파서가 던지는 이 예외는 한 필드가 128KB(<code>csv.field_size_limit</code>)를 넘거나 따옴표가 닫히지 않아 파일 끝까지 한 필드로 읽힐 때 나오는데, 둘 다 평범한 사용자 조작만으로 만들어집니다. 그대로 흘려보내면 <code>handle_errors</code> 의 최후 방어선까지 올라가 "예기치 못한 오류"가 되므로, 여기서 원인 + 힌트가 붙은 <code>AppError</code> 로 바꿉니다.</p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 반복 위임과 파일 수명</strong> — 이전에는 이 자리가
+<code>yield from enumerate(reader, ...)</code> 한 줄이었습니다(위임, PEP 380, 3.3). 지금은
+<code>csv.Error</code> 를 잡기 위해 그 반복을 <code>try</code> 안의 <code>for ... : yield item</code> 으로 풀어 썼는데,
+값 흐름은 같고 여기서 실제로 중요한 성질도 그대로입니다 — <strong><code>with</code> 블록이 이 <code>yield</code>
+위에서 계속 살아 있다</strong>는 것입니다. 제너레이터는 값을 하나 내놓을 때마다 멈춰 있고
+프레임이 보존되므로, <code>with open(...)</code> 의 <code>__exit__</code> 는 소비자가 마지막 행을 꺼내거나
+제너레이터를 버릴 때까지 실행되지 않습니다. <strong>즉 파일의 수명이 호출자에게 넘어갑니다</strong>
+— 소스 주석이 바로 그 말을 하고 있고, 그래서 <code>read_rows</code> 의 결과를 저장해 두었다가
+나중에 소비하면 그동안 파일 핸들이 열려 있게 됩니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p>내보내기는 <code>DictWriter</code> 로 필드명 순서를 config 상수에 고정합니다.</p>
-<p>budget_app/storage/csv_io.py:131-148</p>
+<p>budget_app/storage/csv_io.py:145-186</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_transactions</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">txs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">include_id</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
+<span class="w">    </span><span class="sd">"""거래를 CSV 로 저장하고 작성 건수를 반환한다.</span>
 
-<span class="sd">    인코딩은 BOM 없는 UTF-8 로 고정한다. BOM 을 넣으면 다시 ``import`` 할 때 헤더</span>
-<span class="sd">    첫 컬럼명이 ``﻿id`` 로 깨져 왕복이 실패한다(왕복 안전성 우선).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    인코딩은 BOM 없는 UTF-8 로 고정한다 — 우리가 내보낸 파일에는 BOM 을 넣지 않는다.</span>
+<span class="sd">    반대로 **읽기는** ``CSV_READ_ENCODING`` (``utf-8-sig``) 이라 엑셀이 붙인 BOM 은</span>
+<span class="sd">    흡수한다. 즉 왕복도 외부 CSV 도 모두 안전하다.</span>
+
+<span class="sd">    쓰기는 **임시 파일 + ``os.replace``** 다(JSONL 쓰기와 같은 규칙). 대상 경로를</span>
+<span class="sd">    곧바로 열면 쓰다가 실패했을 때 헤더만 남은 **반쪽 CSV** 가 그 자리에 남는다.</span>
+<span class="sd">    사용자에게는 "내보내기 실패"라고 알렸는데 파일은 존재하는 상태라, 그 파일을</span>
+<span class="sd">    백업으로 믿고 쓰면 데이터가 조용히 사라진다. 지금은 준비가 끝난 뒤에만 이름이</span>
+<span class="sd">    바뀌므로 결과는 "완전한 새 파일" 또는 "손대지 않은 기존 파일" 둘 중 하나다.</span>
+<span class="sd">    """</span>
     <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="c1"># 임시 파일 경로로 먼저 쓰기 때문에, 이 검사가 없으면 폴더를 준 실수가</span>
+        <span class="c1"># ``os.replace`` 단계에서야 드러나 오류 메시지에 사용자가 치지 않은</span>
+        <span class="c1"># ``.tmp`` 경로가 찍힌다. 읽기 쪽 ``read_rows`` 의 존재 검사와 같은 자리다.</span>
+        <span class="k">raise</span> <span class="ne">IsADirectoryError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
     <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">fieldnames</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_FIELDS</span> <span class="k">if</span> <span class="n">include_id</span> <span class="k">else</span> <span class="n">config</span><span class="o">.</span><span class="n">CSV_FIELDS_WITHOUT_ID</span><span class="p">)</span>
 
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">with_name</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">TMP_SUFFIX</span><span class="p">)</span>
     <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictWriter</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">fieldnames</span><span class="o">=</span><span class="n">fieldnames</span><span class="p">)</span>
-        <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">txs</span><span class="p">:</span>
-            <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">_to_row</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">include_id</span><span class="p">))</span>
-            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">CSV_ENCODING</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictWriter</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">fieldnames</span><span class="o">=</span><span class="n">fieldnames</span><span class="p">)</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">txs</span><span class="p">:</span>
+                <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">_to_row</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">include_id</span><span class="p">))</span>
+                <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">fsync</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">fileno</span><span class="p">())</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+        <span class="c1"># 실패했으면 임시 파일을 남기지 않는다(정리 실패가 원인 예외를 가리면 안 된다).</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">tmp</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">raise</span>
     <span class="k">return</span> <span class="n">count</span>
 </code></pre></div>
 
-<p><code>include_id</code> 에 따라 필드 목록 자체를 바꿉니다 — <code>DictWriter</code> 는 <code>fieldnames</code> 에 없는 키를 dict 에 담아 넘기면 <code>ValueError</code> 를 내므로, <code>_to_row</code> 도 같은 플래그를 받아 <code>id</code> 키를 넣을지 결정합니다(storage/csv_io.py:151-163).</p>
+<p><code>include_id</code> 에 따라 필드 목록 자체를 바꿉니다 — <code>DictWriter</code> 는 <code>fieldnames</code> 에 없는 키를 dict 에 담아 넘기면 <code>ValueError</code> 를 내므로, <code>_to_row</code> 도 같은 플래그를 받아 <code>id</code> 키를 넣을지 결정합니다(storage/csv_io.py:189-201).</p>
+<p><strong>쓰기 대상이 <code>path</code> 가 아니라 <code>tmp</code> 라는 점</strong>도 눈여겨볼 자리입니다. 다 쓰고 <code>fsync</code> 한 뒤에야 <code>os.replace(tmp, path)</code> 로 이름을 바꾸므로, 내보내는 중에 실패해도 헤더만 남은 반쪽 CSV 가 생기지 않습니다 — 같은 규칙이 JSONL 쓰기에도 적용되어 있습니다(§8.7).</p>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>newline=""</code> 이 왜 붙어 있나</strong> — <code>csv</code> 모듈이 <strong>직접 요구하는 규약</strong>입니다.
 <code>csv.writer</code> 는 줄 끝을 스스로 <code>\r\n</code> 으로 씁니다(RFC 4180). 그런데 텍스트 파일을
 기본 모드로 열면 파이썬의 줄바꿈 변환기가 Windows 에서 <code>\n</code> 을 다시 <code>\r\n</code> 으로 바꿔
@@ -1736,9 +1808,9 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 <h3 id="88-osdup2-osdevnull-brokenpipe-공식-레시피">8.8 os.dup2 / os.devnull — BrokenPipe 공식 레시피</h3>
 <p>budget_app/cli/app.py:50-58</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
-<span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 &#39;Exception ignored&#39; 출력을 막는다</span>
-<span class="sd">    (파이썬 공식 권장 레시피).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
+<span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다</span>
+<span class="sd">    (파이썬 공식 권장 레시피)."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">devnull</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">O_WRONLY</span><span class="p">)</span>
         <span class="n">os</span><span class="o">.</span><span class="n">dup2</span><span class="p">(</span><span class="n">devnull</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">fileno</span><span class="p">())</span>
@@ -1754,11 +1826,11 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 <h3 id="91-validator-인자-ask_until-의-전략-주입">9.1 validator 인자 — <code>ask_until</code> 의 전략 주입</h3>
 <p>budget_app/cli/prompts.py:60-74</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask_until</span><span class="p">(</span><span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">validator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="n">T</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;``validator(raw)`` 가 정상값을 반환할 때까지 재입력을 요구한다.</span>
+<span class="w">    </span><span class="sd">"""``validator(raw)`` 가 정상값을 반환할 때까지 재입력을 요구한다.</span>
 
 <span class="sd">    - EOF → ``InputAborted`` 로 즉시 종료(무한 루프 방지).</span>
 <span class="sd">    - 유효하지 않은 값이 계속 들어오면 ``MAX_INPUT_RETRIES`` 회에서 중단한다.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">MAX_INPUT_RETRIES</span><span class="p">):</span>
         <span class="n">raw</span> <span class="o">=</span> <span class="n">ask</span><span class="p">(</span><span class="n">prompt</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
@@ -1806,9 +1878,9 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 <p>리팩터 전에는 argparse 의 <code>set_defaults(func=cmd_add)</code> 로 <strong>함수 객체</strong>를 파서에 직접 심었습니다. 지금은 문자열을 심고 표에서 찾습니다.</p>
 <p>budget_app/cli/parser.py:108-111</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_add_add</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;거래 추가 (대화형)&quot;</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"add"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"거래 추가 (대화형)"</span><span class="p">)</span>
     <span class="n">_add_shared_options</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
-    <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">"add"</span><span class="p">)</span>
 </code></pre></div>
 
 <p>budget_app/cli/app.py:26-27</p>
@@ -1843,7 +1915,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </blockquote>
 <p>budget_app/domain/specs.py:76-91</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Spec</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;거래 하나가 조건을 만족하는지 판단하는 명세.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""거래 하나가 조건을 만족하는지 판단하는 명세."""</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_satisfied_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tx</span><span class="p">:</span> <span class="n">Transaction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
@@ -1885,13 +1957,13 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
 <code>And</code>/<code>Or</code>/<code>Not</code> 처럼 중간 단계 클래스를 만들어도 정의 자체는 막히지 않습니다.
 → <a href="12-syntax-and-stdlib.html">12 §1-B</a></p>
 </blockquote>
-<div class="codehilite"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">DateFrom</span><span class="p">(</span><span class="s2">&quot;2024-01-01&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">DateTo</span><span class="p">(</span><span class="s2">&quot;2024-01-31&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">InCategory</span><span class="p">(</span><span class="s2">&quot;food&quot;</span><span class="p">)</span> <span class="o">|</span> <span class="n">InCategory</span><span class="p">(</span><span class="s2">&quot;cafe&quot;</span><span class="p">))</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">HasTag</span><span class="p">(</span><span class="s2">&quot;정기&quot;</span><span class="p">)</span>
+<div class="codehilite"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">DateFrom</span><span class="p">(</span><span class="s2">"2024-01-01"</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">DateTo</span><span class="p">(</span><span class="s2">"2024-01-31"</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">InCategory</span><span class="p">(</span><span class="s2">"food"</span><span class="p">)</span> <span class="o">|</span> <span class="n">InCategory</span><span class="p">(</span><span class="s2">"cafe"</span><span class="p">))</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">HasTag</span><span class="p">(</span><span class="s2">"정기"</span><span class="p">)</span>
 </code></pre></div>
 
 <p><strong><code>SearchFilter</code> 는 판정을 하지 않고 조립만 합니다.</strong></p>
 <p>budget_app/domain/queries.py:57-72</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_build_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">specs</span><span class="o">.</span><span class="n">Spec</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;지정된 조건만 골라 AND 로 잇는다. 하나도 없으면 ``Always``.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""지정된 조건만 골라 AND 로 잇는다. 하나도 없으면 ``Always``."""</span>
         <span class="n">parts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">specs</span><span class="o">.</span><span class="n">Spec</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_from</span><span class="p">:</span>
             <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">specs</span><span class="o">.</span><span class="n">DateFrom</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">date_from</span><span class="p">))</span>
@@ -1908,8 +1980,8 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
         <span class="k">return</span> <span class="n">specs</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="o">*</span><span class="n">parts</span><span class="p">)</span> <span class="k">if</span> <span class="n">parts</span> <span class="k">else</span> <span class="n">specs</span><span class="o">.</span><span class="n">Always</span><span class="p">()</span>
 </code></pre></div>
 
-<p><strong>얻은 것</strong>: 조건 추가가 <strong>클래스 하나 추가</strong>가 되고 기존 코드는 그대로입니다. <code>list</code>/<code>search</code>/<code>summary</code>/<code>export</code> 넷이 <code>SearchFilter</code> 를 공유하므로 표현력이 한 번 늘면 네 명령이 동시에 강해집니다.</p>
-<p><strong>Null Object 도 함께 들어왔습니다.</strong> 조건이 하나도 없는 <code>list</code> 는 <code>Always()</code> 를 받아 <code>None</code> 검사 없이 같은 코드로 처리됩니다.</p>
+<p><strong>얻은 것</strong>: 조건 추가가 <strong>클래스 하나 추가</strong>가 되고 기존 코드는 그대로입니다. <code>search</code>/<code>summary</code>/<code>export</code> 셋이 <code>SearchFilter</code> 를 공유하므로 표현력이 한 번 늘면 세 명령이 동시에 강해집니다.</p>
+<p><strong>Null Object 도 함께 들어왔습니다.</strong> 조건 옵션 없이 실행한 <code>search</code> 는 <code>SearchFilter()</code> 가 조건 0개로 만들어져 <code>Always()</code> 를 조립하므로, 명세 쪽에 <code>None</code> 분기가 필요 없습니다.</p>
 <h3 id="102-unit-of-work-두-파일-쓰기-사이의-빈틈">10.2 Unit of Work — 두 파일 쓰기 사이의 빈틈</h3>
 <p><strong>적용 전.</strong> 가져오기 커밋이 파일 둘을 따로 바꿨습니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="c1"># 리팩터 전 — 지금은 없는 코드</span>
@@ -1921,9 +1993,9 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
 <p><strong>적용 후.</strong> 쓰기를 준비와 커밋으로 나눕니다.</p>
 <p>budget_app/storage/unit_of_work.py:73-181</p>
 <div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnitOfWork</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;여러 저장소의 재작성을 모아 두었다가 한꺼번에 커밋한다.</span>
+<span class="w">    </span><span class="sd">"""여러 저장소의 재작성을 모아 두었다가 한꺼번에 커밋한다.</span>
 <span class="sd">    ...</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Path</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -1937,9 +2009,9 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
         <span class="o">*</span><span class="p">,</span>
         <span class="n">extra</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;한 저장소의 최종 내용을 ``.tmp`` 로 준비한다 — 아직 반영하지 않는다.</span>
+<span class="w">        </span><span class="sd">"""한 저장소의 최종 내용을 ``.tmp`` 로 준비한다 — 아직 반영하지 않는다.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">plan</span><span class="p">:</span> <span class="n">RewritePlan</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">plan_rewrite</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="n">extra</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">plan</span><span class="o">.</span><span class="n">changed</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># 바꿀 것이 없으면 임시 파일도 만들지 않는다</span>
@@ -1950,9 +2022,9 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
     <span class="c1"># ---------- 마무리 ----------</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;준비된 것을 전부 반영한다 — rename 만 연달아 실행.</span>
+<span class="w">        </span><span class="sd">"""준비된 것을 전부 반영한다 — rename 만 연달아 실행.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">done</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">:</span>
@@ -1962,12 +2034,12 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
                 <span class="n">done</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">target</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
             <span class="n">pending</span> <span class="o">=</span> <span class="p">[</span><span class="n">target</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">target</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">]</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UOW_PARTIAL</span><span class="p">,</span> <span class="n">done</span> <span class="ow">or</span> <span class="s2">&quot;없음&quot;</span><span class="p">,</span> <span class="n">pending</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_UOW_PARTIAL</span><span class="p">,</span> <span class="n">done</span> <span class="ow">or</span> <span class="s2">"없음"</span><span class="p">,</span> <span class="n">pending</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
             <span class="k">raise</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;준비한 ``.tmp`` 를 지운다 — 원본은 손대지 않았으므로 이것으로 끝이다.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""준비한 ``.tmp`` 를 지운다 — 원본은 손대지 않았으므로 이것으로 끝이다."""</span>
         <span class="k">for</span> <span class="n">tmp</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_staged</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">tmp</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -2007,11 +2079,11 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
 → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <p><strong>호출부.</strong></p>
-<p>budget_app/services/importexport.py:188-206</p>
+<p>budget_app/services/importexport.py:243-261</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">_commit_atomic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">batch</span><span class="p">:</span> <span class="n">_Batch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;원자 모드 — 두 파일을 **한 단위로** 커밋한다.</span>
+<span class="w">        </span><span class="sd">"""원자 모드 — 두 파일을 **한 단위로** 커밋한다.</span>
 <span class="sd">        ...</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">fresh_categories</span> <span class="o">=</span> <span class="p">[</span><span class="n">Category</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">batch</span><span class="o">.</span><span class="n">new_categories</span><span class="p">]</span>
         <span class="c1"># 파일을 저장소 밖(UoW)에서 쓰므로 id 워터마크는 여기서 명시적으로 알린다.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">remember_ids</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">transactions</span><span class="p">)</span>
@@ -2143,7 +2215,7 @@ method 'is_satisfied_by'</code> 를 냅니다. 그래서 <strong><code>Spec()</c
 <p>과제 방어 때는 이 그림 순서대로 — "규칙은 한 곳에 정의되고(§2.2), 모델이 생성자에서 그것을 강제하며(§1.4), 데이터는 제너레이터로 흐르되 읽기 경로가 목적에 따라 둘로 나뉘고(§3.2), 공통 관심사는 데코레이터로 분리되며 그 데코레이터끼리도 의존 방향에 따라 갈라지고(§4.4), 실패는 계층 공통 예외로 수렴한다(§5.1)" — 설명하면 코드 전체의 설계 의도를 일관된 이야기로 전달할 수 있습니다.</p>
 <p>계층(도메인/저장소/서비스/CLI) 관점의 큰 그림은 <a href="04-architecture.html">04. 아키텍처</a>에서 이어집니다.</p>
 <div class="pager"><span><a href="02-python-basics.html">← 02. 이 코드에 쓰인 파이썬 기초 문법</a></span><span><a href="04-architecture.html">04. 아키텍처 — 계층 구조와 설계 원칙 →</a></span></div>
-<footer>docs/03-python-advanced.md 에서 자동 생성됨 (2026-08-14 04:02) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
+<footer>docs/03-python-advanced.md 에서 자동 생성됨 (2026-08-26 08:39) — 내용 수정은 마크다운 원본에서 하고 docs/_build_html.py 를 다시 실행하세요.</footer>
 </main>
 </div>
 </body>

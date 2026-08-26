@@ -12,8 +12,15 @@ LOG_TORN_TAIL = "%s: 마지막 줄에 개행이 없어 새 레코드를 붙이�
 LOG_UOW_PARTIAL = "커밋 도중 실패했습니다 — 반영됨: %s / 반영 안 됨: %s. 임시 파일을 정리합니다."
 LOG_WATERMARK_CORRUPT = "%s 의 내용을 숫자로 읽을 수 없습니다(%r) — 파일 스캔 값만 사용합니다."
 
+#: 손상 줄 사유 (RawLine.error 에 실려 경고 로그로 나간다)
+ERR_LINE_NOT_UTF8 = "UTF-8 로 디코딩되지 않는 바이트가 들어 있습니다"
+
 # CSV 헤더 오류 (AppError message / hint)
 ERR_CSV_MISSING = "CSV 헤더에 필수 컬럼이 없습니다: {missing}"
 HINT_CSV_REQUIRED = "필수 컬럼: {columns}"
 ERR_CSV_NO_HEADER = "CSV 에 헤더 행이 없습니다: {path}"
 HINT_CSV_NO_HEADER = "첫 줄에 `{columns}` 형태의 헤더를 넣어 주세요."
+ERR_CSV_PARSE = "CSV 를 읽을 수 없습니다: {error}"
+HINT_CSV_PARSE = (
+    "CSV 한 필드가 너무 큽니다. 따옴표(\")가 닫혔는지, 개행이 올바른지 확인해 주세요."
+)
