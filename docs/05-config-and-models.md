@@ -222,7 +222,7 @@ MONTH_FORMAT = "%Y-%m"
 
 > **⚙️ 내부 동작 — `VALID_TYPES` 가 튜플인 이유** — `parse_type` 은 `v not in config.VALID_TYPES` 로 검사합니다. 튜플의 `in` 은 앞에서부터 훑는 **O(n)** 이지만 원소가 둘이라 문제가 되지 않고, 대신 **불변**이라 누가 실수로 `VALID_TYPES.append(...)` 를 할 수 없습니다(튜플에는 그 메서드 자체가 없습니다). 원소가 많고 `in` 이 잦은 자리에는 같은 이유로 `frozenset` 을 씁니다 — `cli/config.py:19` 의 `FALSY_ENV_VALUES = frozenset({"", "0", "false", "no", "off"})` 가 그 예로, 해시 기반이라 `in` 이 **O(1)** 이고 `frozenset` 자신도 해시 가능해 dict 키·집합 원소로 다시 쓸 수 있습니다(`set` 은 `hash({"a"})` 가 `TypeError` 입니다). → [12 §1-B](./12-syntax-and-stdlib.md)
 
-budget_app/services/budgets.py:50-52
+budget_app/services/budgets.py:70-72
 
 ```python
             if tx.type == domain_config.TYPE_INCOME:
@@ -308,7 +308,7 @@ ON_DUPLICATE_CHOICES = (ON_DUPLICATE_SKIP, ON_DUPLICATE_NEW_ID, ON_DUPLICATE_ERR
 DEFAULT_ON_DUPLICATE = ON_DUPLICATE_SKIP
 ```
 
-`ON_DUPLICATE_CHOICES` 는 argparse(파이썬이 기본으로 갖고 있는 명령줄 옵션 해석기)의 `choices=` 에 그대로 넘어갑니다(budget_app/cli/parser.py:226-231). **선택지 목록과 상수가 같은 자리에 있으므로** 정책을 추가할 때 한 곳만 고치면 됩니다.
+`ON_DUPLICATE_CHOICES` 는 argparse(파이썬이 기본으로 갖고 있는 명령줄 옵션 해석기)의 `choices=` 에 그대로 넘어갑니다(budget_app/cli/parser.py:235-240). **선택지 목록과 상수가 같은 자리에 있으므로** 정책을 추가할 때 한 곳만 고치면 됩니다.
 
 argparse 는 값을 변환한 뒤 `value not in choices` 를 검사해 걸리면 그 자리에서 프로그램을 끝냅니다(종료 코드 2). 즉 잘못된 `--on-duplicate` 는 서비스에 도달하지 않습니다 — 서비스 쪽 `ERR_UNKNOWN_DUPLICATE_POLICY` 방어는 CLI 가 아닌 경로로 직접 호출됐을 때를 위한 것입니다(→ [09 §2](./09-cli.md)).
 
@@ -422,7 +422,7 @@ ERR_CATEGORY_NOT_REGISTERED = "등록되지 않은 카테고리입니다: {name}
 
 `MSG_IMPORT_DONE` 도 바뀌었습니다.
 
-budget_app/cli/messages.py:92-94
+budget_app/cli/messages.py:122-124
 
 ```python
 MSG_IMPORT_DONE = (
@@ -939,7 +939,7 @@ patch = TransactionPatch(catgeory="food")
 
 `is_empty` property 덕분에 CLI 의 "수정할 필드가 없습니다" 검사도 한 줄이 됩니다.
 
-budget_app/cli/handlers.py:139-148
+budget_app/cli/handlers.py:154-163
 
 ```python
 def cmd_update(ctx: AppContext, args: argparse.Namespace) -> int:

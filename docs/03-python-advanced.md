@@ -420,7 +420,7 @@ class MonthlySummary:
 
 더 중요한 것은 **계산 규칙의 소속**입니다. 리팩터 전에는 서비스가 문자열 키 dict 를 만들어 `result["usage_pct"]` 를 채웠고, "예산이 없으면 N/A" 같은 해석을 CLI 가 했습니다. 지금은 서비스가 **원자료만** 담아 넘기고, 파생값은 모델이 계산하며, 프레젠터는 `None` 인지만 봅니다.
 
-budget_app/cli/presenter.py:85-92
+budget_app/cli/presenter.py:123-130
 
 ```python
 def _budget_lines(summary: MonthlySummary) -> Iterator[str]:
@@ -838,7 +838,7 @@ output.out_lines             ── stdout 으로 출력
 
 **정렬은 본질적으로 전체를 "훑어야" 하는 연산**입니다. 다만 훑는 것과 **모으는 것**은 다릅니다. `limit` 이 있으면 `heapq.nlargest` 가 크기 `limit` 짜리 힙 하나만 유지하며 스트림을 흘려보내므로 메모리 상한이 파일 크기가 아니라 `O(limit)` 이고, `limit` 이 없는 `search` 경로만 통과분 전체를 모읍니다(그때도 담기는 것은 "필터를 통과한 항목뿐"이라 조건이 좁을수록 줄어듭니다). 정렬이 끝난 뒤 다시 `yield from` 으로 내보내는 이유는 소비자가 `limit` 에 도달하면 `break` 할 수 있도록 **출구를 다시 스트림 형태로 유지**하기 위해서입니다.
 
-budget_app/cli/presenter.py:42-59
+budget_app/cli/presenter.py:71-97
 
 ```python
 def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
@@ -850,11 +850,20 @@ def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[
     ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
     이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
     같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
+
+    머리글은 **첫 행을 실제로 받은 뒤에** 낸다. 미리 내면 결과가 없을 때 머리글만
+    덩그러니 남아 "(데이터 없음)" 과 모순되는 화면이 되고, 표를 파이프로 넘겨 세는
+    쪽도 빈 결과와 한 건을 구분하지 못한다. 행을 하나도 못 받은 경우에만 안내 한 줄이
+    나가는 성질은 그대로다.
     """
     count = 0
     for tx in rows:
         if limit is not None and count >= limit:
             break
+        if count == 0:
+            header = _header_line()
+            yield header
+            yield _rule_line(header)
         yield tx_line(tx)
         count += 1
     if count == 0:
@@ -960,7 +969,7 @@ budget_app/storage/jsonl.py:1-18 (모듈 docstring)
 
 **설계 의도 정리.** 거래가 10만 건이어도 `stream()` 이 동시에 들고 있는 것은 "현재 줄 하나 + 객체 하나" 뿐이므로 읽기 자체는 메모리 O(1)입니다.
 
-- `monthly_summary`(services/budgets.py:30-66)처럼 합계만 누적하는 소비자는 끝까지 O(1)
+- `monthly_summary`(services/budgets.py:50-86)처럼 합계만 누적하는 소비자는 끝까지 O(1)
 - `category_in_use`(storage/repositories.py:121-124)처럼 `any(tx.category == target for tx in self.stream())` 로 조기 종료하는 소비자는 지연 평가 덕분에 파일 뒷부분을 아예 읽지 않음
 - 한도 없는 전체 정렬(`search` 경로의 `stream_sorted`)만 예외적으로 필터 통과분을 모음 — `list --limit N` 은 `heapq.nlargest` 로 상위 N 만 유지
 - `rewrite` 는 재작성이 목적이라 줄들을 모을 수밖에 없지만, **문자열 상태**로만 들고 있습니다(객체가 아니라)
@@ -1034,7 +1043,7 @@ add = log_call(add)     # add 라는 이름이 이제 wrapper 를 가리킨다
 > `@functools.total_ordering` 이 나머지 비교 메서드를 채울 수 있으므로 **아래에서 위로**
 > 라는 규칙이 그대로 적용됩니다(§3.3). 커스텀 데코레이터 셋은 전부 단독 사용입니다 —
 > 서비스 메서드는 `@log_call` 셋(services/transactions.py:34, 52, 72)과 `@measure_time`
-> 하나(services/budgets.py:30)뿐이고, `@handle_errors` 도 `cli/app.py:61` 의
+> 하나(services/budgets.py:50)뿐이고, `@handle_errors` 도 `cli/app.py:63` 의
 > `_dispatch` 한 곳에만 붙습니다. 그래서 이 프로젝트에서는 **커스텀** 데코레이터끼리
 > 순서를 고민할 필요가 없는데, **그 자체가 설계 결과**입니다 — 관측과 오류 처리를 서로
 > 다른 계층에 두었기 때문에 한 함수에 둘이 겹칠 일이 생기지 않았습니다(§4.4).
@@ -1053,7 +1062,7 @@ add.__doc__       # wrapper 의 docstring (None)
 `@functools.wraps(func)` 는 `func` 의 `__name__`, `__doc__`, `__module__` 등을 wrapper 로 복사해 이 문제를 막습니다. 이 프로젝트에서 이것이 실질적으로 중요한 이유가 두 가지 있습니다.
 
 1. `log_call` 과 `measure_time` 은 로그에 `func.__name__` 을 찍습니다. `wraps` 가 없으면 로그가 전부 `wrapper` 로 찍혀 무의미해집니다.
-2. `handle_errors` 로 감싼 `_dispatch`(cli/app.py:61-81)도 `wraps` 덕분에 디버깅·트레이스에서 원래 이름으로 보입니다.
+2. `handle_errors` 로 감싼 `_dispatch`(cli/app.py:63-83)도 `wraps` 덕분에 디버깅·트레이스에서 원래 이름으로 보입니다.
 
 > **⚙️ 내부 동작 — `wraps` 가 정확히 무엇을 복사하나** — `functools.wraps(f)` 는
 > `functools.partial(update_wrapper, wrapped=f)` 이고, `update_wrapper` 가 하는 일은 셋입니다.
@@ -1074,8 +1083,8 @@ add.__doc__       # wrapper 의 docstring (None)
 | 데코레이터 | 위치 | wrapper 가 하는 일 | 핵심 구문 | 붙는 곳 |
 |---|---|---|---|---|
 | `log_call` | decorators.py:37-47 | 호출 전/후 DEBUG 로그 | 순차 실행 | 서비스 3곳 (transactions.py:34, 52, 72) |
-| `measure_time` | decorators.py:50-66 | 실행 시간 측정 로그 | `try/finally` | 서비스 1곳 (budgets.py:30) |
-| `handle_errors` | **cli/error_handler.py:20-128** | 예외 → 메시지 + 종료 코드 | 다단 `except` | CLI 진입점 1곳 (app.py:61 `_dispatch`) |
+| `measure_time` | decorators.py:50-66 | 실행 시간 측정 로그 | `try/finally` | 서비스 1곳 (budgets.py:50) |
+| `handle_errors` | **cli/error_handler.py:20-128** | 예외 → 메시지 + 종료 코드 | 다단 `except` | CLI 진입점 1곳 (app.py:63 `_dispatch`) |
 
 **세 개가 한 파일에 있다가 두 파일로 나뉜 것이 리팩터의 핵심 중 하나입니다.**
 
@@ -1955,7 +1964,7 @@ budget_app/storage/jsonl.py:48-72 (`stage_lines`) 와 80-87 (`atomic_write_lines
 
 ### 8.8 os.dup2 / os.devnull — BrokenPipe 공식 레시피
 
-budget_app/cli/app.py:50-58
+budget_app/cli/app.py:52-60
 
 ```python
 def _silence_broken_pipe() -> None:
@@ -1971,7 +1980,7 @@ def _silence_broken_pipe() -> None:
 
 `os.devnull` 은 OS 별 "블랙홀" 장치 경로(Windows `nul`, Unix `/dev/null`)이고, `os.dup2(a, b)` 는 파일 디스크립터 b 가 a 와 같은 곳을 가리키게 복제합니다. 즉 **stdout 을 블랙홀로 갈아끼워** 인터프리터 종료 시 남은 버퍼를 비우다 BrokenPipeError 가 재발하는 것을 막습니다.
 
-`handle_errors` 가 BrokenPipeError 만은 `raise` 로 위로 넘기고(§5.3), `main`(cli/app.py:84-94)이 이 함수를 호출한 뒤 `EXIT_OK` 를 반환하는 협업 구조입니다. 전말은 [09. CLI 계층](./09-cli.md)에서 상세히 다룹니다.
+`handle_errors` 가 BrokenPipeError 만은 `raise` 로 위로 넘기고(§5.3), `main`(cli/app.py:86-96)이 이 함수를 호출한 뒤 `EXIT_OK` 를 반환하는 협업 구조입니다. 전말은 [09. CLI 계층](./09-cli.md)에서 상세히 다룹니다.
 
 ---
 
@@ -2039,7 +2048,7 @@ Handler = Callable[[AppContext, argparse.Namespace], int]
 
 ```
 
-budget_app/cli/app.py:81
+budget_app/cli/app.py:83
 
 ```python
     return HANDLERS[args.handler](ctx, args)

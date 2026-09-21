@@ -85,6 +85,21 @@ def cmd_budget_set(ctx: AppContext, args: argparse.Namespace) -> int:
     return config.EXIT_OK
 
 
+def cmd_budget_get(ctx: AppContext, args: argparse.Namespace) -> int:
+    # 월을 **여기서 한 번** 정규화한다. 저장소도 같은 정규화를 하지만, 예산이 없을 때
+    # 화면에 찍을 달은 저장소가 아니라 이쪽이 들고 있어야 한다 — 그러지 않으면
+    # `budget get --month 2024-1` 이 `2024-1: 예산 없음` 이라고 답해, 저장된 표기와
+    # 다른 달 이름을 사용자에게 보여 주게 된다.
+    month = validators.parse_month(args.month)
+    output.out_lines(presenter.budget_lines(month, ctx.budget_service.get_budget(month)))
+    return config.EXIT_OK
+
+
+def cmd_budget_list(ctx: AppContext, args: argparse.Namespace) -> int:
+    output.out_lines(presenter.budget_table(ctx.budget_service.list_budgets()))
+    return config.EXIT_OK
+
+
 def cmd_category_add(ctx: AppContext, args: argparse.Namespace) -> int:
     name = prompts.ask_category_name(args.name)
     if ctx.cat_service.add(name):

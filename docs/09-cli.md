@@ -342,7 +342,7 @@ $ python -m budget_app category --data-dir ./mydata list   ✅ 이렇게만 동�
 
 ### 2.6 새 옵션 두 개
 
-budget_app/cli/parser.py:201-214
+budget_app/cli/parser.py:210-223
 
 ```python
 def _add_export(sub) -> None:
@@ -373,7 +373,7 @@ def _add_export(sub) -> None:
 
 ### 2.7 `needs_storage` — backup 만 예외
 
-budget_app/cli/parser.py:248-252
+budget_app/cli/parser.py:257-261
 
 ```python
 def _add_backup(sub) -> None:
@@ -634,7 +634,7 @@ budget_app/cli/presenter.py:1-16
 > **💡 쉽게 말하면** — 도서관에서 두꺼운 책의 내용을 확인하는 방법은 둘입니다. 전권을 복사해 가방에 넣고 나와서 보거나, 열람실에서 필요한 만큼만 한 장씩 넘겨 보거나. 뒤쪽이 제너레이터입니다 — 스무 줄만 필요하면 스물한 장째는 넘기지 않고, 가방(메모리)이 무거워지지도 않습니다.
 > 다만 이 비유는 **중간에 정렬이 끼는 순간** 반쯤 깨집니다 — 최신순으로 보려면 어차피 전권을 한 번은 훑어야 하므로, 첫 줄이 나오기까지 걸리는 시간은 스무 줄만 필요해도 줄지 않습니다. 아끼는 쪽은 **손에 드는 양**입니다. `--limit 20` 을 서비스까지 내려보내면 훑는 동안 손에 남는 것이 스무 장뿐이라 가방은 무거워지지 않습니다. 그 한도가 없는 `search` 만 조건에 걸러진 항목 전체를 쌓아 둡니다. 그래서 이 절 뒤쪽에 "정직하게" 라는 단서가 붙습니다.
 
-budget_app/cli/presenter.py:42-59
+budget_app/cli/presenter.py:71-97
 
 ```python
 def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
@@ -646,11 +646,20 @@ def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[
     ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
     이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
     같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
+
+    머리글은 **첫 행을 실제로 받은 뒤에** 낸다. 미리 내면 결과가 없을 때 머리글만
+    덩그러니 남아 "(데이터 없음)" 과 모순되는 화면이 되고, 표를 파이프로 넘겨 세는
+    쪽도 빈 결과와 한 건을 구분하지 못한다. 행을 하나도 못 받은 경우에만 안내 한 줄이
+    나가는 성질은 그대로다.
     """
     count = 0
     for tx in rows:
         if limit is not None and count >= limit:
             break
+        if count == 0:
+            header = _header_line()
+            yield header
+            yield _rule_line(header)
         yield tx_line(tx)
         count += 1
     if count == 0:
@@ -725,7 +734,7 @@ def cmd_list(ctx: AppContext, args: argparse.Namespace) -> int:
 
 ### 4.3 계산하지 않고 묻기만 한다
 
-budget_app/cli/presenter.py:67-92
+budget_app/cli/presenter.py:105-130
 
 ```python
 def summary_lines(summary: MonthlySummary) -> Iterator[str]:
@@ -762,11 +771,11 @@ def _budget_lines(summary: MonthlySummary) -> Iterator[str]:
 
 > **🔎 문법의 출처** — `yield from` 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. 그 전에는 `for x in gen(): yield x` 라고 손으로 풀어 써야 했고, 여기서는 그것과 결과가 같습니다. 다만 `yield from` 이 단순한 축약이 아닌 이유는 **`send()`·`throw()`·`close()`·반환값(`StopIteration.value`)까지 하위 제너레이터에 그대로 통과시키기** 때문입니다. 이 소스는 값만 흘려보내므로 축약으로 봐도 무방하지만, 같은 문법이 `stream_sorted` 의 `yield from sorted(...)` 처럼 **리스트에도** 쓰입니다 — 대상은 제너레이터가 아니라 아무 이터러블이면 됩니다.
 >
-> `summary_lines` 안의 `return`(`presenter.py:70`)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 `return` 은 "값을 하나 돌려준다"가 아니라 **`StopIteration` 을 일으켜 반복을 끝낸다**는 뜻이고, 그래서 `is_empty` 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 `return 값` 도 문법상 허용되지만 그 값은 `yield` 되지 않고 `StopIteration.value` 에 실립니다). → [12 §1-C](./12-syntax-and-stdlib.md)
+> `summary_lines` 안의 `return`(`presenter.py:108`)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 `return` 은 "값을 하나 돌려준다"가 아니라 **`StopIteration` 을 일으켜 반복을 끝낸다**는 뜻이고, 그래서 `is_empty` 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 `return 값` 도 문법상 허용되지만 그 값은 `yield` 되지 않고 `StopIteration.value` 에 실립니다). → [12 §1-C](./12-syntax-and-stdlib.md)
 
 ### 4.4 진단 줄도 프레젠터가 만든다
 
-budget_app/cli/presenter.py:113-119
+budget_app/cli/presenter.py:180-186
 
 ```python
 def import_result_line(report: ImportReport, mode: str) -> str:
@@ -1015,7 +1024,7 @@ budget_app/cli/app.py:1-13
 from __future__ import annotations
 ```
 
-핸들러 13개는 `cli/handlers.py`(190줄)에 있고, 줄 수는 이렇습니다:
+핸들러 15개는 `cli/handlers.py`(212줄)에 있고, 줄 수는 이렇습니다:
 
 | 핸들러 | 줄 | 핸들러 | 줄 |
 |---|---|---|---|
@@ -1025,13 +1034,14 @@ from __future__ import annotations
 | `cmd_export` | 5 | `cmd_category_add` | 7 |
 | `cmd_search` | 12 | `cmd_import` | 9 |
 | `cmd_add` | 18 | `cmd_category_remove` | 14 |
-| `cmd_update` | 10 | | |
+| `cmd_update` | 10 | `cmd_budget_get` | 3 |
+| `cmd_budget_list` | 2 | | |
 
 가장 긴 `cmd_add`(18줄)도 대부분이 서비스에 넘길 인자 나열입니다.
 
 ### 6.2 `main` — 다섯 단계
 
-budget_app/cli/app.py:84-94
+budget_app/cli/app.py:86-96
 
 ```python
 def main(argv: list[str] | None = None) -> int:
@@ -1055,7 +1065,7 @@ def main(argv: list[str] | None = None) -> int:
 5) 디스패치       HANDLERS[args.handler](ctx, args)
 ```
 
-**순서가 중요합니다.** `setup_logging` 이 3번보다 앞에 있어야 저장소 초기화 중 발생하는 경고 로그도 보입니다. 3·4·5 번은 `main` 이 아니라 `@handle_errors` 가 붙은 `_dispatch`(`app.py:61-81`) 안에 있습니다 — 파일을 여는 코드를 방패 밖에 두지 않기 위해서입니다.
+**순서가 중요합니다.** `setup_logging` 이 3번보다 앞에 있어야 저장소 초기화 중 발생하는 경고 로그도 보입니다. 3·4·5 번은 `main` 이 아니라 `@handle_errors` 가 붙은 `_dispatch`(`app.py:63-83`) 안에 있습니다 — 파일을 여는 코드를 방패 밖에 두지 않기 위해서입니다.
 
 **`argv: list[str] | None = None`** 은 테스트를 위한 설계입니다. `None` 이면 argparse 가 `sys.argv[1:]` 를 쓰고, 리스트를 주면 그것을 파싱합니다. 프로세스를 띄우지 않고 `main(["list", "--limit", "5"])` 로 호출할 수 있습니다.
 
@@ -1084,7 +1094,7 @@ Handler = Callable[[AppContext, argparse.Namespace], int]
 3. `handlers.py` 에 `cmd_xxx(ctx, args)` 작성
 4. `app.py` 의 `HANDLERS` 에 한 줄 추가
 
-`main()` 은 영원히 그대로입니다. **3번에 `@handle_errors` 를 붙이는 단계가 없다는 점**을 눈여겨보세요. 예전에는 핸들러 13개에 각각 붙였지만 지금은 `_dispatch` 한 곳에만 붙습니다(`app.py:61`). 정책이 한 곳에서 적용되면 "새 핸들러에 데코레이터를 빠뜨리는" 실수 자체가 생길 수 없습니다 — `handlers.py` 전체에 `@handle_errors` 는 **한 개도 없습니다**.
+`main()` 은 영원히 그대로입니다. **3번에 `@handle_errors` 를 붙이는 단계가 없다는 점**을 눈여겨보세요. 예전에는 핸들러 13개에 각각 붙였지만 지금은 `_dispatch` 한 곳에만 붙습니다(`app.py:63`). 정책이 한 곳에서 적용되면 "새 핸들러에 데코레이터를 빠뜨리는" 실수 자체가 생길 수 없습니다 — `handlers.py` 전체에 `@handle_errors` 는 **한 개도 없습니다**.
 
 > **🔎 문법의 출처** — `@handle_errors` 같은 데코레이터 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다. `@deco` 를 함수 정의 위에 얹은 것은 `def f(): ...` 뒤에 `f = deco(f)` 를 쓴 것과 **정확히 같은 코드로 풀립니다**(desugar). 그래서 `_dispatch` 라는 이름이 실제로 가리키는 것은 원래 함수가 아니라 `handle_errors` 가 돌려준 `wrapper` 이고, 안쪽에서 `functools.wraps` 로 이름·docstring 을 옮겨 심어야 정체가 유지됩니다. 자세한 것은 [06. 횡단 관심사와 예외 처리](./06-decorators.md), 문법 계보는 [12 §1-C](./12-syntax-and-stdlib.md).
 
@@ -1113,11 +1123,11 @@ budget_app/context.py:42-57
         self.backup_service = BackupService(self.data_dir)
 ```
 
-**리팩터 전에는 핸들러마다 `AppContext(args.data_dir)` 를 만들었습니다**(10곳). 지금은 `_dispatch` 가 한 번 만들어 핸들러에 넘깁니다(`app.py:78`). 그래서 핸들러 시그니처가 `(ctx, args)` 두 인자입니다.
+**리팩터 전에는 핸들러마다 `AppContext(args.data_dir)` 를 만들었습니다**(10곳). 지금은 `_dispatch` 가 한 번 만들어 핸들러에 넘깁니다(`app.py:80`). 그래서 핸들러 시그니처가 `(ctx, args)` 두 인자입니다.
 
 ### 6.5 기간 조건 조립
 
-budget_app/cli/handlers.py:157-161
+budget_app/cli/handlers.py:172-176
 
 ```python
 def cmd_export(ctx: AppContext, args: argparse.Namespace) -> int:
@@ -1181,7 +1191,7 @@ budget_app/cli/error_handler.py:56-60
 
 **(2) `main` 이 잡아 stdout 을 블랙홀로 갈아끼웁니다.**
 
-budget_app/cli/app.py:50-58
+budget_app/cli/app.py:52-60
 
 ```python
 def _silence_broken_pipe() -> None:
@@ -1221,7 +1231,7 @@ def _silence_broken_pipe() -> None:
 
 ```bash
 $ python -m budget_app list | head -1
-TX-000004 | 2024-02-03 | expense | food | 8000 | 김밥
+id        | date       | type    | category     |       amount | memo
 $ echo ${PIPESTATUS[0]}
 0                          ← budget_app 자체는 정상 종료
 ```

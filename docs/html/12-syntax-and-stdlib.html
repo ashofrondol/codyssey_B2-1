@@ -287,7 +287,7 @@ issubclass(SystemExit, Exception)     → False
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
 </code></pre></div>
 
-<p>budget_app/cli/app.py:97-98</p>
+<p>budget_app/cli/app.py:99-100</p>
 <div class="codehilite"><pre><span></span><code><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
 </code></pre></div>
@@ -680,12 +680,19 @@ f-string 은 그 줄을 만나는 순간 문자열이 <strong>완성</strong>되
 넣으려면 템플릿이 <strong>문자열 상수</strong>여야 하는데, f-string 은 정의 지점에서 곧바로
 평가되므로 상수가 될 수 없습니다. 이 프로젝트가 <code>str.format</code> 을 버리지 않은 유일하고
 결정적인 이유입니다.</p>
-<p>budget_app/cli/messages.py:42-43</p>
+<p>budget_app/cli/messages.py:42-50</p>
 <div class="codehilite"><pre><span></span><code><span class="n">MSG_NO_DATA</span> <span class="o">=</span> <span class="s2">"(데이터 없음)"</span>
-<span class="n">FMT_TX_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">{id}</span><span class="s2"> | </span><span class="si">{date}</span><span class="s2"> | </span><span class="si">{type:&lt;7}</span><span class="s2"> | </span><span class="si">{category}</span><span class="s2"> | </span><span class="si">{amount}</span><span class="s2"> | </span><span class="si">{memo}</span><span class="s2">"</span>
+<span class="c1">#: 거래 표의 한 줄 — **열 폭을 정하는 유일한 자리**다.</span>
+<span class="c1">#:</span>
+<span class="c1">#: ``{id}`` 만 폭 지정이 없다. ``TransactionId`` 는 ``__format__`` 을 정의하지 않아</span>
+<span class="c1">#: ``{id:&lt;9}`` 가 TypeError 로 막히고, 값이 ``TX-`` + 6자리라 길이가 이미 고정이다.</span>
+<span class="c1">#: 나머지는 폭을 박아 둔다 — 없으면 ``| rent | 150000 |`` 과 ``| salary | 3000000 |``</span>
+<span class="c1">#: 의 파이프 위치가 어긋나 표가 표로 보이지 않는다. 금액만 우측 정렬(``&gt;``)인데,</span>
+<span class="c1">#: 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 하기 때문이다.</span>
+<span class="n">FMT_TX_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">{id}</span><span class="s2"> | </span><span class="si">{date:&lt;10}</span><span class="s2"> | </span><span class="si">{type:&lt;7}</span><span class="s2"> | </span><span class="si">{category:&lt;12}</span><span class="s2"> | </span><span class="si">{amount:&gt;12}</span><span class="s2"> | </span><span class="si">{memo}</span><span class="s2">"</span>
 </code></pre></div>
 
-<p>budget_app/cli/presenter.py:31-39</p>
+<p>budget_app/cli/presenter.py:60-68</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tx_line</span><span class="p">(</span><span class="n">tx</span><span class="p">:</span> <span class="n">Transaction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">messages</span><span class="o">.</span><span class="n">FMT_TX_LINE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
         <span class="nb">id</span><span class="o">=</span><span class="n">tx</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
@@ -820,8 +827,8 @@ f-string 은 그 줄을 만나는 순간 문자열이 <strong>완성</strong>되
 을 같은 값으로 만듭니다(3.13.1 에서 <code>TransactionId('TX-1')</code> → <code>TX-000001</code> 확인).</p>
 <p><strong><code>{:&lt;7}</code></strong> — <code>&lt;</code> 는 왼쪽 정렬, <code>7</code> 은 최소 폭입니다. 문자열은 원래 왼쪽 정렬이
 기본이지만, 여기서는 <strong>폭 7 을 주기 위해</strong> 정렬 기호를 명시했습니다.</p>
-<p>budget_app/cli/messages.py:43-43</p>
-<div class="codehilite"><pre><span></span><code><span class="n">FMT_TX_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">{id}</span><span class="s2"> | </span><span class="si">{date}</span><span class="s2"> | </span><span class="si">{type:&lt;7}</span><span class="s2"> | </span><span class="si">{category}</span><span class="s2"> | </span><span class="si">{amount}</span><span class="s2"> | </span><span class="si">{memo}</span><span class="s2">"</span>
+<p>budget_app/cli/messages.py:50-50</p>
+<div class="codehilite"><pre><span></span><code><span class="n">FMT_TX_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">{id}</span><span class="s2"> | </span><span class="si">{date:&lt;10}</span><span class="s2"> | </span><span class="si">{type:&lt;7}</span><span class="s2"> | </span><span class="si">{category:&lt;12}</span><span class="s2"> | </span><span class="si">{amount:&gt;12}</span><span class="s2"> | </span><span class="si">{memo}</span><span class="s2">"</span>
 </code></pre></div>
 
 <p>값이 <code>"income"</code>(6자) 아니면 <code>"expense"</code>(7자)뿐이므로, 폭 7 이면 <code>income</code> 뒤에 공백 하나가
@@ -849,7 +856,7 @@ f-string 은 그 줄을 만나는 순간 문자열이 <strong>완성</strong>되
 소스에 붙여 넣을 수 있는 형태가 됩니다.</p>
 <p><strong>없으면 어떻게 되나</strong> — <code>TransactionId</code> 가 <code>__str__</code> 을 갖지 않았다면(tx_id.py:126-127)
 거래 목록 한 줄이 이렇게 나옵니다. 3.13.1 에서 확인한 결과입니다.</p>
-<div class="codehilite"><pre><span></span><code>TransactionId(value='TX-000001') | 2024-01-05 | expense | food | 12000 |
+<div class="codehilite"><pre><span></span><code>TransactionId(value='TX-000001') | 2024-01-05 | expense | food         |        12000 |
 </code></pre></div>
 
 <p><code>@dataclass</code> 가 만들어 주는 것은 <code>__repr__</code> 뿐이고 <code>__str__</code> 은 만들지 않습니다.
@@ -923,7 +930,7 @@ f-string 은 그 줄을 만나는 순간 문자열이 <strong>완성</strong>되
 </code></pre></div>
 
 <p><strong>참고 — <code>startswith</code> 는 지금 이 소스에 없습니다.</strong> 두 docstring 에만 흔적으로
-남아 있습니다(services/budgets.py:35, domain/periods.py:4). 이전에는 "이 달에 속하는가"를
+남아 있습니다(services/budgets.py:55, domain/periods.py:4). 이전에는 "이 달에 속하는가"를
 <code>date.startswith(month + "-")</code> 로 판정했는데, 같은 개념이 CLI 와 서비스에 서로 다른
 알고리즘으로 구현돼 있어서 <code>domain/periods.month_range</code> 하나로 합쳤습니다.</p>
 <p><strong>없으면 어떻게 되나</strong> — <code>strip()</code> 하나가 빠지면 <code>" food "</code> 와 <code>"food"</code> 가 서로 다른
@@ -1825,7 +1832,7 @@ tx_table            0x1000023 True
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">messages</span><span class="o">.</span><span class="n">LOG_CORRUPT_LINE</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="o">.</span><span class="n">lineno</span><span class="p">,</span> <span class="n">raw</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
 
-<p>budget_app/cli/presenter.py:42-59</p>
+<p>budget_app/cli/presenter.py:71-97</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tx_table</span><span class="p">(</span><span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.</span>
 
@@ -1835,11 +1842,20 @@ tx_table            0x1000023 True
 <span class="sd">    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가</span>
 <span class="sd">    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은</span>
 <span class="sd">    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.</span>
+
+<span class="sd">    머리글은 **첫 행을 실제로 받은 뒤에** 낸다. 미리 내면 결과가 없을 때 머리글만</span>
+<span class="sd">    덩그러니 남아 "(데이터 없음)" 과 모순되는 화면이 되고, 표를 파이프로 넘겨 세는</span>
+<span class="sd">    쪽도 빈 결과와 한 건을 구분하지 못한다. 행을 하나도 못 받은 경우에만 안내 한 줄이</span>
+<span class="sd">    나가는 성질은 그대로다.</span>
 <span class="sd">    """</span>
     <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">count</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
             <span class="k">break</span>
+        <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">header</span> <span class="o">=</span> <span class="n">_header_line</span><span class="p">()</span>
+            <span class="k">yield</span> <span class="n">header</span>
+            <span class="k">yield</span> <span class="n">_rule_line</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
         <span class="k">yield</span> <span class="n">tx_line</span><span class="p">(</span><span class="n">tx</span><span class="p">)</span>
         <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -2361,7 +2377,7 @@ to reraise</code> 가 납니다.</p>
 <p>여기서 <code>raise</code> 는 "나는 이 예외를 <strong>인식했지만 처리하지 않는다</strong>"는 선언입니다.
 그냥 절을 지우면 아래의 <code>except OSError</code> 가 잡아 오류 메시지를 찍어 버립니다.
 즉 이 절은 <strong>아무 일도 하지 않기 위해 존재</strong>합니다. 그리고 진짜 처리는 여기 있습니다.</p>
-<p>budget_app/cli/app.py:84-94</p>
+<p>budget_app/cli/app.py:86-96</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -2425,7 +2441,7 @@ to reraise</code> 가 납니다.</p>
 <p><code>return func(...)</code> 과 <code>finally</code> 의 조합이 이 함수의 전부입니다. 성공하면 반환값을
 계산한 뒤 시간을 찍고 반환하며, 실패하면 예외가 올라가기 <strong>직전에</strong> 시간을 찍고
 예외는 그대로 전파됩니다. 즉 <code>measure_time</code> 은 예외를 <strong>삼키지 않습니다</strong>.
-<code>@measure_time</code> 이 붙은 곳은 <code>BudgetService.monthly_summary</code>(budgets.py:30) 한 곳입니다.</p>
+<code>@measure_time</code> 이 붙은 곳은 <code>BudgetService.monthly_summary</code>(budgets.py:50) 한 곳입니다.</p>
 <p><strong>주의 — <code>finally</code> 안의 <code>return</code> 은 예외를 삼킵니다.</strong> 이것은 일반론 예시이며
 이 소스에는 없습니다.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">h</span><span class="p">():</span>
@@ -4123,7 +4139,7 @@ handlers: [] | effective: WARNING
 <p>파싱은 전부 <code>parse_known_args</code> 가 하고 <strong>인식하지 못한 인자 목록을 함께 돌려줍니다</strong>. <code>parse_args</code> 가 더하는 것은 "남은 게 있으면 에러로 끝낸다"는 정책 한 줄뿐입니다. 두 함수가 나뉜 이유는 래퍼 스크립트(자기 인자만 떼고 나머지를 다른 프로그램에 넘기는 도구) 때문이고, 이 소스는 그런 관용을 원하지 않으므로 <code>parse_args</code> 를 씁니다.</p>
 <p><code>parse_known_args</code> 는 3.13 에서 <code>_parse_known_args2</code> 로 위임하고, 그 앞부분이 <strong>기본값을 namespace 에 심는 단계</strong>입니다. 아래 SUPPRESS 항목에서 다시 인용합니다.</p>
 <p><strong>이 소스에서</strong></p>
-<p>budget_app/cli/app.py:84-90</p>
+<p>budget_app/cli/app.py:86-92</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -4170,7 +4186,7 @@ handlers: [] | effective: WARNING
     <span class="n">sub</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"command"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
 
-<p>budget_app/cli/parser.py:161-166</p>
+<p>budget_app/cli/parser.py:170-175</p>
 <div class="codehilite"><pre><span></span><code>    <span class="n">cat</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"cat_cmd"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">p_add</span> <span class="o">=</span> <span class="n">cat</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"add"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"카테고리 추가"</span><span class="p">)</span>
@@ -4247,7 +4263,7 @@ plain     ['list', '--data-dir', 'Y']                -&gt; data_dir='Y' debug=Fa
 </code></pre></div>
 
 <p><code>plain</code> 의 첫 줄이 버그입니다. 사용자가 분명히 <code>--data-dir X --debug</code> 를 줬는데 하위 파서의 기본값이 <code>./data</code> 와 <code>False</code> 로 되돌려 놓았고, <strong>경고 한 줄 없이</strong> 그렇게 됩니다. <code>--data-dir</code> 은 이 프로그램에서 "어느 폴더의 데이터를 읽고 쓸 것인가"이므로, 이 조용한 되돌림은 <strong>엉뚱한 폴더에 거래를 저장하는 결과</strong>로 이어집니다. <code>parser.py:66-69</code> 의 docstring 이 "여기에 <code>default=DEFAULT_DATA_DIR</code> 를 주면 하위 파서가 앞에서 읽어 둔 값을 기본값으로 되돌려 버린다"고 적은 것이 정확히 이 출력입니다.</p>
-<p><strong>없으면 어떻게 되나</strong> — 대안은 하위 파서에서 옵션을 아예 빼는 것인데, 그러면 <code>budget_app list --data-dir X</code>(옵션을 뒤에 쓰는, 더 자연스러운 순서)가 "unrecognized arguments" 로 거절됩니다. 두 순서를 모두 받으면서 값을 잃지 않는 방법이 SUPPRESS 입니다. <code>app.py:89</code> 의 <code>getattr(args, "debug", False)</code> 도 이 설계의 짝입니다 — 어느 파서도 값을 넣지 않았으면 <code>args.debug</code> 속성 자체가 없기 때문입니다.</p>
+<p><strong>없으면 어떻게 되나</strong> — 대안은 하위 파서에서 옵션을 아예 빼는 것인데, 그러면 <code>budget_app list --data-dir X</code>(옵션을 뒤에 쓰는, 더 자연스러운 순서)가 "unrecognized arguments" 로 거절됩니다. 두 순서를 모두 받으면서 값을 잃지 않는 방법이 SUPPRESS 입니다. <code>app.py:91</code> 의 <code>getattr(args, "debug", False)</code> 도 이 설계의 짝입니다 — 어느 파서도 값을 넣지 않았으면 <code>args.debug</code> 속성 자체가 없기 때문입니다.</p>
 <hr>
 <h3 id="set_defaults-namespace-에-값을-심는-두-번째-통로"><code>set_defaults</code> — namespace 에 값을 심는 두 번째 통로</h3>
 <p><strong>어디서 왔나</strong> — argparse 도입 때부터 있는 메서드입니다. "옵션이 아닌데 namespace 에 들어 있어야 하는 값"을 위한 자리입니다.</p>
@@ -4270,7 +4286,7 @@ plain     ['list', '--data-dir', 'Y']                -&gt; data_dir='Y' debug=Fa
     <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">"add"</span><span class="p">)</span>
 </code></pre></div>
 
-<p>budget_app/cli/parser.py:251-252</p>
+<p>budget_app/cli/parser.py:260-261</p>
 <div class="codehilite"><pre><span></span><code>    <span class="c1"># 백업은 기존 폴더를 읽기만 한다 — 없으면 만들지 말고 오류로 알려야 한다.</span>
     <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">"backup"</span><span class="p">,</span> <span class="n">needs_storage</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
@@ -4285,15 +4301,15 @@ plain     ['list', '--data-dir', 'Y']                -&gt; data_dir='Y' debug=Fa
     <span class="s2">"budget.set"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_budget_set</span><span class="p">,</span>
 </code></pre></div>
 
-<p>budget_app/cli/app.py:78-81</p>
+<p>budget_app/cli/app.py:80-83</p>
 <div class="codehilite"><pre><span></span><code>    <span class="n">ctx</span> <span class="o">=</span> <span class="n">AppContext</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">))</span>
     <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">needs_storage</span><span class="p">:</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">prepare</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">HANDLERS</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">handler</span><span class="p">](</span><span class="n">ctx</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
 </code></pre></div>
 
-<p>둘째는 <strong>최상위에서 켜고 말단에서 끄는 플래그</strong>입니다. <code>parser.py:91</code> 이 <code>needs_storage=True</code> 를 최상위 <code>_defaults</code> 에 넣고, <code>parser.py:252</code> 이 <code>backup</code> 서브파서에서만 <code>False</code> 로 덮습니다. 여기서는 SUPPRESS 와 반대 방향으로 <code>vars(subnamespace)</code> 복사를 <strong>이용합니다</strong> — 하위 파서의 <code>_defaults</code> 가 상위 값을 덮는 성질이 이 경우에는 정확히 원하는 동작입니다.</p>
-<p>셋째는 <code>parser.py:214</code> 의 <code>p.set_defaults(handler="export", include_id=True)</code> 로, <code>action="store_false"</code> 옵션의 기본값을 뒤에서 정하는 용법입니다(다음 항목).</p>
+<p>둘째는 <strong>최상위에서 켜고 말단에서 끄는 플래그</strong>입니다. <code>parser.py:91</code> 이 <code>needs_storage=True</code> 를 최상위 <code>_defaults</code> 에 넣고, <code>parser.py:261</code> 이 <code>backup</code> 서브파서에서만 <code>False</code> 로 덮습니다. 여기서는 SUPPRESS 와 반대 방향으로 <code>vars(subnamespace)</code> 복사를 <strong>이용합니다</strong> — 하위 파서의 <code>_defaults</code> 가 상위 값을 덮는 성질이 이 경우에는 정확히 원하는 동작입니다.</p>
+<p>셋째는 <code>parser.py:223</code> 의 <code>p.set_defaults(handler="export", include_id=True)</code> 로, <code>action="store_false"</code> 옵션의 기본값을 뒤에서 정하는 용법입니다(다음 항목).</p>
 <p><strong>없으면 어떻게 되나</strong> — <code>set_defaults</code> 가 없다면 "어떤 명령이 선택됐는가"를 <code>args.command</code> 와 <code>args.cat_cmd</code> 두 문자열을 조합해 판정해야 합니다. <code>parser.py:17-21</code> 의 docstring 이 회고하는 옛 구조(<code>if sub == "add" ... elif ...</code>)가 정확히 그 모습이고, 하위 명령이 늘 때마다 분기가 늘어납니다. 지금은 파서에 한 줄, <code>HANDLERS</code> 에 한 줄이면 끝이고 <code>main</code> 은 변하지 않습니다.</p>
 <hr>
 <h3 id="type-콜러블과-argumenttypeerror"><code>type=</code> 콜러블과 <code>ArgumentTypeError</code></h3>
@@ -4328,7 +4344,7 @@ plain     ['list', '--data-dir', 'Y']                -&gt; data_dir='Y' debug=Fa
     <span class="k">return</span> <span class="n">value</span>
 </code></pre></div>
 
-<p><code>ERR_ARG_NOT_INT</code> 와 <code>ERR_ARG_NOT_POSITIVE</code> 는 <code>cli/messages.py:68-69</code> 의 한국어 문장(<code>"정수여야 합니다: {value}"</code>, <code>"1 이상이어야 합니다: {value}"</code>)입니다. 실제 출력이 이렇습니다.</p>
+<p><code>ERR_ARG_NOT_INT</code> 와 <code>ERR_ARG_NOT_POSITIVE</code> 는 <code>cli/messages.py:98-99</code> 의 한국어 문장(<code>"정수여야 합니다: {value}"</code>, <code>"1 이상이어야 합니다: {value}"</code>)입니다. 실제 출력이 이렇습니다.</p>
 <div class="codehilite"><pre><span></span><code>$ python -m budget_app list --limit 0
 usage: budget_app list [-h] [--data-dir DATA_DIR] [--debug] [--limit LIMIT]
 budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
@@ -4348,7 +4364,7 @@ $ echo $?
 <li><strong><code>dest=</code></strong> — 옵션 문자열과 namespace 속성 이름을 분리합니다. 지정하지 않으면 <code>--no-id</code> → <code>no_id</code> 처럼 앞의 <code>--</code> 를 떼고 <code>-</code> 를 <code>_</code> 로 바꾼 이름이 됩니다.</li>
 </ul>
 <p><strong>이 소스에서</strong> — 셋이 한 자리에서 만나는 곳이 <code>--no-id</code> 입니다.</p>
-<p>budget_app/cli/parser.py:208-214</p>
+<p>budget_app/cli/parser.py:217-223</p>
 <div class="codehilite"><pre><span></span><code>    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
         <span class="s2">"--no-id"</span><span class="p">,</span>
         <span class="n">dest</span><span class="o">=</span><span class="s2">"include_id"</span><span class="p">,</span>
@@ -4358,14 +4374,14 @@ $ echo $?
     <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">"export"</span><span class="p">,</span> <span class="n">include_id</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
 
-<p>읽는 순서는 이렇습니다. 사용자가 보는 이름은 <strong>부정형</strong> <code>--no-id</code> 이고, 코드가 보는 이름은 <strong>긍정형</strong> <code>args.include_id</code> 입니다. <code>store_false</code> 가 그 뒤집기를 담당하고, <code>set_defaults(include_id=True)</code> 가 "주지 않았으면 포함"을 정합니다(<code>store_false</code> 의 기본 <code>default=True</code> 와 같은 값이지만, 명시해 두면 <code>parser.py:214</code> 한 줄만 읽어도 기본이 무엇인지 압니다).</p>
-<p>budget_app/cli/handlers.py:159-159</p>
+<p>읽는 순서는 이렇습니다. 사용자가 보는 이름은 <strong>부정형</strong> <code>--no-id</code> 이고, 코드가 보는 이름은 <strong>긍정형</strong> <code>args.include_id</code> 입니다. <code>store_false</code> 가 그 뒤집기를 담당하고, <code>set_defaults(include_id=True)</code> 가 "주지 않았으면 포함"을 정합니다(<code>store_false</code> 의 기본 <code>default=True</code> 와 같은 값이지만, 명시해 두면 <code>parser.py:223</code> 한 줄만 읽어도 기본이 무엇인지 압니다).</p>
+<p>budget_app/cli/handlers.py:174-174</p>
 <div class="codehilite"><pre><span></span><code>    <span class="n">count</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">io_service</span><span class="o">.</span><span class="n">export_csv</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">),</span> <span class="n">flt</span><span class="p">,</span> <span class="n">include_id</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">include_id</span><span class="p">)</span>
 </code></pre></div>
 
 <p>핸들러 코드에 <code>not args.no_id</code> 같은 <strong>이중 부정이 한 번도 나오지 않는 것</strong>이 이 조합의 목적입니다.</p>
-<p><code>choices</code> 는 세 곳입니다 — <code>parser.py:130</code> 과 <code>parser.py:186</code> 의 <code>choices=list(domain_config.VALID_TYPES)</code>, 그리고 <code>parser.py:229</code> 의 <code>choices=list(services_config.ON_DUPLICATE_CHOICES)</code>. 세 값 모두 <strong>다른 계층이 소유한 상수</strong>에서 옵니다(<code>domain/config.py:15</code>, <code>services/config.py:12</code>). CLI 는 허용 값 목록을 직접 적지 않고 빌려다 씁니다.</p>
-<p><code>store_true</code> 는 <code>--debug</code>(<code>parser.py:76</code>, <code>:85</code>)와 <code>--atomic</code>(<code>parser.py:222-225</code>)입니다.</p>
+<p><code>choices</code> 는 세 곳입니다 — <code>parser.py:130</code> 과 <code>parser.py:195</code> 의 <code>choices=list(domain_config.VALID_TYPES)</code>, 그리고 <code>parser.py:238</code> 의 <code>choices=list(services_config.ON_DUPLICATE_CHOICES)</code>. 세 값 모두 <strong>다른 계층이 소유한 상수</strong>에서 옵니다(<code>domain/config.py:15</code>, <code>services/config.py:12</code>). CLI 는 허용 값 목록을 직접 적지 않고 빌려다 씁니다.</p>
+<p><code>store_true</code> 는 <code>--debug</code>(<code>parser.py:76</code>, <code>:85</code>)와 <code>--atomic</code>(<code>parser.py:231-234</code>)입니다.</p>
 <p><strong>없으면 어떻게 되나</strong> — <code>choices</code> 를 빼면 <code>--type incom</code>(오타)이 파서를 통과해 도메인의 <code>parse_type</code> 까지 내려가서야 걸립니다. 종료 코드가 2(인자 오류) 대신 2(검증 오류)로 — 이 소스는 마침 둘 다 2 입니다만 — 오류를 발견하는 <strong>계층</strong>이 달라지고, 무엇보다 usage 에 선택지가 표시되지 않아 사용자가 무엇을 써야 하는지 알 수 없습니다.</p>
 <hr>
 <h3 id="argparse-의-systemexit2-오류-방패를-지나지-않는-경로">argparse 의 <code>SystemExit(2)</code> — 오류 방패를 지나지 않는 경로</h3>
@@ -4390,7 +4406,7 @@ False
 
 <p><code>2</code> 라는 숫자는 argparse 가 하드코딩한 관례입니다(유닉스에서 "사용법 오류"를 뜻하는 관행). <code>--help</code> 는 같은 <code>exit</code> 을 <code>status=0</code> 으로 부릅니다.</p>
 <p><strong>이 소스에서</strong> — <code>main</code> 의 구조를 다시 보면 argparse 오류가 어디로 빠져나가는지 보입니다.</p>
-<p>budget_app/cli/app.py:84-94</p>
+<p>budget_app/cli/app.py:86-96</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -4404,7 +4420,7 @@ False
         <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">EXIT_OK</span>
 </code></pre></div>
 
-<p><code>@handle_errors</code> 는 <code>_dispatch</code> 에 붙어 있는데(<code>app.py:61</code>), argparse 는 그 <strong>한 줄 위</strong>에서 <code>SystemExit</code> 을 던집니다. 그러므로 인자 오류는 <code>handle_errors</code> 를 <strong>지나지 않습니다.</strong> 설령 그 자리를 감싸더라도 <code>except Exception</code> 은 <code>SystemExit</code> 을 잡지 못합니다.</p>
+<p><code>@handle_errors</code> 는 <code>_dispatch</code> 에 붙어 있는데(<code>app.py:63</code>), argparse 는 그 <strong>한 줄 위</strong>에서 <code>SystemExit</code> 을 던집니다. 그러므로 인자 오류는 <code>handle_errors</code> 를 <strong>지나지 않습니다.</strong> 설령 그 자리를 감싸더라도 <code>except Exception</code> 은 <code>SystemExit</code> 을 잡지 못합니다.</p>
 <p>그래서 종료 코드 표를 정직하게 읽으면 두 출처가 섞여 있습니다.</p>
 <p>종료 코드 여덟 개는 <code>cli/config.py:21-29</code> 에 상수로 모여 있습니다(전문은 §1-A 의
 <code>sys.exit</code> 항목에 인용했습니다).</p>
@@ -4463,7 +4479,7 @@ WindowsPath data\a.jsonl
 
 <p><code>/</code> 는 연산자 오버로딩입니다 — <code>PurePath.__truediv__</code> 가 <code>self.with_segments(self, key)</code> 를 돌려주고, <code>__rtruediv__</code> 도 있어 <code>"base" / Path("x")</code> 도 됩니다. 결합은 <code>os.path.join</code> 과 같은 규칙(오른쪽이 절대 경로면 왼쪽을 버립니다)을 따릅니다.</p>
 <p><strong>이 소스에서</strong> — 경계에서 문자열을 받아 즉시 <code>Path</code> 로 바꾸고, 안쪽은 전부 <code>Path</code> 로 다닙니다.</p>
-<p>budget_app/cli/app.py:78-78</p>
+<p>budget_app/cli/app.py:80-80</p>
 <div class="codehilite"><pre><span></span><code>    <span class="n">ctx</span> <span class="o">=</span> <span class="n">AppContext</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">))</span>
 </code></pre></div>
 
@@ -5159,7 +5175,7 @@ RESULT line 3
 <p><strong>무엇이 문제인가</strong> — <code>except BrokenPipeError</code> 로 잡고 정상 종료하는 것만으로는 부족합니다. <strong>인터프리터가 종료하면서 <code>sys.stdout</code> 을 flush 하는데, 버퍼에 남은 바이트가 다시 같은 깨진 파이프로 나가면서 예외가 한 번 더 납니다.</strong> 그 시점에는 잡아 줄 코드가 없어 파이썬이 <code>Exception ignored in: &lt;_io.TextIOWrapper ...&gt;</code> 를 stderr 로 찍습니다(이 두 번째 단계는 유닉스에서 보고되는 증상이고, 로컬 Windows 재현에서는 첫 단계인 <code>print</code> 자체의 트레이스백까지만 관찰됐습니다 — 아래 실행 결과). <code>head</code> 로 앞 몇 줄만 본 사용자가 잘못한 것이 없는데 오류 메시지를 받게 됩니다.</p>
 <p>공식 해법은 <strong>stdout 의 fd 자체를 <code>/dev/null</code> 로 갈아 끼우는 것</strong>입니다(파이썬 <code>signal</code> 모듈 문서의 "Note on SIGPIPE" 레시피). <code>os.dup2(devnull, sys.stdout.fileno())</code> 는 커널의 fd 테이블에서 1번 항목이 devnull 을 가리키게 바꿉니다. 파이썬 객체는 그대로라 종료 시 flush 도 그대로 일어나지만, 그 바이트는 이제 깨진 파이프가 아니라 <strong>아무 데도 가지 않는 곳</strong>으로 갑니다.</p>
 <p><strong>이 소스에서</strong> —</p>
-<p>budget_app/cli/app.py:50-58</p>
+<p>budget_app/cli/app.py:52-60</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
 <span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다</span>
@@ -5172,7 +5188,7 @@ RESULT line 3
 </code></pre></div>
 
 <p>호출 지점은 <code>main</code> 의 최상위 한 곳입니다.</p>
-<p>budget_app/cli/app.py:91-94</p>
+<p>budget_app/cli/app.py:93-96</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">except</span> <span class="ne">BrokenPipeError</span><span class="p">:</span>
         <span class="c1"># 예: `budget_app list | head` — head 가 먼저 닫음. 오류가 아니므로 조용히 종료.</span>
         <span class="n">_silence_broken_pipe</span><span class="p">()</span>

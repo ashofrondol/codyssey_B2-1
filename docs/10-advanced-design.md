@@ -1044,12 +1044,12 @@ finally:
 | 7 | 대화형 EOF 무한 대기 | `InputAborted` | cli/prompts.py:28-37, 52-57 |
 | 8 | 잘못된 입력 무한 루프 | `for _ in range(MAX_INPUT_RETRIES)` | cli/prompts.py:66 |
 | 9 | 참조 무결성 (카테고리) | 사용 중 삭제 차단 + 재지정 | services/categories.py:38-89 |
-| 10 | 파이프 끊김 | `raise` → `_silence_broken_pipe` | cli/error_handler.py:57-60 + cli/app.py:50-58, 91-94 |
+| 10 | 파이프 끊김 | `raise` → `_silence_broken_pipe` | cli/error_handler.py:57-60 + cli/app.py:52-60, 91-94 |
 | 11 | Ctrl+C | `except KeyboardInterrupt` → 130 | cli/error_handler.py:61-63 (`EXIT_INTERRUPT`, cli/config.py:29) |
 | 12 | 스택트레이스 노출 | `except Exception` + `logger.error(..., exc_info=output.debug_enabled())` — 기본 실행에서는 붙지 않고 `--debug` 일 때만 | cli/error_handler.py:113-126 |
 | 13 | 인코딩 불일치 | 모든 `open` 에 `encoding` 명시 | 전역 (값은 storage/config.py:22, 39-40) |
 | 14 | CRLF 오염 | JSONL 은 `newline="\n"`, CSV 는 `newline=""` | storage/jsonl.py:66, 239 / storage/csv_io.py:89, 142 |
-| 15 | 음수 `--top` | `max(0, top_n)` | services/budgets.py:57 |
+| 15 | 음수 `--top` | `max(0, top_n)` | services/budgets.py:77 |
 | 16 | 환경변수 `=0` 오독 | `FALSY_ENV_VALUES` 집합 | cli/config.py:19 |
 | 17 | falsy 반환값 오독 | `EXIT_OK if result is None else result` | cli/error_handler.py:54 |
 | 18 | 백업 폴더 덮어쓰기 | `mkdir(exist_ok=False)` | storage/backup.py:30 |

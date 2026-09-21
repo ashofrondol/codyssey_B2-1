@@ -1252,7 +1252,7 @@ t3    A: fsync 후 os.replace(tmp, path)   ← B 가 쓰던 내용을 커밋할 
 <td>10</td>
 <td>파이프 끊김</td>
 <td><code>raise</code> → <code>_silence_broken_pipe</code></td>
-<td>cli/error_handler.py:57-60 + cli/app.py:50-58, 91-94</td>
+<td>cli/error_handler.py:57-60 + cli/app.py:52-60, 91-94</td>
 </tr>
 <tr>
 <td>11</td>
@@ -1282,7 +1282,7 @@ t3    A: fsync 후 os.replace(tmp, path)   ← B 가 쓰던 내용을 커밋할 
 <td>15</td>
 <td>음수 <code>--top</code></td>
 <td><code>max(0, top_n)</code></td>
-<td>services/budgets.py:57</td>
+<td>services/budgets.py:77</td>
 </tr>
 <tr>
 <td>16</td>

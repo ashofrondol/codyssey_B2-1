@@ -131,7 +131,7 @@
 │       ├── config.py              #    한도·종료 코드
 │       ├── messages.py            #    프롬프트·결과·오류 표시 (전체의 3분의 2)
 │       ├── app.py                 #    HANDLERS 레지스트리 + main
-│       ├── handlers.py            #    cmd_* 13개
+│       ├── handlers.py            #    cmd_* 15개
 │       ├── parser.py              #    argparse 문법
 │       ├── prompts.py             #    대화형 입력
 │       ├── presenter.py           #    도메인 → 문자열 (출력 안 함)
@@ -340,7 +340,7 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
 <p><code>sys.exit(main())</code> 은 <code>main()</code> 이 반환한 정수를 그대로 <strong>프로세스 종료 코드</strong>(프로그램이 끝나면서 바깥에 남기는 숫자 한 개 — §6)로 만듭니다. <code>main()</code> 은 <code>cli/app.py</code> 에 있습니다.</p>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>sys.exit()</code> 은 프로세스를 그 자리에서 끝내는 함수가 아니라 <strong><code>SystemExit</code> 예외를 던지는 함수</strong>입니다. 그 예외가 아무에게도 잡히지 않고 인터프리터 최상단까지 올라오면, 그때 인터프리터가 예외의 인자를 종료 코드로 삼아 프로세스를 끝냅니다. 그래서 <code>sys.exit(main())</code> 은 "<code>main()</code> 을 먼저 끝까지 실행해 정수를 받고 → 그 정수를 담은 <code>SystemExit</code> 을 던진다"는 두 단계입니다. 이 사실은 §6 에서 다시 중요해집니다 — <code>SystemExit</code> 은 <code>Exception</code> 이 아니라 <strong><code>BaseException</code> 의 직계 자식</strong>이라 <code>except Exception</code> 그물에 걸리지 않습니다. → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
-<p>budget_app/cli/app.py:84-94</p>
+<p>budget_app/cli/app.py:86-96</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -380,16 +380,18 @@ HANDLERS[args.handler]          문자열 키 → 핸들러 함수 (예: "list" 
 반환된 int                       프로세스 종료 코드가 됨 (0=성공, 그 외=오류)
 </code></pre></div>
 
-<p><code>AppContext</code> 조립과 <code>prepare()</code> 가 <code>main</code> 이 아니라 <code>_dispatch</code> 안에 있는 것이 핵심입니다. <code>@handle_errors</code>(오류를 사람이 읽을 문장과 종료 코드로 바꿔 주는 덧씌우개)는 <code>_dispatch</code> <strong>한 곳에만</strong> 붙어 있습니다(<code>cli/app.py:61</code>). 그래서 여기 밖에서 파일을 건드리면 그 예외는 방패를 통과하지 못하고 원시 트레이스백(파이썬이 토해 내는 여러 줄짜리 오류 더미)으로 새어 나갑니다.</p>
+<p><code>AppContext</code> 조립과 <code>prepare()</code> 가 <code>main</code> 이 아니라 <code>_dispatch</code> 안에 있는 것이 핵심입니다. <code>@handle_errors</code>(오류를 사람이 읽을 문장과 종료 코드로 바꿔 주는 덧씌우개)는 <code>_dispatch</code> <strong>한 곳에만</strong> 붙어 있습니다(<code>cli/app.py:63</code>). 그래서 여기 밖에서 파일을 건드리면 그 예외는 방패를 통과하지 못하고 원시 트레이스백(파이썬이 토해 내는 여러 줄짜리 오류 더미)으로 새어 나갑니다.</p>
 <h3 id="33-명령-핸들러-대응은-문자열-키로">3.3 명령 → 핸들러 대응은 문자열 키로</h3>
 <p><code>args.handler</code> 는 각 하위 명령 파서를 만들 때 <code>set_defaults(handler="list")</code> 처럼 심어둔 <strong>문자열</strong>입니다. 그 문자열을 함수로 바꾸는 표는 <code>cli/app.py</code> 에 있습니다.</p>
-<p>budget_app/cli/app.py:28-42</p>
+<p>budget_app/cli/app.py:28-44</p>
 <div class="codehilite"><pre><span></span><code><span class="n">HANDLERS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Handler</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"add"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_add</span><span class="p">,</span>
     <span class="s2">"list"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_list</span><span class="p">,</span>
     <span class="s2">"search"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_search</span><span class="p">,</span>
     <span class="s2">"summary"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_summary</span><span class="p">,</span>
     <span class="s2">"budget.set"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_budget_set</span><span class="p">,</span>
+    <span class="s2">"budget.get"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_budget_get</span><span class="p">,</span>
+    <span class="s2">"budget.list"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_budget_list</span><span class="p">,</span>
     <span class="s2">"category.add"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_category_add</span><span class="p">,</span>
     <span class="s2">"category.list"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_category_list</span><span class="p">,</span>
     <span class="s2">"category.remove"</span><span class="p">:</span> <span class="n">handlers</span><span class="o">.</span><span class="n">cmd_category_remove</span><span class="p">,</span>
@@ -462,14 +464,14 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
         <span class="bp">self</span><span class="o">.</span><span class="n">_cats</span><span class="o">.</span><span class="n">seed_defaults</span><span class="p">()</span>
 </code></pre></div>
 
-<p><strong>생성자와 <code>prepare()</code> 가 나뉜 이유</strong>를 눈여겨보세요. 객체를 만드는 것(<code>__init__</code>)과 환경을 준비하는 것(<code>prepare</code>)은 다른 일입니다. 저장소 생성자가 폴더를 만들고 파일을 건드리면, 객체를 만드는 것만으로 디스크가 바뀝니다. 그러면 오타 난 <code>--data-dir</code> 도 조용히 새 폴더를 만들고 기본 카테고리를 심어 버립니다. 지금은 <code>_dispatch()</code> 가 한 번만 <code>prepare()</code> 를 호출하고, <code>backup</code> 처럼 준비가 필요 없는 명령은 <code>needs_storage=False</code> 로 건너뜁니다(<code>cli/parser.py:248-252</code>. 기본값 <code>True</code> 는 최상위 파서 한 곳에 <code>set_defaults(needs_storage=True)</code> 로 있습니다 — <code>cli/parser.py:91</code>).</p>
+<p><strong>생성자와 <code>prepare()</code> 가 나뉜 이유</strong>를 눈여겨보세요. 객체를 만드는 것(<code>__init__</code>)과 환경을 준비하는 것(<code>prepare</code>)은 다른 일입니다. 저장소 생성자가 폴더를 만들고 파일을 건드리면, 객체를 만드는 것만으로 디스크가 바뀝니다. 그러면 오타 난 <code>--data-dir</code> 도 조용히 새 폴더를 만들고 기본 카테고리를 심어 버립니다. 지금은 <code>_dispatch()</code> 가 한 번만 <code>prepare()</code> 를 호출하고, <code>backup</code> 처럼 준비가 필요 없는 명령은 <code>needs_storage=False</code> 로 건너뜁니다(<code>cli/parser.py:257-261</code>. 기본값 <code>True</code> 는 최상위 파서 한 곳에 <code>set_defaults(needs_storage=True)</code> 로 있습니다 — <code>cli/parser.py:91</code>).</p>
 <blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — <code>__init__</code> 은 조리대에 도구를 늘어놓는 일이고, <code>prepare()</code> 는 가스를 켜고 재료를 꺼내 두는 일입니다. 도구를 늘어놓는 것만으로 가스가 켜진다면, 문을 열어 본 사람이 불을 붙인 셈이 됩니다. 둘을 나눠서 얻는 것은, 폴더를 만들고 파일을 건드리는 일이 <strong>객체를 만들 때마다</strong>가 아니라 명령당 딱 한 번, 그것도 오류를 받아 주는 방패 안에서만 일어난다는 점입니다.
 다만 이 비유는 "그러면 오타는 걸러지겠네"에서 깨집니다 — 오타 난 <code>--data-dir</code> 은 지금도 그 자리에 폴더를 만들고 기본 카테고리를 심은 뒤 아무 일 없다는 듯 끝납니다. 준비를 아예 건너뛰는 <code>backup</code> 만은 폴더를 만드는 대신 종료 코드 3 으로 "그런 폴더가 없다"고 알려 줍니다(§4.11).</p>
 </blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>prepare()</code> 가 마지막에 부르는 <code>_require_usable_data_dir</code> 는 <code>raise NotADirectoryError(errno.ENOTDIR, "not a directory", str(self.data_dir))</code> 로 예외를 직접 만듭니다(<code>context.py:79-80</code>). <code>NotADirectoryError</code> 같은 세분화된 예외들은 PEP 3151(파이썬 3.3)이 만든 <code>OSError</code> 하위 클래스 계층이고, 그전에는 전부 <code>OSError</code> 하나를 받아 <code>e.errno == errno.ENOTDIR</code> 로 직접 갈라야 했습니다. 인자 3개를 주는 형태는 OS 가 던지는 것과 <strong>같은 모양</strong>(errno, strerror, filename)이라 <code>exc.filename</code> 이 채워지고, 그 덕분에 <code>handle_errors</code> 가 <code>exc.filename or exc</code> 로 사용자에게 경로를 보여줄 수 있습니다(<code>cli/error_handler.py:88</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <hr>
 <h2 id="4-명령어-11종-상세">4. 명령어 11종 상세</h2>
-<p>이 프로그램은 11개 명령을 제공합니다: <code>add</code> / <code>list</code> / <code>search</code> / <code>summary</code> / <code>budget set</code> / <code>category add·list·remove</code> / <code>update</code> / <code>delete</code> / <code>import</code> / <code>export</code> / <code>backup</code>.</p>
+<p>이 프로그램은 11개 명령을 제공합니다: <code>add</code> / <code>list</code> / <code>search</code> / <code>summary</code> / <code>budget set·get·list</code> / <code>category add·list·remove</code> / <code>update</code> / <code>delete</code> / <code>import</code> / <code>export</code> / <code>backup</code>.</p>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — argparse 에서 "하위 명령"은 별도 기능이 아니라 <strong>위치 인자 하나</strong>입니다. <code>parser.add_subparsers()</code>(<code>cli/parser.py:92</code>)는 <code>_SubParsersAction</code> 이라는 액션을 등록하는데, 이 액션의 <code>choices</code> 가 <code>add_parser()</code> 로 붙인 이름들의 사전이고 값은 <strong>완전히 독립된 <code>ArgumentParser</code> 객체</strong>입니다. 상위 파서가 <code>list</code> 라는 단어를 만나면 그 액션을 실행하고, 액션은 사전에서 하위 파서를 꺼내 <strong>나머지 인자 전부</strong>를 넘깁니다. <code>budget set</code> 처럼 2단인 명령은 하위 파서가 다시 <code>add_subparsers()</code> 를 하는 재귀 구조일 뿐입니다(<code>cli/parser.py:150</code>). 그래서 <code>--help</code> 도, <code>--data-dir</code> 도 단계마다 따로 정의해야 합니다(§3.4). <code>required=True</code> 를 붙인 것도 의미가 있습니다. argparse 의 기본은 "하위 명령을 생략해도 통과"라서, 명시하지 않으면 <code>python -m budget_app</code> 만 쳤을 때 <code>args.handler</code> 가 아예 존재하지 않아 <code>AttributeError</code> 로 죽습니다. 명시해 두면 usage 를 보여 주고 종료 코드 2 로 끝납니다. → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <h3 id="41-add-거래-추가-대화형">4.1 add — 거래 추가 (대화형)</h3>
@@ -536,18 +538,27 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
 <div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>list<span class="w"> </span>--limit<span class="w"> </span><span class="m">3</span>
 </code></pre></div>
 
-<div class="codehilite"><pre><span></span><code>TX-000005 | 2024-01-22 | expense | food | 35000 | 회식
-TX-000004 | 2024-01-20 | expense | rent | 150000 | 공과금
-TX-000001 | 2024-01-15 | expense | food | 15000 | 점심
+<div class="codehilite"><pre><span></span><code>id        | date       | type    | category     |       amount | memo
+----------+------------+---------+--------------+--------------+-----
+TX-000005 | 2024-01-22 | expense | food         |        35000 | 회식
+TX-000004 | 2024-01-20 | expense | rent         |       150000 | 공과금
+TX-000001 | 2024-01-15 | expense | food         |        15000 | 점심
 </code></pre></div>
 
 <p>한 줄의 형식은 <code>cli/messages.py</code> 의 템플릿 하나로 정의되어 있습니다.</p>
-<p>budget_app/cli/messages.py:42-43</p>
+<p>budget_app/cli/messages.py:42-50</p>
 <div class="codehilite"><pre><span></span><code><span class="n">MSG_NO_DATA</span> <span class="o">=</span> <span class="s2">"(데이터 없음)"</span>
-<span class="n">FMT_TX_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">{id}</span><span class="s2"> | </span><span class="si">{date}</span><span class="s2"> | </span><span class="si">{type:&lt;7}</span><span class="s2"> | </span><span class="si">{category}</span><span class="s2"> | </span><span class="si">{amount}</span><span class="s2"> | </span><span class="si">{memo}</span><span class="s2">"</span>
+<span class="c1">#: 거래 표의 한 줄 — **열 폭을 정하는 유일한 자리**다.</span>
+<span class="c1">#:</span>
+<span class="c1">#: ``{id}`` 만 폭 지정이 없다. ``TransactionId`` 는 ``__format__`` 을 정의하지 않아</span>
+<span class="c1">#: ``{id:&lt;9}`` 가 TypeError 로 막히고, 값이 ``TX-`` + 6자리라 길이가 이미 고정이다.</span>
+<span class="c1">#: 나머지는 폭을 박아 둔다 — 없으면 ``| rent | 150000 |`` 과 ``| salary | 3000000 |``</span>
+<span class="c1">#: 의 파이프 위치가 어긋나 표가 표로 보이지 않는다. 금액만 우측 정렬(``&gt;``)인데,</span>
+<span class="c1">#: 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 하기 때문이다.</span>
+<span class="n">FMT_TX_LINE</span> <span class="o">=</span> <span class="s2">"</span><span class="si">{id}</span><span class="s2"> | </span><span class="si">{date:&lt;10}</span><span class="s2"> | </span><span class="si">{type:&lt;7}</span><span class="s2"> | </span><span class="si">{category:&lt;12}</span><span class="s2"> | </span><span class="si">{amount:&gt;12}</span><span class="s2"> | </span><span class="si">{memo}</span><span class="s2">"</span>
 </code></pre></div>
 
-<p><code>{type:&lt;7}</code> 은 타입 컬럼을 7칸 왼쪽 정렬한다는 뜻입니다. <code>expense</code> 는 정확히 7글자라 그대로 나오고, <code>income</code> 은 6글자라 뒤에 공백 1칸이 붙어 세로줄이 맞습니다. 거래가 없으면 <code>(데이터 없음)</code> 을 출력합니다.</p>
+<p><code>{type:&lt;7}</code> 은 타입 컬럼을 7칸 왼쪽 정렬한다는 뜻입니다. <code>expense</code> 는 정확히 7글자라 그대로 나오고, <code>income</code> 은 6글자라 뒤에 공백 1칸이 붙어 세로줄이 맞습니다. 날짜·카테고리·금액에도 같은 방식으로 폭이 지정돼 있고(금액만 <code>&gt;</code> 로 <strong>우측 정렬</strong> — 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 합니다), <code>{id}</code> 만 폭이 없습니다. <code>TransactionId</code> 가 <code>__format__</code> 을 정의하지 않아 <code>{id:&lt;9}</code> 가 <code>TypeError</code> 로 막히고, 값이 <code>TX-</code> + 6자리라 길이가 이미 고정이기 때문입니다. 머리글과 구분선은 <strong>이 템플릿 하나에서</strong> 만들어집니다 — 머리글은 같은 템플릿에 열 이름을 넣어 찍고, 구분선은 그 머리글을 글자 단위로 훑어 만들므로 셋의 폭이 갈라질 수 없습니다(<code>cli/presenter.py</code> 의 <code>_header_line</code> / <code>_rule_line</code>). 거래가 없으면 머리글 없이 <code>(데이터 없음)</code> 한 줄만 출력합니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 콜론 뒤의 <code>&lt;7</code> 은 PEP 3101 이 정의한 <strong>형식 명세 미니 언어</strong>(format spec mini-language)입니다. <code>[[fill]align][sign][#][0][width]...</code> 문법에서 <code>&lt;</code> 가 왼쪽 정렬, <code>7</code> 이 최소 폭입니다. 같은 미니 언어를 f-string(PEP 498, 3.6)도 그대로 씁니다 — <code>f"{x:&lt;7}"</code> 과 <code>"{:&lt;7}".format(x)</code> 는 같은 코드 경로를 탑니다. 이 프로젝트가 f-string 대신 <code>.format()</code> 을 쓰는 이유는 <strong>템플릿을 <code>messages.py</code> 에 미리 정의해 두고 나중에 값을 채우기 위해서</strong>입니다. f-string 은 정의되는 자리에서 값이 필요하므로 이 용도로는 쓸 수 없습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>"...{type:&lt;7}...".format(**kwargs)</code> 는 먼저 템플릿을 (리터럴 조각, 필드 이름, 형식 명세) 튜플들로 쪼갭니다. 위 템플릿이라면 <code>('', 'id', '', None)</code>, <code>(' | ', 'type', '&lt;7', None)</code>, … 식입니다. 그다음 각 필드에 대해 내장 함수 <code>format(값, "&lt;7")</code> 을 부릅니다. <code>format()</code> 은 다시 그 값의 <code>__format__</code> 특수 메서드에 명세 문자열을 넘깁니다. 즉 정렬을 실제로 수행하는 것은 <code>str.__format__</code> 이고, 만약 값이 문자열이 아닌 다른 타입이면 <strong>그 타입이 정의한 <code>__format__</code></strong> 이 대신 불립니다(예: <code>datetime.__format__</code> 은 명세를 <code>strftime</code> 패턴으로 해석합니다). → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
@@ -633,7 +644,7 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
 3) transport 20000원
 </code></pre></div>
 
-<p>지출이 예산을 초과하면 <code>[경고] 예산을 초과했습니다!</code> 가 추가로 출력됩니다(<code>cli/messages.py:58</code> 의 <code>MSG_OVER_BUDGET</code>). 해당 월에 거래도 없고 예산도 없으면 <code>2024-01: 데이터 없음</code> 형식으로 한 줄만 출력합니다.</p>
+<p>지출이 예산을 초과하면 <code>[경고] 예산을 초과했습니다!</code> 가 추가로 출력됩니다(<code>cli/messages.py:79</code> 의 <code>MSG_OVER_BUDGET</code>). 해당 월에 거래도 없고 예산도 없으면 <code>2024-01: 데이터 없음</code> 형식으로 한 줄만 출력합니다.</p>
 <h3 id="45-budget-set-월-예산-설정">4.5 budget set — 월 예산 설정</h3>
 <p>한 달 예산을 설정합니다. 같은 월에 다시 설정하면 덮어씁니다(<code>BudgetStore.set</code> 이 같은 달의 기존 항목을 지우고 새 값을 끝에 붙입니다 — <code>storage/repositories.py:300-308</code>).</p>
 <div class="table-wrap"><table>
@@ -659,6 +670,19 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
 
 <div class="codehilite"><pre><span></span><code>[저장 완료] 2024-01 예산 500000원
 </code></pre></div>
+<p>저장한 예산을 다시 보는 길이 둘 있습니다. <code>budget get --month YYYY-MM</code> 은 한 달만, <code>budget list</code> 는 설정된 모든 달을 월 오름차순으로 보여 줍니다. 설정된 적 없는 달은 <strong>오류가 아니라 답</strong>이므로 종료 코드는 0 입니다 — <code>summary</code> 가 빈 달에 <code>데이터 없음</code> 을 내면서 0 으로 끝나는 것과 같은 규칙입니다.</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>budget<span class="w"> </span>get<span class="w"> </span>--month<span class="w"> </span><span class="m">2024</span>-01
+python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>budget<span class="w"> </span>list
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>2024-01 예산 500000원
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>month   |       amount
+--------+-------------
+2023-12 |       250000
+2024-01 |       500000
+2024-02 |       300000
+</code></pre></div>
+<p>같은 달이 파일에 두 줄 남아 있어도(손으로 고친 경우) 두 명령은 <strong>같은 답</strong>을 냅니다. <code>BudgetStore.get</code> 이 "마지막 줄을 유효값으로 본다"고 정해 두었고 <code>BudgetService.list_budgets</code> 가 그 규칙을 그대로 따르기 때문입니다.</p>
 
 <h3 id="46-category-add-list-remove-카테고리-관리">4.6 category add / list / remove — 카테고리 관리</h3>
 <p>거래에 쓸 카테고리를 관리합니다. 하위 명령 3개가 <strong>각각 별도의 핸들러</strong>를 가집니다(<code>cmd_category_add</code> / <code>cmd_category_list</code> / <code>cmd_category_remove</code>).</p>
@@ -752,7 +776,7 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
 </code></pre></div>
 
 <div class="codehilite"><pre><span></span><code>[수정 완료] id=TX-000005
-TX-000005 | 2024-01-22 | expense | food | 35000 | 회식
+TX-000005 | 2024-01-22 | expense | food         |        35000 | 회식
 </code></pre></div>
 
 <p>수정 후 갱신된 행을 한 줄 다시 보여줍니다. 변경 필드를 하나도 지정하지 않으면 <code>[오류] 수정할 필드가 없습니다.</code> 와 힌트가 출력됩니다(종료 코드 4). 존재하지 않는 id 면 <code>[오류] 해당 id 의 거래를 찾을 수 없습니다: ...</code> 입니다.</p>
@@ -935,7 +959,7 @@ TX-000005 | 2024-01-22 | expense | food | 35000 | 회식
 </tbody>
 </table></div>
 <p>기간 필수 규칙은 핸들러 코드에서 직접 확인할 수 있습니다.</p>
-<p>budget_app/cli/handlers.py:164-177</p>
+<p>budget_app/cli/handlers.py:179-192</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_export_filter</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SearchFilter</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""기간 조건은 필수 — ``--month`` 또는 ``--from``/``--to`` **중 하나**.</span>
 
@@ -1266,7 +1290,7 @@ $ python -m budget_app backup --data-dir ./없는폴더 ; echo $?   # FileNotFou
 <ul>
 <li>budget_app 은 <strong>표준 라이브러리만으로 만든 파일 기반 가계부 콘솔 앱</strong>이며, 과제 명세에 따라 생성된 코드를 학습·설명하는 것이 이 문서 시리즈의 목적입니다.</li>
 <li>실행은 <code>python -m budget_app</code> 으로 하며, <code>runpy</code> 가 패키지를 import 한 뒤 <code>__main__.py</code> → <code>cli/app.py</code> 의 <code>main()</code> → <code>_dispatch()</code>(오류 방패) → <code>AppContext</code> 조립 → <code>HANDLERS[args.handler]</code> → 종료 코드 반환의 흐름입니다. <code>sys.exit()</code> 은 그 정수를 담은 <code>SystemExit</code> 예외를 던지는 함수입니다.</li>
-<li>명령은 11종: <code>add</code>(대화형), <code>list</code>, <code>search</code>, <code>summary</code>, <code>budget set</code>, <code>category add/list/remove</code>, <code>update</code>(옵션 방식 고정), <code>delete</code>, <code>import</code>(<code>--atomic</code>·<code>--on-duplicate</code>·<code>--auto-category</code>), <code>export</code>(기간 필수, <code>--no-id</code>), <code>backup</code>.</li>
+<li>명령은 11종: <code>add</code>(대화형), <code>list</code>, <code>search</code>, <code>summary</code>, <code>budget set/get/list</code>, <code>category add/list/remove</code>, <code>update</code>(옵션 방식 고정), <code>delete</code>, <code>import</code>(<code>--atomic</code>·<code>--on-duplicate</code>·<code>--auto-category</code>), <code>export</code>(기간 필수, <code>--no-id</code>), <code>backup</code>.</li>
 <li>데이터는 JSONL 파일 3종에 저장되고, 거래를 처음 추가하면 발급 번호를 기억하는 <code>id_counter</code> 파일이 같은 폴더에 하나 더 생깁니다. 카테고리 파일이 비어 있으면 기본 5종이 자동 시드됩니다.</li>
 <li>CSV 교환 스키마는 <code>id</code> 를 <strong>선택 컬럼</strong>으로 포함합니다. 내보내기는 기본 포함, 가져오기는 있으면 복원·없으면 발급이라 왕복해도 중복이 생기지 않습니다.</li>
 <li>종료 코드 8종은 <code>cli/config.py</code> 의 <code>EXIT_*</code> 상수로 정의되고 <code>@handle_errors</code> 가 매핑합니다. 다만 argparse 가 거절한 인자의 2번은 <code>SystemExit</code>(= <code>BaseException</code>) 이라 그 방패를 <strong>지나지 않습니다</strong>.</li>

@@ -177,3 +177,104 @@ def test_id_scan_sees_ids_on_corrupt_lines(txs, run, add_tx):
     ids = [tx.id.value for tx in txs.stream()]
     assert "TX-000005" not in ids or len(set(ids)) == len(ids)
     assert txs.path.read_text(encoding="utf-8").count("TX-000005") == 1
+
+
+# ============================================================
+# 보너스 B3 — 출력 포맷 테이블 정렬
+#
+# "열이 맞는다"는 눈으로만 확인하던 성질이었다. 눈은 회귀를 잡지 못하므로,
+# 구분자(`|`/`+`)의 **문자 위치**라는 기계가 셀 수 있는 형태로 옮겨 둔다.
+# 폭 지정을 하나라도 빼면 이 테스트가 먼저 빨개진다.
+# ============================================================
+
+
+def _separator_columns(line: str) -> list[int]:
+    return [i for i, ch in enumerate(line) if ch in "|+"]
+
+
+def test_tx_table_columns_line_up_across_header_rule_and_rows(run, add_tx):
+    """길이가 제각각인 값을 넣어도 모든 줄의 열 경계가 같은 자리에 온다."""
+    add_tx(date="2024-01-20", category="rent", amount=150000, memo="월세")
+    add_tx(date="2024-01-14", category="salary", type_="income", amount=3000000)
+    add_tx(date="2024-01-12", category="transport", amount=20000, memo="택시")
+
+    lines = run("list").out.splitlines()
+    assert len(lines) == 5, lines  # 머리글 + 구분선 + 3행
+
+    expected = _separator_columns(lines[0])
+    assert expected, "머리글에 열 구분자가 없다"
+    for line in lines[1:]:
+        assert _separator_columns(line) == expected, f"열이 어긋난다: {line!r}"
+
+
+def test_tx_table_starts_with_header_and_rule(run, add_tx):
+    add_tx()
+    lines = run("list").out.splitlines()
+    assert lines[0].split("|")[0].strip() == "id"
+    assert set(lines[1]) <= {"-", "+"}, lines[1]
+
+
+def test_empty_tx_table_has_no_header(run):
+    """결과가 없을 때 머리글만 남으면 '(데이터 없음)' 과 모순된 화면이 된다."""
+    assert run("list").out.splitlines() == ["(데이터 없음)"]
+
+
+def test_search_table_is_aligned_too(run, add_tx):
+    add_tx(date="2024-01-14", category="salary", type_="income", amount=3000000)
+    add_tx(date="2024-01-12", category="transport", amount=20000)
+
+    lines = run("search", "--from", "2024-01-01", "--to", "2024-01-31").out.splitlines()
+    expected = _separator_columns(lines[0])
+    for line in lines[1:]:
+        assert _separator_columns(line) == expected, f"열이 어긋난다: {line!r}"
+
+
+# ============================================================
+# budget 조회 전용 하위 명령
+# ============================================================
+
+
+def test_budget_get_reports_the_saved_amount(run):
+    run("budget", "set", "--month", "2024-01", "--amount", "500000")
+    result = run("budget", "get", "--month", "2024-01")
+    assert result.code == 0
+    assert "2024-01 예산 500000원" in result.out
+
+
+def test_budget_get_on_unset_month_is_an_answer_not_a_failure(run):
+    """``summary`` 의 빈 달과 같은 규칙 — 없다는 것도 조회의 답이므로 rc 는 0 이다."""
+    result = run("budget", "get", "--month", "2030-05")
+    assert result.code == 0
+    assert "2030-05: 예산 없음" in result.out
+
+
+def test_budget_get_normalizes_the_month_it_echoes(run):
+    """``2024-3`` 으로 물어도 저장된 표기(``2024-03``)로 답해야 한다."""
+    result = run("budget", "get", "--month", "2024-3")
+    assert result.code == 0
+    assert "2024-03" in result.out
+
+
+def test_budget_list_shows_every_month_in_order(run):
+    run("budget", "set", "--month", "2024-02", "--amount", "300000")
+    run("budget", "set", "--month", "2023-12", "--amount", "250000")
+
+    lines = run("budget", "list").out.splitlines()
+    assert _separator_columns(lines[1]) == _separator_columns(lines[0])
+    assert [line.split("|")[0].strip() for line in lines[2:]] == ["2023-12", "2024-02"]
+
+
+def test_budget_list_without_any_budget_says_so(run):
+    assert "(설정된 예산 없음)" in run("budget", "list").out
+
+
+def test_budget_list_and_get_agree_on_a_duplicated_month(budgets, run):
+    """손으로 고친 파일에 같은 달이 두 줄 남아 있어도 두 명령이 같은 답을 내야 한다."""
+    from budget_app.domain.entities import Budget
+
+    budgets.append(Budget(month="2024-01", amount=100000))
+    budgets.append(Budget(month="2024-01", amount=700000))
+
+    assert "700000" in run("budget", "get", "--month", "2024-01").out
+    rows = [line for line in run("budget", "list").out.splitlines() if "2024-01" in line]
+    assert len(rows) == 1 and "700000" in rows[0]

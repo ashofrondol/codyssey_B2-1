@@ -84,8 +84,8 @@ def add(self, date, type_, category, amount, memo="", tags=None):
 | 데코레이터 | 정의 위치 | 붙는 곳 | 목적 |
 | --- | --- | --- | --- |
 | `@log_call` | decorators.py:37-47 | `TransactionService.add`(transactions.py:34) / `update`(52) / `delete`(72) | 호출/반환 DEBUG 로그 |
-| `@measure_time` | decorators.py:50-66 | `BudgetService.monthly_summary`(budgets.py:30) | 실행 시간 DEBUG 로그 |
-| `@handle_errors` | **cli/error_handler.py:20-128** | **`cli/app.py:61` 의 `_dispatch` 단 한 곳** | 예외 → 메시지 + 종료 코드 |
+| `@measure_time` | decorators.py:50-66 | `BudgetService.monthly_summary`(budgets.py:50) | 실행 시간 DEBUG 로그 |
+| `@handle_errors` | **cli/error_handler.py:20-128** | **`cli/app.py:63` 의 `_dispatch` 단 한 곳** | 예외 → 메시지 + 종료 코드 |
 
 적용 현황을 소스에서 확인하려면:
 
@@ -93,7 +93,7 @@ def add(self, date, type_, category, amount, memo="", tags=None):
 grep -rn "@log_call\|@measure_time\|@handle_errors" budget_app/
 ```
 
-**`@handle_errors` 가 한 곳뿐인 것이 중요합니다.** 이전에는 CLI 핸들러 13개에 각각 붙어 있었지만, 지금은 `_dispatch` 하나에만 붙습니다. 이유는 §5 와 `cli/app.py:63-77` 의 docstring 에 있습니다 — 컨텍스트 조립(`AppContext(...)`, `prepare()`)이 데코레이터 **밖**에 있으면 `--data-dir` 오타 하나로 원시 트레이스백이 새어 나갔기 때문입니다. 방패는 파일을 여는 코드까지 감싸야 방패입니다.
+**`@handle_errors` 가 한 곳뿐인 것이 중요합니다.** 이전에는 CLI 핸들러 13개에 각각 붙어 있었지만, 지금은 `_dispatch` 하나에만 붙습니다. 이유는 §5 와 `cli/app.py:65-79` 의 docstring 에 있습니다 — 컨텍스트 조립(`AppContext(...)`, `prepare()`)이 데코레이터 **밖**에 있으면 `--data-dir` 오타 하나로 원시 트레이스백이 새어 나갔기 때문입니다. 방패는 파일을 여는 코드까지 감싸야 방패입니다.
 
 > **🔎 문법의 출처** — `@데코레이터` 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다.
 > `@handle_errors` 뒤에 `def _dispatch(...)` 를 쓰면 파이썬은 함수를 정의한 뒤
@@ -329,7 +329,7 @@ namespace(implementation='GetSystemTimePreciseAsFileTime()', monotonic=False, ad
 
 사용처는 요약 계산 하나입니다.
 
-budget_app/services/budgets.py:30-31
+budget_app/services/budgets.py:50-51
 
 ```python
     @measure_time
@@ -501,7 +501,7 @@ RuntimeError: No active exception to reraise
 
 왜 여기서 처리하지 않는가 — `list | head`(가운데 `|` 는 앞 명령의 출력을 뒤 명령의 입력으로 잇는 파이프입니다)에서 `head` 가 먼저 닫히면 stdout 이 깨진 상태입니다. 이 상황에서 `output.err(...)` 를 부르면 `err()` 안의 `sys.stdout.flush()` 가 또 `BrokenPipeError` 를 냅니다(그래서 `output.err` 도 그 예외를 삼키도록 되어 있습니다 — cli/output.py:60-65). 근본 해결은 **stdout 을 통째로 블랙홀로 갈아끼우는 것**이고, 그 일은 `main()` 이 합니다.
 
-budget_app/cli/app.py:50-58
+budget_app/cli/app.py:52-60
 
 ```python
 def _silence_broken_pipe() -> None:
@@ -609,7 +609,7 @@ budget_app/cli/error_handler.py:76-76
 
 **`UnicodeDecodeError` 는 왜 여기 있나.** 이것은 `ValueError` 의 자손이지만, "사용자가 값을 고치면 되는 문제"가 아니라 **파일 자체의 상태 문제**입니다. 그래서 부류 3 에 넣고 전용 종료 코드(6)를 줍니다. 힌트도 구체적입니다.
 
-budget_app/cli/messages.py:116-117
+budget_app/cli/messages.py:146-147
 
 ```python
 MSG_ERR_ENCODING = "[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다)."
@@ -636,7 +636,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc7 in position 0: invalid 
 
 **`UnicodeEncodeError` 는 그 짝입니다.** 읽기(decode)가 아니라 **쓰기(encode)** 가 실패한 경우로, UTF-8 로 표현할 수 없는 문자가 데이터에 남아 있으면 `export` 나 백업이 여기로 옵니다. 같은 부류·같은 종료 코드(6)를 쓰되 문구만 쓰기 쪽으로 바꿉니다 — 분류해 두지 않으면 부류 4 로 떨어져 "예기치 못한 오류"가 됩니다.
 
-budget_app/cli/messages.py:118-121
+budget_app/cli/messages.py:148-151
 
 ```python
 MSG_ERR_ENCODING_WRITE = "[오류] UTF-8 로 저장할 수 없는 문자가 있습니다 (손상된 바이트가 섞였습니다)."
@@ -712,7 +712,7 @@ KeyError: 'nope'
 
 **정책이 부류마다 같다**는 것이 요점입니다. 어느 부류든 사용자 화면에는 원인 한 줄과 힌트만 나가고 트레이스백이 없습니다(요구사항 Q2). 마지막 부류만 "프로그램이 예상하지 못한 상태"라 `[ERROR] unhandled error` 기록 한 줄이 더 붙을 뿐이고, 스택은 힌트가 안내하는 대로 `--debug` 를 켰을 때 비로소 나옵니다 — 그때 `%(asctime)s %(name)s:%(lineno)d` 까지 붙은 상세 포맷(`LOG_FORMAT_DEBUG`)으로 바뀌고 다른 DEBUG 로그도 함께 보입니다.
 
-**그리고 `setup_logging` 이 "디버그인가"를 확정하는 유일한 지점입니다.** `cli/app.py:87-88` 의 주석이 그 의존을 명시합니다 — `main()` 이 `output.setup_logging()` 을 부르지 않으면 로거에 핸들러가 붙지 않고, `output.debug_enabled()` 도 계속 `False` 라 `--debug` 로 요청한 스택트레이스가 어디에도 남지 않습니다.
+**그리고 `setup_logging` 이 "디버그인가"를 확정하는 유일한 지점입니다.** `cli/app.py:89-90` 의 주석이 그 의존을 명시합니다 — `main()` 이 `output.setup_logging()` 을 부르지 않으면 로거에 핸들러가 붙지 않고, `output.debug_enabled()` 도 계속 `False` 라 `--debug` 로 요청한 스택트레이스가 어디에도 남지 않습니다.
 
 > **⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나** — `logging.getLogger("budget_app")` 로
 > 만든 로거는 처리를 부모(루트)에게 전파하는데, 루트에도 핸들러가 없으면
@@ -830,7 +830,7 @@ print("검증 완료")
        │
        ▼  (예외가 콜스택을 거슬러 올라감)
 5) @handle_errors 의 wrapper 가 except AppError 로 포착         [cli/error_handler.py:70]
-       │  (핸들러가 아니라 app.py:61 의 _dispatch 를 감싼 wrapper 다)
+       │  (핸들러가 아니라 app.py:63 의 _dispatch 를 감싼 wrapper 다)
        │
        ├─▶ output.err("[오류] 해당 id 의 거래를 찾을 수 없습니다: TX-999999")
        ├─▶ output.err("[힌트] `list` 로 id 를 확인하세요.")

@@ -127,13 +127,13 @@
 <tr>
 <td><code>@measure_time</code></td>
 <td>decorators.py:50-66</td>
-<td><code>BudgetService.monthly_summary</code>(budgets.py:30)</td>
+<td><code>BudgetService.monthly_summary</code>(budgets.py:50)</td>
 <td>실행 시간 DEBUG 로그</td>
 </tr>
 <tr>
 <td><code>@handle_errors</code></td>
 <td><strong>cli/error_handler.py:20-128</strong></td>
-<td><strong><code>cli/app.py:61</code> 의 <code>_dispatch</code> 단 한 곳</strong></td>
+<td><strong><code>cli/app.py:63</code> 의 <code>_dispatch</code> 단 한 곳</strong></td>
 <td>예외 → 메시지 + 종료 코드</td>
 </tr>
 </tbody>
@@ -142,7 +142,7 @@
 <div class="codehilite"><pre><span></span><code>grep<span class="w"> </span>-rn<span class="w"> </span><span class="s2">"@log_call\|@measure_time\|@handle_errors"</span><span class="w"> </span>budget_app/
 </code></pre></div>
 
-<p><strong><code>@handle_errors</code> 가 한 곳뿐인 것이 중요합니다.</strong> 이전에는 CLI 핸들러 13개에 각각 붙어 있었지만, 지금은 <code>_dispatch</code> 하나에만 붙습니다. 이유는 §5 와 <code>cli/app.py:63-77</code> 의 docstring 에 있습니다 — 컨텍스트 조립(<code>AppContext(...)</code>, <code>prepare()</code>)이 데코레이터 <strong>밖</strong>에 있으면 <code>--data-dir</code> 오타 하나로 원시 트레이스백이 새어 나갔기 때문입니다. 방패는 파일을 여는 코드까지 감싸야 방패입니다.</p>
+<p><strong><code>@handle_errors</code> 가 한 곳뿐인 것이 중요합니다.</strong> 이전에는 CLI 핸들러 13개에 각각 붙어 있었지만, 지금은 <code>_dispatch</code> 하나에만 붙습니다. 이유는 §5 와 <code>cli/app.py:65-79</code> 의 docstring 에 있습니다 — 컨텍스트 조립(<code>AppContext(...)</code>, <code>prepare()</code>)이 데코레이터 <strong>밖</strong>에 있으면 <code>--data-dir</code> 오타 하나로 원시 트레이스백이 새어 나갔기 때문입니다. 방패는 파일을 여는 코드까지 감싸야 방패입니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@데코레이터</code> 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다.
 <code>@handle_errors</code> 뒤에 <code>def _dispatch(...)</code> 를 쓰면 파이썬은 함수를 정의한 뒤
 <code>_dispatch = handle_errors(_dispatch)</code> 를 실행합니다. 즉 데코레이터는 <strong>문법 설탕</strong>(없어도
@@ -356,7 +356,7 @@ services.py ──@log_call 쓰려고 import──▶ decorators.py ──import
 
 <p><code>monotonic=True</code>/<code>adjustable=False</code> 가 곧 "뒤로 가지 않고 관리자가 바꿀 수도 없다"는 보장입니다. 리눅스에서는 <code>implementation</code> 이 <code>clock_gettime(CLOCK_MONOTONIC)</code> 으로 바뀌지만 두 플래그의 값은 같습니다.</p>
 <p>사용처는 요약 계산 하나입니다.</p>
-<p>budget_app/services/budgets.py:30-31</p>
+<p>budget_app/services/budgets.py:50-51</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@measure_time</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">monthly_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">top_n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_TOP_N</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonthlySummary</span><span class="p">:</span>
 </code></pre></div>
@@ -515,7 +515,7 @@ to re-raise</code> 가 납니다. → <a href="12-syntax-and-stdlib.html">12 §1
 </code></pre></div>
 
 <p>왜 여기서 처리하지 않는가 — <code>list | head</code>(가운데 <code>|</code> 는 앞 명령의 출력을 뒤 명령의 입력으로 잇는 파이프입니다)에서 <code>head</code> 가 먼저 닫히면 stdout 이 깨진 상태입니다. 이 상황에서 <code>output.err(...)</code> 를 부르면 <code>err()</code> 안의 <code>sys.stdout.flush()</code> 가 또 <code>BrokenPipeError</code> 를 냅니다(그래서 <code>output.err</code> 도 그 예외를 삼키도록 되어 있습니다 — cli/output.py:60-65). 근본 해결은 <strong>stdout 을 통째로 블랙홀로 갈아끼우는 것</strong>이고, 그 일은 <code>main()</code> 이 합니다.</p>
-<p>budget_app/cli/app.py:50-58</p>
+<p>budget_app/cli/app.py:52-60</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
 <span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다</span>
@@ -607,7 +607,7 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong><code>UnicodeDecodeError</code> 는 왜 여기 있나.</strong> 이것은 <code>ValueError</code> 의 자손이지만, "사용자가 값을 고치면 되는 문제"가 아니라 <strong>파일 자체의 상태 문제</strong>입니다. 그래서 부류 3 에 넣고 전용 종료 코드(6)를 줍니다. 힌트도 구체적입니다.</p>
-<p>budget_app/cli/messages.py:116-117</p>
+<p>budget_app/cli/messages.py:146-147</p>
 <div class="codehilite"><pre><span></span><code><span class="n">MSG_ERR_ENCODING</span> <span class="o">=</span> <span class="s2">"[오류] 파일 인코딩을 읽을 수 없습니다 (UTF-8 이 아닙니다)."</span>
 <span class="n">HINT_ENCODING</span> <span class="o">=</span> <span class="s2">"[힌트] CSV 를 UTF-8 로 다시 저장하세요 (엑셀: '다른 이름으로 저장 &gt; CSV UTF-8')."</span>
 </code></pre></div>
@@ -628,7 +628,7 @@ errno 상수를 한 번도 언급하지 않고도 원인별로 다른 힌트를 
 
 <p><code>exc.encoding</code>(<code>'utf-8'</code>) / <code>exc.object</code>(문제의 바이트열) / <code>exc.start</code>·<code>exc.end</code>(위치) / <code>exc.reason</code>(사유)이 전부 채워져 있습니다. 이 코드가 그 값들을 화면에 노출하지 않는 이유는 <strong>사용자가 할 일이 "UTF-8 로 다시 저장"뿐</strong>이기 때문입니다 — 바이트 오프셋을 알려 줘도 행동이 달라지지 않습니다.</p>
 <p><strong><code>UnicodeEncodeError</code> 는 그 짝입니다.</strong> 읽기(decode)가 아니라 <strong>쓰기(encode)</strong> 가 실패한 경우로, UTF-8 로 표현할 수 없는 문자가 데이터에 남아 있으면 <code>export</code> 나 백업이 여기로 옵니다. 같은 부류·같은 종료 코드(6)를 쓰되 문구만 쓰기 쪽으로 바꿉니다 — 분류해 두지 않으면 부류 4 로 떨어져 "예기치 못한 오류"가 됩니다.</p>
-<p>budget_app/cli/messages.py:118-121</p>
+<p>budget_app/cli/messages.py:148-151</p>
 <div class="codehilite"><pre><span></span><code><span class="n">MSG_ERR_ENCODING_WRITE</span> <span class="o">=</span> <span class="s2">"[오류] UTF-8 로 저장할 수 없는 문자가 있습니다 (손상된 바이트가 섞였습니다)."</span>
 <span class="n">HINT_ENCODING_WRITE</span> <span class="o">=</span> <span class="p">(</span>
     <span class="s2">"[힌트] 해당 값을 UTF-8 로 다시 입력해 주세요 (터미널·입력 파일 인코딩을 UTF-8 로 맞추세요)."</span>
@@ -689,7 +689,7 @@ KeyError: 'nope'
 </code></pre></div>
 
 <p><strong>정책이 부류마다 같다</strong>는 것이 요점입니다. 어느 부류든 사용자 화면에는 원인 한 줄과 힌트만 나가고 트레이스백이 없습니다(요구사항 Q2). 마지막 부류만 "프로그램이 예상하지 못한 상태"라 <code>[ERROR] unhandled error</code> 기록 한 줄이 더 붙을 뿐이고, 스택은 힌트가 안내하는 대로 <code>--debug</code> 를 켰을 때 비로소 나옵니다 — 그때 <code>%(asctime)s %(name)s:%(lineno)d</code> 까지 붙은 상세 포맷(<code>LOG_FORMAT_DEBUG</code>)으로 바뀌고 다른 DEBUG 로그도 함께 보입니다.</p>
-<p><strong>그리고 <code>setup_logging</code> 이 "디버그인가"를 확정하는 유일한 지점입니다.</strong> <code>cli/app.py:87-88</code> 의 주석이 그 의존을 명시합니다 — <code>main()</code> 이 <code>output.setup_logging()</code> 을 부르지 않으면 로거에 핸들러가 붙지 않고, <code>output.debug_enabled()</code> 도 계속 <code>False</code> 라 <code>--debug</code> 로 요청한 스택트레이스가 어디에도 남지 않습니다.</p>
+<p><strong>그리고 <code>setup_logging</code> 이 "디버그인가"를 확정하는 유일한 지점입니다.</strong> <code>cli/app.py:89-90</code> 의 주석이 그 의존을 명시합니다 — <code>main()</code> 이 <code>output.setup_logging()</code> 을 부르지 않으면 로거에 핸들러가 붙지 않고, <code>output.debug_enabled()</code> 도 계속 <code>False</code> 라 <code>--debug</code> 로 요청한 스택트레이스가 어디에도 남지 않습니다.</p>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — 핸들러가 없으면 어떻게 되나</strong> — <code>logging.getLogger("budget_app")</code> 로
 만든 로거는 처리를 부모(루트)에게 전파하는데, 루트에도 핸들러가 없으면
 <code>logging.lastResort</code> 라는 <strong>최후 수단 핸들러</strong>가 대신 받습니다. 이것은 stderr 로
@@ -789,7 +789,7 @@ KeyError: 'nope'
        │
        ▼  (예외가 콜스택을 거슬러 올라감)
 5) @handle_errors 의 wrapper 가 except AppError 로 포착         [cli/error_handler.py:70]
-       │  (핸들러가 아니라 app.py:61 의 _dispatch 를 감싼 wrapper 다)
+       │  (핸들러가 아니라 app.py:63 의 _dispatch 를 감싼 wrapper 다)
        │
        ├─▶ output.err("[오류] 해당 id 의 거래를 찾을 수 없습니다: TX-999999")
        ├─▶ output.err("[힌트] `list` 로 id 를 확인하세요.")

@@ -180,7 +180,7 @@ from . import config, messages, output, presenter, prompts
 
 모든 파이썬 모듈에는 `__name__` 이라는 변수가 자동으로 생깁니다. **직접 실행되면** `"__main__"` 이고, **import 되면** 모듈 이름(예: `"budget_app.cli"`)입니다. 그래서 `if __name__ == "__main__":` 블록은 "직접 실행될 때만 동작하는 코드"가 됩니다.
 
-budget_app/cli/app.py:84-98
+budget_app/cli/app.py:86-100
 ```python
 def main(argv: list[str] | None = None) -> int:
     try:
@@ -494,7 +494,7 @@ def month_range(month: str) -> tuple[str, str]:
 
 **(2) str.format — 템플릿을 만들어 두고 나중에 채울 때.** messages.py 의 메시지들은 정의 시점에 채울 값이 없습니다.
 
-budget_app/cli/messages.py:48
+budget_app/cli/messages.py:69
 ```python
 MSG_SAVED_TX = "[저장 완료] id={id}"
 ```
@@ -653,7 +653,7 @@ budget_app/services/transactions.py:104-108
 
 **dict — 이름표가 달린 값 묶음.** 카테고리별 합계 누적이 대표적입니다.
 
-budget_app/services/budgets.py:46-54
+budget_app/services/budgets.py:66-74
 ```python
         for tx in self.txs.stream():
             if not flt.matches(tx):
@@ -802,7 +802,7 @@ budget_app/storage/csv_io.py:96-97
 
 지출 TOP N 출력에서는 순위 표시용으로 씁니다. `(category, amount)` 부분은 튜플 안의 튜플을 한 번에 푸는 **중첩 언패킹**(묶음으로 온 값을 그 자리에서 여러 변수로 풀어 받는 것)입니다.
 
-budget_app/cli/presenter.py:80-82
+budget_app/cli/presenter.py:118-120
 ```python
         yield messages.MSG_TOP_EXPENSE_HEADER.format(n=len(summary.top_expense))
         for rank, (category, amount) in enumerate(summary.top_expense, start=1):
@@ -834,7 +834,7 @@ budget_app/storage/repositories.py:121-124
 
 ### 6.3 `sorted(key=lambda, reverse=True)` 와 슬라이싱
 
-budget_app/services/budgets.py:56-58
+budget_app/services/budgets.py:76-78
 ```python
         top_expense = tuple(
             sorted(per_category.items(), key=lambda kv: kv[1], reverse=True)[: max(0, top_n)]
@@ -1067,7 +1067,7 @@ budget_app/storage/config.py:22-22
 FILE_ENCODING = "utf-8"
 ```
 
-UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, `handle_errors` 가 이를 잡아 "엑셀에서 CSV UTF-8 로 다시 저장하라"는 힌트(cli/messages.py:116-117)를 보여줍니다.
+UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, `handle_errors` 가 이를 잡아 "엑셀에서 CSV UTF-8 로 다시 저장하라"는 힌트(cli/messages.py:146-147)를 보여줍니다.
 
 한 가지 예외가 있는데, 그것도 상수로 설명되어 있습니다. JSONL 파일은 `errors="surrogateescape"`(storage/config.py:25)로 엽니다.
 
@@ -1387,7 +1387,7 @@ budget_app/storage/jsonl.py:215 (주는 쪽 — "한 번 순회하면 소진된�
 
 #### ② `Sequence` 를 고른 자리는 버그 방지선이다
 
-budget_app/cli/presenter.py:100-105
+budget_app/cli/presenter.py:167-172
 ```python
 def category_lines(names: Sequence[str]) -> Iterator[str]:
     if not names:
@@ -1597,7 +1597,7 @@ budget_app/storage/repositories.py:248-254
 
 호출부는 이 반환값으로 메시지만 바꿉니다.
 
-budget_app/cli/handlers.py:88-94
+budget_app/cli/handlers.py:103-109
 ```python
 def cmd_category_add(ctx: AppContext, args: argparse.Namespace) -> int:
     name = prompts.ask_category_name(args.name)
@@ -1641,7 +1641,7 @@ budget_app/services/transactions.py:108
 
 `for it in sorted(...): yield it` 과 같은 뜻이지만 한 줄입니다. 프레젠터에서는 다른 제너레이터 함수에 위임하는 데 씁니다.
 
-budget_app/cli/presenter.py:76-77
+budget_app/cli/presenter.py:114-115
 ```python
     if summary.budget is not None:
         yield from _budget_lines(summary)
@@ -1660,13 +1660,13 @@ budget_app/cli/presenter.py:76-77
 | 문법 요소 | 대표 위치 |
 |---|---|
 | 패키지/`__main__`/상대 임포트 | `__init__.py:1-3`, `__main__.py:1-8`, cli/handlers.py:22-30 |
-| `if __name__` + `sys.exit` | cli/app.py:97-98, cli/config.py:22-29 |
+| `if __name__` + `sys.exit` | cli/app.py:99-100, cli/config.py:22-29 |
 | 기본값·키워드·키워드 전용 인자 | services/transactions.py:34-42, cli/handlers.py:33-50, services/importexport.py:88-95 |
 | `*args`/`**kwargs`, `{**A, **B}` 병합 | decorators.py:37-47, domain/entities.py:113-124 |
-| 문자열 메서드·3가지 포맷 | domain/validators.py:96-100, domain/periods.py:30, cli/messages.py:48, storage/jsonl.py:225 |
+| 문자열 메서드·3가지 포맷 | domain/validators.py:96-100, domain/periods.py:30, cli/messages.py:69, storage/jsonl.py:225 |
 | 포맷 스펙 미니 언어 (`{:06d}`·`{:<7}`·`{!r}`) | domain/config.py:30, cli/messages.py:43, domain/specs.py:182 |
-| 컴프리헨션 3종 + dict.get 누적 | storage/repositories.py:238·242, domain/entities.py:144-150, services/budgets.py:54 |
-| enumerate/any/sorted/슬라이싱/max | storage/jsonl.py:178, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:56-58, storage/repositories.py:53-63 |
+| 컴프리헨션 3종 + dict.get 누적 | storage/repositories.py:238·242, domain/entities.py:144-150, services/budgets.py:74 |
+| enumerate/any/sorted/슬라이싱/max | storage/jsonl.py:178, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:76-78, storage/repositories.py:53-63 |
 | try/except/finally/raise | domain/validators.py:118-121·132-135, storage/jsonl.py:201-213, decorators.py:50-66 |
 | open 모드/encoding/newline/with/fsync | storage/jsonl.py:48-72, 220-247, storage/csv_io.py:145-186 |
 | pathlib.Path 전반 | storage/backup.py:17-33, storage/jsonl.py:48-60, 150-158 |

@@ -65,7 +65,7 @@ docstring 이 나열하는 네 개의 유스케이스 서비스에, 폴더 단�
 | 클래스 | 위치 | 담당 |
 |---|---|---|
 | `TransactionService` | `services/transactions.py:27-112` | 거래 추가/수정/삭제/조회 |
-| `BudgetService` | `services/budgets.py:20-66` | 예산 설정 + 월별 요약 |
+| `BudgetService` | `services/budgets.py:20-86` | 예산 설정 + 월별 요약 |
 | `CategoryService` | `services/categories.py:15-89` | 카테고리 추가/조회/삭제 (사용 중 보호) |
 | `ImportExportService` | `services/importexport.py:61-261` | CSV 가져오기/내보내기 정책 |
 | `BackupService` | `services/maintenance.py:29-37` | 데이터 폴더 백업 (얇은 위임) |
@@ -227,7 +227,7 @@ budget_app/services/transactions.py:86-108
 
 ## 3. `BudgetService` — 단일 패스 집계
 
-budget_app/services/budgets.py:30-66
+budget_app/services/budgets.py:50-86
 
 ```python
     @measure_time
@@ -834,7 +834,7 @@ class ImportReport:
 
 프레젠터도 둘을 구분해 보여 줍니다.
 
-budget_app/cli/presenter.py:122-153
+budget_app/cli/presenter.py:189-220
 
 ```python
 def import_problem_lines(report: ImportReport) -> list[str]:
@@ -869,7 +869,7 @@ def import_problem_lines(report: ImportReport) -> list[str]:
 
 중복 목록 뒤에는 **"고칠 필요 없다"는 안내**가 붙습니다.
 
-budget_app/cli/messages.py:99-101
+budget_app/cli/messages.py:129-131
 
 ```python
 MSG_IMPORT_DUPLICATE_HINT = (

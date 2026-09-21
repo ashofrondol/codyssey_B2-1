@@ -84,7 +84,7 @@
 ┌──────────────────────────────────────────────────────────────┐
 │  cli/               CLI 계층                                   │
 │    app.py           HANDLERS 레지스트리 + main                  │
-│    handlers.py      cmd_* 13개 (오케스트레이션만)               │
+│    handlers.py      cmd_* 15개 (오케스트레이션만)               │
 │    parser.py        argparse 문법 정의                          │
 │    prompts.py       대화형 입력 (재입력 루프 / EOF)             │
 │    presenter.py     도메인 → 화면 문자열 (반환만, 출력 안 함)    │
@@ -776,7 +776,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>sys.exit(n)</code> 은 프로세스를 즉시 죽이는 것이 아니라 <code>SystemExit(n)</code> <strong>예외를 던지는</strong> 것입니다. 그래서 <code>try</code>/<code>finally</code> 와 컨텍스트 매니저의 정리 코드가 정상적으로 돌고, 인터프리터 최상단이 그 예외를 받아 종료 코드로 씁니다. 인자가 정수면 그대로 종료 코드, 문자열이면 stderr 에 찍고 코드 1, <code>None</code>/생략이면 0 입니다. <code>main()</code> 이 <code>int</code> 를 돌려주도록 설계한 이유가 여기 있습니다 — 모든 핸들러가 <code>config.EXIT_*</code> 상수를 <code>return</code> 하면 그 값이 그대로 셸의 <code>$?</code> 가 됩니다. 예외로 종료 코드를 정하지 않으므로 <code>handle_errors</code> 가 예외를 잡아 <code>return EXIT_IO</code> 하는 방식이 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong>2단계 — 파싱·준비·디스패치.</strong> 디스패치는 명령 이름에 맞는 함수를 골라 일을 넘기는 것을 말합니다.</p>
-<p>budget_app/cli/app.py:84-94</p>
+<p>budget_app/cli/app.py:86-96</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -798,10 +798,10 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
     <span class="n">p</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">handler</span><span class="o">=</span><span class="s2">"add"</span><span class="p">)</span>
 </code></pre></div>
 
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>set_defaults(handler="add")</code> 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 <code>Namespace</code> 에 <strong>그냥 꽂아 넣을 값</strong>을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 <code>_defaults</code> 를 상위 <code>Namespace</code> 에 합칩니다. 그래서 <code>args.handler</code> 는 사용자가 입력한 적 없는데도 값이 들어 있고, <code>--data-dir</code> 처럼 실제 옵션이 아니라서 <code>--help</code> 에도 나오지 않습니다. <code>needs_storage</code> 도 같은 통로로 들어옵니다 — 최상위에서 <code>set_defaults(needs_storage=True)</code>, <code>backup</code> 하위 파서만 <code>False</code> 로 덮습니다(<code>cli/parser.py:91</code>, <code>cli/parser.py:252</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>set_defaults(handler="add")</code> 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 <code>Namespace</code> 에 <strong>그냥 꽂아 넣을 값</strong>을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 <code>_defaults</code> 를 상위 <code>Namespace</code> 에 합칩니다. 그래서 <code>args.handler</code> 는 사용자가 입력한 적 없는데도 값이 들어 있고, <code>--data-dir</code> 처럼 실제 옵션이 아니라서 <code>--help</code> 에도 나오지 않습니다. <code>needs_storage</code> 도 같은 통로로 들어옵니다 — 최상위에서 <code>set_defaults(needs_storage=True)</code>, <code>backup</code> 하위 파서만 <code>False</code> 로 덮습니다(<code>cli/parser.py:91</code>, <code>cli/parser.py:261</code>). → <a href="12-syntax-and-stdlib.html">12 §2-B</a></p>
 </blockquote>
 <p><strong>3단계 — 컨텍스트 조립과 핸들러 실행.</strong> <code>@handle_errors</code> 는 개별 핸들러가 아니라 <strong><code>_dispatch</code> 한 곳에만</strong> 붙습니다.</p>
-<p>budget_app/cli/app.py:61-81</p>
+<p>budget_app/cli/app.py:63-83</p>
 <div class="codehilite"><pre><span></span><code><span class="nd">@handle_errors</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_dispatch</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""컨텍스트를 조립하고 핸들러를 부른다 — **오류 방패 안에서**.</span>
@@ -929,7 +929,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
       → output.out_lines(...)                                  stdout
 </code></pre></div>
 
-<p>budget_app/services/budgets.py:30-66</p>
+<p>budget_app/services/budgets.py:50-86</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@measure_time</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">monthly_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">top_n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_TOP_N</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonthlySummary</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""월별 요약을 계산해 ``MonthlySummary`` 로 돌려준다.</span>
@@ -976,7 +976,7 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </blockquote>
 <p><strong>(3) 리팩터 전에는 dict 를 돌려줬습니다.</strong> <code>{"month": ..., "income": ..., "usage_pct": ...}</code> 형태의 9키 딕셔너리였고, CLI 가 <code>result["has_data"]</code> 처럼 꺼내 썼습니다. 키 오타는 런타임 <code>KeyError</code> 였고, "예산이 없으면 N/A" 같은 <strong>도메인 상태 해석이 화면 코드에 섞여</strong> 있었습니다.</p>
 <p>프레젠터는 그 결과를 읽기만 합니다.</p>
-<p>budget_app/cli/presenter.py:67-92</p>
+<p>budget_app/cli/presenter.py:105-130</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">summary_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="n">MonthlySummary</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
         <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_NO_DATA</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">month</span><span class="p">)</span>
@@ -1229,8 +1229,8 @@ services/ ──▶ errors, decorators   (둘 다 output 을 모름) ✅
 </tr>
 </tbody>
 </table></div>
-<p>그리고 진입점(<code>cli/app.py:78-80</code> 의 <code>_dispatch</code>)이 <strong>한 번만</strong> <code>prepare()</code> 를 호출하되, 필요 없는 명령은 건너뜁니다. 건너뛸지 여부는 파서가 남긴 <code>needs_storage</code> 플래그가 정합니다.</p>
-<p>budget_app/cli/parser.py:248-252</p>
+<p>그리고 진입점(<code>cli/app.py:80-82</code> 의 <code>_dispatch</code>)이 <strong>한 번만</strong> <code>prepare()</code> 를 호출하되, 필요 없는 명령은 건너뜁니다. 건너뛸지 여부는 파서가 남긴 <code>needs_storage</code> 플래그가 정합니다.</p>
+<p>budget_app/cli/parser.py:257-261</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_add_backup</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"backup"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"데이터 폴더 백업 (보너스)"</span><span class="p">)</span>
     <span class="n">_add_shared_options</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
@@ -1305,7 +1305,7 @@ storage.csv_io.read_rows()   ── AppError ─────────┤
 context._require_usable_...  ── NotADirectoryError┤
                                                   ▼
                         @handle_errors  (cli/error_handler.py:20-128)
-                                    ↑ 붙는 자리는 cli/app.py:61 의 _dispatch 하나
+                                    ↑ 붙는 자리는 cli/app.py:63 의 _dispatch 하나
                                                   │
                      ┌────────────────────────────┼────────────────────────┐
                      ▼                            ▼                        ▼
@@ -1378,7 +1378,7 @@ python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w
 <p>같은 이유로 <code>_silence_broken_pipe()</code> 가 필요합니다. 하류가 먼저 닫힌 뒤 인터프리터가 종료하면서 stdout 버퍼를 마지막으로 비우려다 또 <code>BrokenPipeError</code> 가 나고, 그것은 이미 예외 처리 밖이라 <code>Exception ignored in: ...</code> 가 찍힙니다. <code>os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())</code> 는 <strong>파일 서술자 1번 자체를 <code>/dev/null</code> 로 갈아 끼워서</strong>, 남은 바이트가 아무 데도 가지 않고 조용히 사라지게 합니다(파이썬 공식 문서가 권장하는 레시피입니다). → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <p><code>import</code> 는 한 명령이 두 채널을 모두 쓰는 예입니다.</p>
-<p>budget_app/cli/handlers.py:180-191</p>
+<p>budget_app/cli/handlers.py:195-206</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cmd_import</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">AppContext</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">messages</span><span class="o">.</span><span class="n">MODE_ATOMIC</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">atomic</span> <span class="k">else</span> <span class="n">messages</span><span class="o">.</span><span class="n">MODE_PARTIAL</span>
     <span class="n">report</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">io_service</span><span class="o">.</span><span class="n">import_csv</span><span class="p">(</span>

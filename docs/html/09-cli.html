@@ -361,7 +361,7 @@ $ python -m budget_app category --data-dir ./mydata list   ✅ 이렇게만 동�
 <p><strong>원인.</strong> argparse 는 하위 명령 이름(<code>list</code>)을 만나면 그 뒤의 모든 인자를 <strong>말단 파서</strong>에게 넘깁니다. 말단 파서에 <code>--data-dir</code> 가 정의돼 있지 않으니 "모르는 인자"가 됩니다.</p>
 <p><strong>같은 프로그램인데 명령에 따라 옵션 자리가 다른 것</strong>은 사용성 문제이자 일관성 문제입니다. 말단 파서에도 같은 옵션을 달아 양쪽 다 동작하게 했습니다.</p>
 <h3 id="26-새-옵션-두-개">2.6 새 옵션 두 개</h3>
-<p>budget_app/cli/parser.py:201-214</p>
+<p>budget_app/cli/parser.py:210-223</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_add_export</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"export"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"CSV 내보내기"</span><span class="p">)</span>
     <span class="n">_add_shared_options</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
@@ -386,7 +386,7 @@ $ python -m budget_app category --data-dir ./mydata list   ✅ 이렇게만 동�
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>choices</code> 검사는 타입 변환 <strong>뒤에</strong> 일어납니다. argparse 는 <code>_get_value()</code> 로 <code>type=</code> 을 적용한 다음 <code>_check_value()</code> 에서 <code>value not in choices</code> 를 봅니다. 그래서 <code>choices</code> 에 담기는 값은 명령줄 문자열이 아니라 <strong>변환 결과</strong>여야 합니다. 이 소스에서는 <code>--type</code>·<code>--on-duplicate</code> 모두 <code>type=</code> 이 없어 문자열 그대로이므로 문제가 되지 않습니다. <code>ON_DUPLICATE_CHOICES</code>(<code>services/config.py:12</code>)와 <code>VALID_TYPES</code>(<code>domain/config.py:15</code>)는 둘 다 <strong>튜플</strong>이고, <code>list(...)</code> 로 감싼 것은 argparse 액션이 공용 상수 객체를 그대로 붙들지 않도록 사본을 넘기는 방어입니다.</p>
 </blockquote>
 <h3 id="27-needs_storage-backup-만-예외">2.7 <code>needs_storage</code> — backup 만 예외</h3>
-<p>budget_app/cli/parser.py:248-252</p>
+<p>budget_app/cli/parser.py:257-261</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_add_backup</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="n">p</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"backup"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"데이터 폴더 백업 (보너스)"</span><span class="p">)</span>
     <span class="n">_add_shared_options</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
@@ -623,7 +623,7 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <blockquote class="callout tip"><p><strong>💡 쉽게 말하면</strong> — 도서관에서 두꺼운 책의 내용을 확인하는 방법은 둘입니다. 전권을 복사해 가방에 넣고 나와서 보거나, 열람실에서 필요한 만큼만 한 장씩 넘겨 보거나. 뒤쪽이 제너레이터입니다 — 스무 줄만 필요하면 스물한 장째는 넘기지 않고, 가방(메모리)이 무거워지지도 않습니다.
 다만 이 비유는 <strong>중간에 정렬이 끼는 순간</strong> 반쯤 깨집니다 — 최신순으로 보려면 어차피 전권을 한 번은 훑어야 하므로, 첫 줄이 나오기까지 걸리는 시간은 스무 줄만 필요해도 줄지 않습니다. 아끼는 쪽은 <strong>손에 드는 양</strong>입니다. <code>--limit 20</code> 을 서비스까지 내려보내면 훑는 동안 손에 남는 것이 스무 장뿐이라 가방은 무거워지지 않습니다. 그 한도가 없는 <code>search</code> 만 조건에 걸러진 항목 전체를 쌓아 둡니다. 그래서 이 절 뒤쪽에 "정직하게" 라는 단서가 붙습니다.</p>
 </blockquote>
-<p>budget_app/cli/presenter.py:42-59</p>
+<p>budget_app/cli/presenter.py:71-97</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tx_table</span><span class="p">(</span><span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.</span>
 
@@ -633,11 +633,20 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <span class="sd">    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가</span>
 <span class="sd">    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은</span>
 <span class="sd">    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.</span>
+
+<span class="sd">    머리글은 **첫 행을 실제로 받은 뒤에** 낸다. 미리 내면 결과가 없을 때 머리글만</span>
+<span class="sd">    덩그러니 남아 "(데이터 없음)" 과 모순되는 화면이 되고, 표를 파이프로 넘겨 세는</span>
+<span class="sd">    쪽도 빈 결과와 한 건을 구분하지 못한다. 행을 하나도 못 받은 경우에만 안내 한 줄이</span>
+<span class="sd">    나가는 성질은 그대로다.</span>
 <span class="sd">    """</span>
     <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">count</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
             <span class="k">break</span>
+        <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">header</span> <span class="o">=</span> <span class="n">_header_line</span><span class="p">()</span>
+            <span class="k">yield</span> <span class="n">header</span>
+            <span class="k">yield</span> <span class="n">_rule_line</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
         <span class="k">yield</span> <span class="n">tx_line</span><span class="p">(</span><span class="n">tx</span><span class="p">)</span>
         <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -698,7 +707,7 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <p>"당기는 만큼만 읽는다"가 <strong>파일 읽기까지 그대로 성립하는 경로</strong>는 정렬이 없는 곳입니다. 예를 들어 <code>TransactionRepository.get</code>(<code>storage/repositories.py:112-119</code>)이 <code>stream()</code> 을 돌다 원하는 id 를 찾는 순간 <code>return</code> 하면 그 뒤의 줄은 디스크에서 읽지도 않습니다. 제너레이터 사슬의 이득은 "사슬 전체가 게으를 때"만 끝까지 전달되고, <strong>중간에 <code>sort</code> 같은 전량 소비자가 하나 끼면 거기서 끊긴다</strong> — 이것이 이 구조를 읽을 때 가장 흔히 오해하는 지점입니다(<a href="10-advanced-design.html">10 §4</a>의 성능 분석과 이어집니다).</p>
 <p><strong>빈 결과 처리가 여기 있는 것</strong>도 눈여겨보세요. <code>count == 0</code> 이면 <code>(데이터 없음)</code> 한 줄을 내보냅니다. "비어 있을 때 무엇을 보여줄지"는 <strong>표시의 문제</strong>이므로 서비스가 아니라 프레젠터의 일입니다.</p>
 <h3 id="43-계산하지-않고-묻기만-한다">4.3 계산하지 않고 묻기만 한다</h3>
-<p>budget_app/cli/presenter.py:67-92</p>
+<p>budget_app/cli/presenter.py:105-130</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">summary_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="n">MonthlySummary</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
         <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_SUMMARY_NO_DATA</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">month</span><span class="o">=</span><span class="n">summary</span><span class="o">.</span><span class="n">month</span><span class="p">)</span>
@@ -730,10 +739,10 @@ budget_app list: error: argument --limit: 1 이상이어야 합니다: 0
 <p><code>summary.is_empty</code>, <code>summary.balance</code>, <code>summary.over_budget</code> — <strong>전부 묻기만</strong> 합니다. <code>income - expense</code> 를 여기서 계산하지 않습니다.</p>
 <p><strong><code>yield from _budget_lines(summary)</code></strong> 는 다른 제너레이터에 반복을 위임합니다. 예산 관련 두 줄을 별도 함수로 뺀 이유는 <code>summary_lines</code> 의 흐름(수입→지출→잔액→예산→TOP)이 한눈에 읽히게 하기 위해서입니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>yield from</code> 은 PEP 380 으로 파이썬 3.3 에 들어왔습니다. 그 전에는 <code>for x in gen(): yield x</code> 라고 손으로 풀어 써야 했고, 여기서는 그것과 결과가 같습니다. 다만 <code>yield from</code> 이 단순한 축약이 아닌 이유는 <strong><code>send()</code>·<code>throw()</code>·<code>close()</code>·반환값(<code>StopIteration.value</code>)까지 하위 제너레이터에 그대로 통과시키기</strong> 때문입니다. 이 소스는 값만 흘려보내므로 축약으로 봐도 무방하지만, 같은 문법이 <code>stream_sorted</code> 의 <code>yield from sorted(...)</code> 처럼 <strong>리스트에도</strong> 쓰입니다 — 대상은 제너레이터가 아니라 아무 이터러블이면 됩니다.</p>
-<p><code>summary_lines</code> 안의 <code>return</code>(<code>presenter.py:70</code>)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 <code>return</code> 은 "값을 하나 돌려준다"가 아니라 <strong><code>StopIteration</code> 을 일으켜 반복을 끝낸다</strong>는 뜻이고, 그래서 <code>is_empty</code> 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 <code>return 값</code> 도 문법상 허용되지만 그 값은 <code>yield</code> 되지 않고 <code>StopIteration.value</code> 에 실립니다). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
+<p><code>summary_lines</code> 안의 <code>return</code>(<code>presenter.py:108</code>)에 값이 없는 것도 문법의 결과입니다. 제너레이터 함수에서 <code>return</code> 은 "값을 하나 돌려준다"가 아니라 <strong><code>StopIteration</code> 을 일으켜 반복을 끝낸다</strong>는 뜻이고, 그래서 <code>is_empty</code> 일 때 한 줄만 내고 그 자리에서 끝납니다(파이썬 3.3 부터는 <code>return 값</code> 도 문법상 허용되지만 그 값은 <code>yield</code> 되지 않고 <code>StopIteration.value</code> 에 실립니다). → <a href="12-syntax-and-stdlib.html">12 §1-C</a></p>
 </blockquote>
 <h3 id="44-진단-줄도-프레젠터가-만든다">4.4 진단 줄도 프레젠터가 만든다</h3>
-<p>budget_app/cli/presenter.py:113-119</p>
+<p>budget_app/cli/presenter.py:180-186</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">import_result_line</span><span class="p">(</span><span class="n">report</span><span class="p">:</span> <span class="n">ImportReport</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_IMPORT_DONE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
         <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
@@ -925,7 +934,7 @@ RESULT 2
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 </code></pre></div>
 
-<p>핸들러 13개는 <code>cli/handlers.py</code>(190줄)에 있고, 줄 수는 이렇습니다:</p>
+<p>핸들러 15개는 <code>cli/handlers.py</code>(212줄)에 있고, 줄 수는 이렇습니다:</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -975,6 +984,12 @@ RESULT 2
 <tr>
 <td><code>cmd_update</code></td>
 <td>10</td>
+<td><code>cmd_budget_get</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>cmd_budget_list</code></td>
+<td>2</td>
 <td></td>
 <td></td>
 </tr>
@@ -982,7 +997,7 @@ RESULT 2
 </table></div>
 <p>가장 긴 <code>cmd_add</code>(18줄)도 대부분이 서비스에 넘길 인자 나열입니다.</p>
 <h3 id="62-main-다섯-단계">6.2 <code>main</code> — 다섯 단계</h3>
-<p>budget_app/cli/app.py:84-94</p>
+<p>budget_app/cli/app.py:86-96</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -1003,7 +1018,7 @@ RESULT 2
 5) 디스패치       HANDLERS[args.handler](ctx, args)
 </code></pre></div>
 
-<p><strong>순서가 중요합니다.</strong> <code>setup_logging</code> 이 3번보다 앞에 있어야 저장소 초기화 중 발생하는 경고 로그도 보입니다. 3·4·5 번은 <code>main</code> 이 아니라 <code>@handle_errors</code> 가 붙은 <code>_dispatch</code>(<code>app.py:61-81</code>) 안에 있습니다 — 파일을 여는 코드를 방패 밖에 두지 않기 위해서입니다.</p>
+<p><strong>순서가 중요합니다.</strong> <code>setup_logging</code> 이 3번보다 앞에 있어야 저장소 초기화 중 발생하는 경고 로그도 보입니다. 3·4·5 번은 <code>main</code> 이 아니라 <code>@handle_errors</code> 가 붙은 <code>_dispatch</code>(<code>app.py:63-83</code>) 안에 있습니다 — 파일을 여는 코드를 방패 밖에 두지 않기 위해서입니다.</p>
 <p><strong><code>argv: list[str] | None = None</code></strong> 은 테스트를 위한 설계입니다. <code>None</code> 이면 argparse 가 <code>sys.argv[1:]</code> 를 쓰고, 리스트를 주면 그것을 파싱합니다. 프로세스를 띄우지 않고 <code>main(["list", "--limit", "5"])</code> 로 호출할 수 있습니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — 타입 표기가 <code>Optional[List[str]]</code> 이 아니라 <code>list[str] | None</code> 인 것은 두 PEP 이 겹친 결과입니다. 소문자 <code>list[str]</code> 은 PEP 585(3.9)가 표준 컨테이너에 첨자를 허용하면서, <code>X | None</code> 은 PEP 604(3.10)가 <code>|</code> 를 타입 합집합으로 쓰게 하면서 가능해졌습니다. 그 위에 파일 첫머리의 <code>from __future__ import annotations</code>(PEP 563)가 <strong>모든 어노테이션을 문자열로만 보관</strong>하게 만들어, 실행 시점에 평가되지 않으니 3.10 미만에서도 구문 오류가 나지 않습니다. 이 프로젝트의 요구 버전이 <code>&gt;=3.10</code> 이므로 실제로는 future import 없이도 동작하지만, 어노테이션 평가 비용을 없애고 따옴표 표기를 영구히 불필요하게 만드는 효과는 그대로 남습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote><blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — <code>parse_args(argv)</code> 에 <code>None</code> 을 주면 argparse 가 내부에서 <code>args = sys.argv[1:]</code> 로 바꿔치기합니다(<code>_parse_known_args2</code> 의 첫 세 줄). <code>sys.argv[0]</code> 은 프로그램 이름이라 잘라 내는 것이고, 그래서 usage 에 찍히는 이름은 <code>sys.argv[0]</code> 이 아니라 <code>ArgumentParser(prog=config.PROG_NAME)</code> 으로 <strong>직접 지정한</strong> <code>"budget_app"</code> 입니다. 지정하지 않으면 argparse 는 <code>os.path.basename(sys.argv[0])</code> 을 쓰는데, <code>python -m budget_app</code> 으로 실행하면 그 값이 <code>__main__.py</code> 라서 사용자에게 낯선 이름이 나옵니다.</p>
@@ -1024,7 +1039,7 @@ RESULT 2
 <li><code>handlers.py</code> 에 <code>cmd_xxx(ctx, args)</code> 작성</li>
 <li><code>app.py</code> 의 <code>HANDLERS</code> 에 한 줄 추가</li>
 </ol>
-<p><code>main()</code> 은 영원히 그대로입니다. <strong>3번에 <code>@handle_errors</code> 를 붙이는 단계가 없다는 점</strong>을 눈여겨보세요. 예전에는 핸들러 13개에 각각 붙였지만 지금은 <code>_dispatch</code> 한 곳에만 붙습니다(<code>app.py:61</code>). 정책이 한 곳에서 적용되면 "새 핸들러에 데코레이터를 빠뜨리는" 실수 자체가 생길 수 없습니다 — <code>handlers.py</code> 전체에 <code>@handle_errors</code> 는 <strong>한 개도 없습니다</strong>.</p>
+<p><code>main()</code> 은 영원히 그대로입니다. <strong>3번에 <code>@handle_errors</code> 를 붙이는 단계가 없다는 점</strong>을 눈여겨보세요. 예전에는 핸들러 13개에 각각 붙였지만 지금은 <code>_dispatch</code> 한 곳에만 붙습니다(<code>app.py:63</code>). 정책이 한 곳에서 적용되면 "새 핸들러에 데코레이터를 빠뜨리는" 실수 자체가 생길 수 없습니다 — <code>handlers.py</code> 전체에 <code>@handle_errors</code> 는 <strong>한 개도 없습니다</strong>.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처</strong> — <code>@handle_errors</code> 같은 데코레이터 표기는 PEP 318 로 파이썬 2.4 에 들어왔습니다. <code>@deco</code> 를 함수 정의 위에 얹은 것은 <code>def f(): ...</code> 뒤에 <code>f = deco(f)</code> 를 쓴 것과 <strong>정확히 같은 코드로 풀립니다</strong>(desugar). 그래서 <code>_dispatch</code> 라는 이름이 실제로 가리키는 것은 원래 함수가 아니라 <code>handle_errors</code> 가 돌려준 <code>wrapper</code> 이고, 안쪽에서 <code>functools.wraps</code> 로 이름·docstring 을 옮겨 심어야 정체가 유지됩니다. 자세한 것은 <a href="06-decorators.html">06. 횡단 관심사와 예외 처리</a>, 문법 계보는 <a href="12-syntax-and-stdlib.html">12 §1-C</a>.</p>
 </blockquote>
 <h3 id="64-appcontext-합성-루트">6.4 <code>AppContext</code> — 합성 루트</h3>
@@ -1048,9 +1063,9 @@ RESULT 2
         <span class="bp">self</span><span class="o">.</span><span class="n">backup_service</span> <span class="o">=</span> <span class="n">BackupService</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="p">)</span>
 </code></pre></div>
 
-<p><strong>리팩터 전에는 핸들러마다 <code>AppContext(args.data_dir)</code> 를 만들었습니다</strong>(10곳). 지금은 <code>_dispatch</code> 가 한 번 만들어 핸들러에 넘깁니다(<code>app.py:78</code>). 그래서 핸들러 시그니처가 <code>(ctx, args)</code> 두 인자입니다.</p>
+<p><strong>리팩터 전에는 핸들러마다 <code>AppContext(args.data_dir)</code> 를 만들었습니다</strong>(10곳). 지금은 <code>_dispatch</code> 가 한 번 만들어 핸들러에 넘깁니다(<code>app.py:80</code>). 그래서 핸들러 시그니처가 <code>(ctx, args)</code> 두 인자입니다.</p>
 <h3 id="65-기간-조건-조립">6.5 기간 조건 조립</h3>
-<p>budget_app/cli/handlers.py:157-161</p>
+<p>budget_app/cli/handlers.py:172-176</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cmd_export</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">AppContext</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="n">flt</span> <span class="o">=</span> <span class="n">_export_filter</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
     <span class="n">count</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">io_service</span><span class="o">.</span><span class="n">export_csv</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">),</span> <span class="n">flt</span><span class="p">,</span> <span class="n">include_id</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">include_id</span><span class="p">)</span>
@@ -1095,7 +1110,7 @@ RESULT 2
 
 <p>여기서 <code>output.err(...)</code> 를 부르면 그 안의 <code>sys.stdout.flush()</code> 가 또 <code>BrokenPipeError</code> 를 냅니다. <strong>2차 사고</strong>입니다.</p>
 <p><strong>(2) <code>main</code> 이 잡아 stdout 을 블랙홀로 갈아끼웁니다.</strong></p>
-<p>budget_app/cli/app.py:50-58</p>
+<p>budget_app/cli/app.py:52-60</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
 <span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다</span>
@@ -1125,7 +1140,7 @@ RESULT 2
 <p><code>head</code> 가 먼저 끝난 것은 실패가 아니므로 0을 반환합니다.</p>
 <p><strong>검증:</strong></p>
 <div class="codehilite"><pre><span></span><code>$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>budget_app<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
-TX-000004<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="m">2024</span>-02-03<span class="w"> </span><span class="p">|</span><span class="w"> </span>expense<span class="w"> </span><span class="p">|</span><span class="w"> </span>food<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="m">8000</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>김밥
+id<span class="w">        </span><span class="p">|</span><span class="w"> </span>date<span class="w">       </span><span class="p">|</span><span class="w"> </span><span class="nb">type</span><span class="w">    </span><span class="p">|</span><span class="w"> </span>category<span class="w">     </span><span class="p">|</span><span class="w">       </span>amount<span class="w"> </span><span class="p">|</span><span class="w"> </span>memo
 $<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="si">${</span><span class="nv">PIPESTATUS</span><span class="p">[0]</span><span class="si">}</span>
 <span class="m">0</span><span class="w">                          </span>←<span class="w"> </span>budget_app<span class="w"> </span>자체는<span class="w"> </span>정상<span class="w"> </span>종료
 </code></pre></div>

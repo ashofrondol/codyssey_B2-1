@@ -189,7 +189,7 @@ sys.exit(정수) ──▶ 셸 종료 코드로 전달 ($?, %ERRORLEVEL%)
 <h2 id="2-if-__name__-__main__-관용구와-sysexitmain">2. <code>if __name__ == "__main__"</code> 관용구와 <code>sys.exit(main())</code></h2>
 <h3 id="21-관용구의-의미">2.1 관용구의 의미</h3>
 <p>모든 파이썬 모듈에는 <code>__name__</code> 이라는 변수가 자동으로 생깁니다. <strong>직접 실행되면</strong> <code>"__main__"</code> 이고, <strong>import 되면</strong> 모듈 이름(예: <code>"budget_app.cli"</code>)입니다. 그래서 <code>if __name__ == "__main__":</code> 블록은 "직접 실행될 때만 동작하는 코드"가 됩니다.</p>
-<p>budget_app/cli/app.py:84-98</p>
+<p>budget_app/cli/app.py:86-100</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">parser_module</span><span class="o">.</span><span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
@@ -506,7 +506,7 @@ sys.exit(정수) ──▶ 셸 종료 코드로 전달 ($?, %ERRORLEVEL%)
 <p>반대급부가 이 절의 주제입니다 — <strong>컴파일 시점에 이름이 확정되므로 템플릿으로 보관할 수 없습니다.</strong> 그래서 <code>messages.py</code> 는 f-string 을 쓸 수 없습니다. 참고로 f-string 의 문법 규정이 파서에 정식 편입된 것은 PEP 701(파이썬 3.12)이고, 그 전에는 중괄호 안에 같은 종류의 따옴표를 넣을 수 없는 등의 제약이 있었습니다. → <a href="12-syntax-and-stdlib.html">12 §1-A</a></p>
 </blockquote>
 <p><strong>(2) str.format — 템플릿을 만들어 두고 나중에 채울 때.</strong> messages.py 의 메시지들은 정의 시점에 채울 값이 없습니다.</p>
-<p>budget_app/cli/messages.py:48</p>
+<p>budget_app/cli/messages.py:69</p>
 <div class="codehilite"><pre><span></span><code><span class="n">MSG_SAVED_TX</span> <span class="o">=</span> <span class="s2">"[저장 완료] id=</span><span class="si">{id}</span><span class="s2">"</span>
 </code></pre></div>
 
@@ -703,7 +703,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 
 <p><code>sorted(...)</code> 가 그 리스트를 만듭니다. <code>limit</code> 이 있는 <code>list</code> 경로는 리스트 대신 크기 <code>limit</code> 짜리 <strong>힙</strong>만 유지합니다(<code>heapq.nlargest</code>).</p>
 <p><strong>dict — 이름표가 달린 값 묶음.</strong> 카테고리별 합계 누적이 대표적입니다.</p>
-<p>budget_app/services/budgets.py:46-54</p>
+<p>budget_app/services/budgets.py:66-74</p>
 <div class="codehilite"><pre><span></span><code>        <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">txs</span><span class="o">.</span><span class="n">stream</span><span class="p">():</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">flt</span><span class="o">.</span><span class="n">matches</span><span class="p">(</span><span class="n">tx</span><span class="p">):</span>
                 <span class="k">continue</span>
@@ -819,7 +819,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 
 <p>한때 이 자리는 <code>yield from enumerate(...)</code> 한 줄이었습니다(<a href="#115-yield-from--반복을-통째로-위임">§11.5</a>). 지금 <code>for</code> 로 풀어 쓴 것은 파서가 던지는 <code>csv.Error</code> 를 감싸는 <code>try</code> 의 범위를 눈에 보이게 하기 위해서입니다 — <code>yield</code> 가 <code>try</code> 안에서 일어난다는 사실이 코드에 드러납니다.</p>
 <p>지출 TOP N 출력에서는 순위 표시용으로 씁니다. <code>(category, amount)</code> 부분은 튜플 안의 튜플을 한 번에 푸는 <strong>중첩 언패킹</strong>(묶음으로 온 값을 그 자리에서 여러 변수로 풀어 받는 것)입니다.</p>
-<p>budget_app/cli/presenter.py:80-82</p>
+<p>budget_app/cli/presenter.py:118-120</p>
 <div class="codehilite"><pre><span></span><code>        <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_TOP_EXPENSE_HEADER</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">top_expense</span><span class="p">))</span>
         <span class="k">for</span> <span class="n">rank</span><span class="p">,</span> <span class="p">(</span><span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">top_expense</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
             <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">FMT_TOP_EXPENSE_ITEM</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rank</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">category</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="n">amount</span><span class="p">)</span>
@@ -844,7 +844,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 </code></pre></div>
 
 <h3 id="63-sortedkeylambda-reversetrue-와-슬라이싱">6.3 <code>sorted(key=lambda, reverse=True)</code> 와 슬라이싱</h3>
-<p>budget_app/services/budgets.py:56-58</p>
+<p>budget_app/services/budgets.py:76-78</p>
 <div class="codehilite"><pre><span></span><code>        <span class="n">top_expense</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
             <span class="nb">sorted</span><span class="p">(</span><span class="n">per_category</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)[:</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">top_n</span><span class="p">)]</span>
         <span class="p">)</span>
@@ -1058,7 +1058,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 <div class="codehilite"><pre><span></span><code><span class="n">FILE_ENCODING</span> <span class="o">=</span> <span class="s2">"utf-8"</span>
 </code></pre></div>
 
-<p>UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, <code>handle_errors</code> 가 이를 잡아 "엑셀에서 CSV UTF-8 로 다시 저장하라"는 힌트(cli/messages.py:116-117)를 보여줍니다.</p>
+<p>UTF-8 이 아닌 파일을 읽으면 UnicodeDecodeError 가 나고, <code>handle_errors</code> 가 이를 잡아 "엑셀에서 CSV UTF-8 로 다시 저장하라"는 힌트(cli/messages.py:146-147)를 보여줍니다.</p>
 <p>한 가지 예외가 있는데, 그것도 상수로 설명되어 있습니다. JSONL 파일은 <code>errors="surrogateescape"</code>(storage/config.py:25)로 엽니다.</p>
 <blockquote class="callout origin"><p><strong>🔎 문법의 출처 / ⚙️ 내부 동작</strong> — <code>errors="surrogateescape"</code> 는 PEP 383 으로 <strong>파이썬 3.1</strong> 에 들어온 오류 처리기입니다. 디코딩할 수 없는 바이트를 예외로 터뜨리는 대신 유니코드의 <strong>대리 영역(U+DC80~U+DCFF)</strong> 문자로 바꿔 담아 두고, 같은 처리기로 인코딩할 때 <strong>원래 바이트를 그대로 복원</strong>합니다. 즉 손상된 바이트가 왕복해도 한 비트도 변하지 않습니다.</p>
 <p>이 소스가 이것을 고른 이유는 저장 정책과 맞물립니다 — JSONL 재작성은 "손상된 줄은 해석하지 않고 원문 그대로 보존한다"인데, 기본값인 <code>errors="strict"</code> 였다면 읽는 순간 <code>UnicodeDecodeError</code> 로 터져 <strong>보존할 기회 자체가 없습니다.</strong> 읽기와 쓰기가 같은 처리기를 쓰기 때문에 무손실 왕복이 성립합니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
@@ -1405,7 +1405,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 
 <p>파라미터에 <code>Iterable</code>/<code>Sequence</code> 를 쓴 자리가 17곳입니다. 여기에 <code>List</code> 라고 적었다면 호출자는 제너레이터를 넘기기 전에 <code>list(...)</code> 로 통째로 메모리에 올려야 했을 것이고, <a href="07-repository.html">07 §2</a>의 스트리밍 설계가 그 자리에서 무너집니다. <strong><code>Iterable</code> 은 "게으르게 넘겨도 된다"는 허가증입니다.</strong></p>
 <h4 id="②-sequence-를-고른-자리는-버그-방지선이다">② <code>Sequence</code> 를 고른 자리는 버그 방지선이다</h4>
-<p>budget_app/cli/presenter.py:100-105</p>
+<p>budget_app/cli/presenter.py:167-172</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">category_lines</span><span class="p">(</span><span class="n">names</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">names</span><span class="p">:</span>
         <span class="k">yield</span> <span class="n">messages</span><span class="o">.</span><span class="n">MSG_NO_CATEGORIES_LISTED</span>
@@ -1583,7 +1583,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 </code></pre></div>
 
 <p>호출부는 이 반환값으로 메시지만 바꿉니다.</p>
-<p>budget_app/cli/handlers.py:88-94</p>
+<p>budget_app/cli/handlers.py:103-109</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cmd_category_add</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">AppContext</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="n">name</span> <span class="o">=</span> <span class="n">prompts</span><span class="o">.</span><span class="n">ask_category_name</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">cat_service</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
@@ -1617,7 +1617,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 </code></pre></div>
 
 <p><code>for it in sorted(...): yield it</code> 과 같은 뜻이지만 한 줄입니다. 프레젠터에서는 다른 제너레이터 함수에 위임하는 데 씁니다.</p>
-<p>budget_app/cli/presenter.py:76-77</p>
+<p>budget_app/cli/presenter.py:114-115</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">if</span> <span class="n">summary</span><span class="o">.</span><span class="n">budget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">yield from</span> <span class="n">_budget_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
 </code></pre></div>
@@ -1642,7 +1642,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 </tr>
 <tr>
 <td><code>if __name__</code> + <code>sys.exit</code></td>
-<td>cli/app.py:97-98, cli/config.py:22-29</td>
+<td>cli/app.py:99-100, cli/config.py:22-29</td>
 </tr>
 <tr>
 <td>기본값·키워드·키워드 전용 인자</td>
@@ -1654,7 +1654,7 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 </tr>
 <tr>
 <td>문자열 메서드·3가지 포맷</td>
-<td>domain/validators.py:96-100, domain/periods.py:30, cli/messages.py:48, storage/jsonl.py:225</td>
+<td>domain/validators.py:96-100, domain/periods.py:30, cli/messages.py:69, storage/jsonl.py:225</td>
 </tr>
 <tr>
 <td>포맷 스펙 미니 언어 (<code>{:06d}</code>·<code>{:&lt;7}</code>·<code>{!r}</code>)</td>
@@ -1662,11 +1662,11 @@ r.getMessage()       # 'call add'              ← 이때 합쳐진다   (실측
 </tr>
 <tr>
 <td>컴프리헨션 3종 + dict.get 누적</td>
-<td>storage/repositories.py:238·242, domain/entities.py:144-150, services/budgets.py:54</td>
+<td>storage/repositories.py:238·242, domain/entities.py:144-150, services/budgets.py:74</td>
 </tr>
 <tr>
 <td>enumerate/any/sorted/슬라이싱/max</td>
-<td>storage/jsonl.py:178, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:56-58, storage/repositories.py:53-63</td>
+<td>storage/jsonl.py:178, storage/csv_io.py:87, storage/repositories.py:246, services/budgets.py:76-78, storage/repositories.py:53-63</td>
 </tr>
 <tr>
 <td>try/except/finally/raise</td>

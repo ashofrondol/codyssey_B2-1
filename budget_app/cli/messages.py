@@ -40,7 +40,28 @@ FMT_AVAILABLE_SUFFIX = " (사용 가능: {available})"
 
 # 공통 표
 MSG_NO_DATA = "(데이터 없음)"
-FMT_TX_LINE = "{id} | {date} | {type:<7} | {category} | {amount} | {memo}"
+#: 거래 표의 한 줄 — **열 폭을 정하는 유일한 자리**다.
+#:
+#: ``{id}`` 만 폭 지정이 없다. ``TransactionId`` 는 ``__format__`` 을 정의하지 않아
+#: ``{id:<9}`` 가 TypeError 로 막히고, 값이 ``TX-`` + 6자리라 길이가 이미 고정이다.
+#: 나머지는 폭을 박아 둔다 — 없으면 ``| rent | 150000 |`` 과 ``| salary | 3000000 |``
+#: 의 파이프 위치가 어긋나 표가 표로 보이지 않는다. 금액만 우측 정렬(``>``)인데,
+#: 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 하기 때문이다.
+FMT_TX_LINE = "{id} | {date:<10} | {type:<7} | {category:<12} | {amount:>12} | {memo}"
+#: 머리글 칸의 글자. 머리글도 **본문과 같은 템플릿**으로 찍으므로 폭이 두 곳에
+#: 적히지 않는다 — 위 한 줄만 고치면 머리글과 구분선이 함께 따라온다.
+TX_HEADERS = {
+    "id": "id",
+    "date": "date",
+    "type": "type",
+    "category": "category",
+    "amount": "amount",
+    "memo": "memo",
+}
+#: 구분선은 완성된 머리글 줄을 글자 단위로 훑어 만든다(``presenter._rule_line``).
+#: 폭을 다시 세지 않으므로 머리글과 길이가 어긋나는 상태가 성립하지 않는다.
+TX_RULE_CHAR = "-"
+TX_RULE_JOINT = "+"
 
 # add
 MSG_NO_CATEGORIES = "[안내] 등록된 카테고리가 없습니다. 먼저 `category add` 로 추가하세요."
@@ -61,6 +82,15 @@ FMT_TOP_EXPENSE_ITEM = "{rank}) {category} {amount}원"
 
 # budget / category
 MSG_SAVED_BUDGET = "[저장 완료] {month} 예산 {amount}원"
+MSG_BUDGET_FOUND = "{month} 예산 {amount}원"
+#: 조회 결과가 "없음"인 것은 실패가 아니라 답이다 — ``summary`` 의 빈 달과 같은 모양,
+#: 같은 종료 코드 0 으로 말한다.
+MSG_BUDGET_NOT_SET = "{month}: 예산 없음"
+MSG_NO_BUDGETS = "(설정된 예산 없음)"
+#: 예산 표도 거래 표와 같은 규칙이다 — 폭은 여기 한 줄에만 적고, 머리글은 같은
+#: 템플릿으로 찍고, 구분선은 그 머리글에서 만든다.
+FMT_BUDGET_LINE = "{month:<7} | {amount:>12}"
+BUDGET_HEADERS = {"month": "month", "amount": "amount"}
 MSG_SAVED_CATEGORY = "[저장 완료] category={name}"
 MSG_CATEGORY_EXISTS = "[안내] 이미 존재하는 카테고리입니다: {name}"
 MSG_NO_CATEGORIES_LISTED = "(등록된 카테고리 없음)"

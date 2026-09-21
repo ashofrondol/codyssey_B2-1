@@ -31,6 +31,8 @@ HANDLERS: dict[str, Handler] = {
     "search": handlers.cmd_search,
     "summary": handlers.cmd_summary,
     "budget.set": handlers.cmd_budget_set,
+    "budget.get": handlers.cmd_budget_get,
+    "budget.list": handlers.cmd_budget_list,
     "category.add": handlers.cmd_category_add,
     "category.list": handlers.cmd_category_list,
     "category.remove": handlers.cmd_category_remove,

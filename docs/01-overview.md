@@ -101,7 +101,7 @@ codyssey_B2-1/
 │       ├── config.py              #    한도·종료 코드
 │       ├── messages.py            #    프롬프트·결과·오류 표시 (전체의 3분의 2)
 │       ├── app.py                 #    HANDLERS 레지스트리 + main
-│       ├── handlers.py            #    cmd_* 13개
+│       ├── handlers.py            #    cmd_* 15개
 │       ├── parser.py              #    argparse 문법
 │       ├── prompts.py             #    대화형 입력
 │       ├── presenter.py           #    도메인 → 문자열 (출력 안 함)
@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
 > **⚙️ 내부 동작** — `sys.exit()` 은 프로세스를 그 자리에서 끝내는 함수가 아니라 **`SystemExit` 예외를 던지는 함수**입니다. 그 예외가 아무에게도 잡히지 않고 인터프리터 최상단까지 올라오면, 그때 인터프리터가 예외의 인자를 종료 코드로 삼아 프로세스를 끝냅니다. 그래서 `sys.exit(main())` 은 "`main()` 을 먼저 끝까지 실행해 정수를 받고 → 그 정수를 담은 `SystemExit` 을 던진다"는 두 단계입니다. 이 사실은 §6 에서 다시 중요해집니다 — `SystemExit` 은 `Exception` 이 아니라 **`BaseException` 의 직계 자식**이라 `except Exception` 그물에 걸리지 않습니다. → [12 §1-C](./12-syntax-and-stdlib.md)
 
-budget_app/cli/app.py:84-94
+budget_app/cli/app.py:86-96
 
 ```python
 def main(argv: list[str] | None = None) -> int:
@@ -257,13 +257,13 @@ HANDLERS[args.handler]          문자열 키 → 핸들러 함수 (예: "list" 
 반환된 int                       프로세스 종료 코드가 됨 (0=성공, 그 외=오류)
 ```
 
-`AppContext` 조립과 `prepare()` 가 `main` 이 아니라 `_dispatch` 안에 있는 것이 핵심입니다. `@handle_errors`(오류를 사람이 읽을 문장과 종료 코드로 바꿔 주는 덧씌우개)는 `_dispatch` **한 곳에만** 붙어 있습니다(`cli/app.py:61`). 그래서 여기 밖에서 파일을 건드리면 그 예외는 방패를 통과하지 못하고 원시 트레이스백(파이썬이 토해 내는 여러 줄짜리 오류 더미)으로 새어 나갑니다.
+`AppContext` 조립과 `prepare()` 가 `main` 이 아니라 `_dispatch` 안에 있는 것이 핵심입니다. `@handle_errors`(오류를 사람이 읽을 문장과 종료 코드로 바꿔 주는 덧씌우개)는 `_dispatch` **한 곳에만** 붙어 있습니다(`cli/app.py:63`). 그래서 여기 밖에서 파일을 건드리면 그 예외는 방패를 통과하지 못하고 원시 트레이스백(파이썬이 토해 내는 여러 줄짜리 오류 더미)으로 새어 나갑니다.
 
 ### 3.3 명령 → 핸들러 대응은 문자열 키로
 
 `args.handler` 는 각 하위 명령 파서를 만들 때 `set_defaults(handler="list")` 처럼 심어둔 **문자열**입니다. 그 문자열을 함수로 바꾸는 표는 `cli/app.py` 에 있습니다.
 
-budget_app/cli/app.py:28-42
+budget_app/cli/app.py:28-44
 
 ```python
 HANDLERS: dict[str, Handler] = {
@@ -272,6 +272,8 @@ HANDLERS: dict[str, Handler] = {
     "search": handlers.cmd_search,
     "summary": handlers.cmd_summary,
     "budget.set": handlers.cmd_budget_set,
+    "budget.get": handlers.cmd_budget_get,
+    "budget.list": handlers.cmd_budget_list,
     "category.add": handlers.cmd_category_add,
     "category.list": handlers.cmd_category_list,
     "category.remove": handlers.cmd_category_remove,
@@ -359,7 +361,7 @@ class AppContext:
         self._cats.seed_defaults()
 ```
 
-**생성자와 `prepare()` 가 나뉜 이유**를 눈여겨보세요. 객체를 만드는 것(`__init__`)과 환경을 준비하는 것(`prepare`)은 다른 일입니다. 저장소 생성자가 폴더를 만들고 파일을 건드리면, 객체를 만드는 것만으로 디스크가 바뀝니다. 그러면 오타 난 `--data-dir` 도 조용히 새 폴더를 만들고 기본 카테고리를 심어 버립니다. 지금은 `_dispatch()` 가 한 번만 `prepare()` 를 호출하고, `backup` 처럼 준비가 필요 없는 명령은 `needs_storage=False` 로 건너뜁니다(`cli/parser.py:248-252`. 기본값 `True` 는 최상위 파서 한 곳에 `set_defaults(needs_storage=True)` 로 있습니다 — `cli/parser.py:91`).
+**생성자와 `prepare()` 가 나뉜 이유**를 눈여겨보세요. 객체를 만드는 것(`__init__`)과 환경을 준비하는 것(`prepare`)은 다른 일입니다. 저장소 생성자가 폴더를 만들고 파일을 건드리면, 객체를 만드는 것만으로 디스크가 바뀝니다. 그러면 오타 난 `--data-dir` 도 조용히 새 폴더를 만들고 기본 카테고리를 심어 버립니다. 지금은 `_dispatch()` 가 한 번만 `prepare()` 를 호출하고, `backup` 처럼 준비가 필요 없는 명령은 `needs_storage=False` 로 건너뜁니다(`cli/parser.py:257-261`. 기본값 `True` 는 최상위 파서 한 곳에 `set_defaults(needs_storage=True)` 로 있습니다 — `cli/parser.py:91`).
 
 > **💡 쉽게 말하면** — `__init__` 은 조리대에 도구를 늘어놓는 일이고, `prepare()` 는 가스를 켜고 재료를 꺼내 두는 일입니다. 도구를 늘어놓는 것만으로 가스가 켜진다면, 문을 열어 본 사람이 불을 붙인 셈이 됩니다. 둘을 나눠서 얻는 것은, 폴더를 만들고 파일을 건드리는 일이 **객체를 만들 때마다**가 아니라 명령당 딱 한 번, 그것도 오류를 받아 주는 방패 안에서만 일어난다는 점입니다.
 > 다만 이 비유는 "그러면 오타는 걸러지겠네"에서 깨집니다 — 오타 난 `--data-dir` 은 지금도 그 자리에 폴더를 만들고 기본 카테고리를 심은 뒤 아무 일 없다는 듯 끝납니다. 준비를 아예 건너뛰는 `backup` 만은 폴더를 만드는 대신 종료 코드 3 으로 "그런 폴더가 없다"고 알려 줍니다(§4.11).
@@ -370,7 +372,7 @@ class AppContext:
 
 ## 4. 명령어 11종 상세
 
-이 프로그램은 11개 명령을 제공합니다: `add` / `list` / `search` / `summary` / `budget set` / `category add·list·remove` / `update` / `delete` / `import` / `export` / `backup`.
+이 프로그램은 11개 명령을 제공합니다: `add` / `list` / `search` / `summary` / `budget set·get·list` / `category add·list·remove` / `update` / `delete` / `import` / `export` / `backup`.
 
 > **⚙️ 내부 동작** — argparse 에서 "하위 명령"은 별도 기능이 아니라 **위치 인자 하나**입니다. `parser.add_subparsers()`(`cli/parser.py:92`)는 `_SubParsersAction` 이라는 액션을 등록하는데, 이 액션의 `choices` 가 `add_parser()` 로 붙인 이름들의 사전이고 값은 **완전히 독립된 `ArgumentParser` 객체**입니다. 상위 파서가 `list` 라는 단어를 만나면 그 액션을 실행하고, 액션은 사전에서 하위 파서를 꺼내 **나머지 인자 전부**를 넘깁니다. `budget set` 처럼 2단인 명령은 하위 파서가 다시 `add_subparsers()` 를 하는 재귀 구조일 뿐입니다(`cli/parser.py:150`). 그래서 `--help` 도, `--data-dir` 도 단계마다 따로 정의해야 합니다(§3.4). `required=True` 를 붙인 것도 의미가 있습니다. argparse 의 기본은 "하위 명령을 생략해도 통과"라서, 명시하지 않으면 `python -m budget_app` 만 쳤을 때 `args.handler` 가 아예 존재하지 않아 `AttributeError` 로 죽습니다. 명시해 두면 usage 를 보여 주고 종료 코드 2 로 끝납니다. → [12 §2-B](./12-syntax-and-stdlib.md)
 
@@ -439,21 +441,30 @@ python -m budget_app list --limit 3
 ```
 
 ```text
-TX-000005 | 2024-01-22 | expense | food | 35000 | 회식
-TX-000004 | 2024-01-20 | expense | rent | 150000 | 공과금
-TX-000001 | 2024-01-15 | expense | food | 15000 | 점심
+id        | date       | type    | category     |       amount | memo
+----------+------------+---------+--------------+--------------+-----
+TX-000005 | 2024-01-22 | expense | food         |        35000 | 회식
+TX-000004 | 2024-01-20 | expense | rent         |       150000 | 공과금
+TX-000001 | 2024-01-15 | expense | food         |        15000 | 점심
 ```
 
 한 줄의 형식은 `cli/messages.py` 의 템플릿 하나로 정의되어 있습니다.
 
-budget_app/cli/messages.py:42-43
+budget_app/cli/messages.py:42-50
 
 ```python
 MSG_NO_DATA = "(데이터 없음)"
-FMT_TX_LINE = "{id} | {date} | {type:<7} | {category} | {amount} | {memo}"
+#: 거래 표의 한 줄 — **열 폭을 정하는 유일한 자리**다.
+#:
+#: ``{id}`` 만 폭 지정이 없다. ``TransactionId`` 는 ``__format__`` 을 정의하지 않아
+#: ``{id:<9}`` 가 TypeError 로 막히고, 값이 ``TX-`` + 6자리라 길이가 이미 고정이다.
+#: 나머지는 폭을 박아 둔다 — 없으면 ``| rent | 150000 |`` 과 ``| salary | 3000000 |``
+#: 의 파이프 위치가 어긋나 표가 표로 보이지 않는다. 금액만 우측 정렬(``>``)인데,
+#: 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 하기 때문이다.
+FMT_TX_LINE = "{id} | {date:<10} | {type:<7} | {category:<12} | {amount:>12} | {memo}"
 ```
 
-`{type:<7}` 은 타입 컬럼을 7칸 왼쪽 정렬한다는 뜻입니다. `expense` 는 정확히 7글자라 그대로 나오고, `income` 은 6글자라 뒤에 공백 1칸이 붙어 세로줄이 맞습니다. 거래가 없으면 `(데이터 없음)` 을 출력합니다.
+`{type:<7}` 은 타입 컬럼을 7칸 왼쪽 정렬한다는 뜻입니다. `expense` 는 정확히 7글자라 그대로 나오고, `income` 은 6글자라 뒤에 공백 1칸이 붙어 세로줄이 맞습니다. 날짜·카테고리·금액에도 같은 방식으로 폭이 지정돼 있고(금액만 `>` 로 **우측 정렬** — 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 합니다), `{id}` 만 폭이 없습니다. `TransactionId` 가 `__format__` 을 정의하지 않아 `{id:<9}` 가 `TypeError` 로 막히고, 값이 `TX-` + 6자리라 길이가 이미 고정이기 때문입니다. 머리글과 구분선은 **이 템플릿 하나에서** 만들어집니다 — 머리글은 같은 템플릿에 열 이름을 넣어 찍고, 구분선은 그 머리글을 글자 단위로 훑어 만들므로 셋의 폭이 갈라질 수 없습니다(`cli/presenter.py` 의 `_header_line` / `_rule_line`). 거래가 없으면 머리글 없이 `(데이터 없음)` 한 줄만 출력합니다.
 
 > **🔎 문법의 출처** — 콜론 뒤의 `<7` 은 PEP 3101 이 정의한 **형식 명세 미니 언어**(format spec mini-language)입니다. `[[fill]align][sign][#][0][width]...` 문법에서 `<` 가 왼쪽 정렬, `7` 이 최소 폭입니다. 같은 미니 언어를 f-string(PEP 498, 3.6)도 그대로 씁니다 — `f"{x:<7}"` 과 `"{:<7}".format(x)` 는 같은 코드 경로를 탑니다. 이 프로젝트가 f-string 대신 `.format()` 을 쓰는 이유는 **템플릿을 `messages.py` 에 미리 정의해 두고 나중에 값을 채우기 위해서**입니다. f-string 은 정의되는 자리에서 값이 필요하므로 이 용도로는 쓸 수 없습니다. → [12 §1-A](./12-syntax-and-stdlib.md)
 
@@ -509,7 +520,7 @@ python -m budget_app summary --month 2024-01 --top 3
 3) transport 20000원
 ```
 
-지출이 예산을 초과하면 `[경고] 예산을 초과했습니다!` 가 추가로 출력됩니다(`cli/messages.py:58` 의 `MSG_OVER_BUDGET`). 해당 월에 거래도 없고 예산도 없으면 `2024-01: 데이터 없음` 형식으로 한 줄만 출력합니다.
+지출이 예산을 초과하면 `[경고] 예산을 초과했습니다!` 가 추가로 출력됩니다(`cli/messages.py:79` 의 `MSG_OVER_BUDGET`). 해당 월에 거래도 없고 예산도 없으면 `2024-01: 데이터 없음` 형식으로 한 줄만 출력합니다.
 
 ### 4.5 budget set — 월 예산 설정
 
@@ -527,6 +538,27 @@ python -m budget_app budget set --month 2024-01 --amount 500000
 ```text
 [저장 완료] 2024-01 예산 500000원
 ```
+
+저장한 예산을 다시 보는 길이 둘 있습니다. `budget get --month YYYY-MM` 은 한 달만, `budget list` 는 설정된 모든 달을 월 오름차순으로 보여 줍니다. 설정된 적 없는 달은 **오류가 아니라 답**이므로 종료 코드는 0 입니다 — `summary` 가 빈 달에 `데이터 없음` 을 내면서 0 으로 끝나는 것과 같은 규칙입니다.
+
+```bash
+python -m budget_app budget get --month 2024-01
+python -m budget_app budget list
+```
+
+```text
+2024-01 예산 500000원
+```
+
+```text
+month   |       amount
+--------+-------------
+2023-12 |       250000
+2024-01 |       500000
+2024-02 |       300000
+```
+
+같은 달이 파일에 두 줄 남아 있어도(손으로 고친 경우) 두 명령은 **같은 답**을 냅니다. `BudgetStore.get` 이 "마지막 줄을 유효값으로 본다"고 정해 두었고 `BudgetService.list_budgets` 가 그 규칙을 그대로 따르기 때문입니다.
 
 ### 4.6 category add / list / remove — 카테고리 관리
 
@@ -583,7 +615,7 @@ python -m budget_app update --id TX-000005 --amount 35000 --memo "회식"
 
 ```text
 [수정 완료] id=TX-000005
-TX-000005 | 2024-01-22 | expense | food | 35000 | 회식
+TX-000005 | 2024-01-22 | expense | food         |        35000 | 회식
 ```
 
 수정 후 갱신된 행을 한 줄 다시 보여줍니다. 변경 필드를 하나도 지정하지 않으면 `[오류] 수정할 필드가 없습니다.` 와 힌트가 출력됩니다(종료 코드 4). 존재하지 않는 id 면 `[오류] 해당 id 의 거래를 찾을 수 없습니다: ...` 입니다.
@@ -683,7 +715,7 @@ python -m budget_app import --from import.csv --atomic
 
 기간 필수 규칙은 핸들러 코드에서 직접 확인할 수 있습니다.
 
-budget_app/cli/handlers.py:164-177
+budget_app/cli/handlers.py:179-192
 
 ```python
 def _export_filter(args: argparse.Namespace) -> SearchFilter:
@@ -990,7 +1022,7 @@ pyproject.toml:1-5
 
 - budget_app 은 **표준 라이브러리만으로 만든 파일 기반 가계부 콘솔 앱**이며, 과제 명세에 따라 생성된 코드를 학습·설명하는 것이 이 문서 시리즈의 목적입니다.
 - 실행은 `python -m budget_app` 으로 하며, `runpy` 가 패키지를 import 한 뒤 `__main__.py` → `cli/app.py` 의 `main()` → `_dispatch()`(오류 방패) → `AppContext` 조립 → `HANDLERS[args.handler]` → 종료 코드 반환의 흐름입니다. `sys.exit()` 은 그 정수를 담은 `SystemExit` 예외를 던지는 함수입니다.
-- 명령은 11종: `add`(대화형), `list`, `search`, `summary`, `budget set`, `category add/list/remove`, `update`(옵션 방식 고정), `delete`, `import`(`--atomic`·`--on-duplicate`·`--auto-category`), `export`(기간 필수, `--no-id`), `backup`.
+- 명령은 11종: `add`(대화형), `list`, `search`, `summary`, `budget set/get/list`, `category add/list/remove`, `update`(옵션 방식 고정), `delete`, `import`(`--atomic`·`--on-duplicate`·`--auto-category`), `export`(기간 필수, `--no-id`), `backup`.
 - 데이터는 JSONL 파일 3종에 저장되고, 거래를 처음 추가하면 발급 번호를 기억하는 `id_counter` 파일이 같은 폴더에 하나 더 생깁니다. 카테고리 파일이 비어 있으면 기본 5종이 자동 시드됩니다.
 - CSV 교환 스키마는 `id` 를 **선택 컬럼**으로 포함합니다. 내보내기는 기본 포함, 가져오기는 있으면 복원·없으면 발급이라 왕복해도 중복이 생기지 않습니다.
 - 종료 코드 8종은 `cli/config.py` 의 `EXIT_*` 상수로 정의되고 `@handle_errors` 가 매핑합니다. 다만 argparse 가 거절한 인자의 2번은 `SystemExit`(= `BaseException`) 이라 그 방패를 **지나지 않습니다**.

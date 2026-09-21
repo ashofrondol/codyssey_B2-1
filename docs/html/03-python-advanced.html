@@ -435,7 +435,7 @@ dataclass 자신도 <code>frozen</code> 클래스의 생성된 <code>__init__</c
 
 <p><strong>설계 의도.</strong> <code>balance</code> 는 <code>income - expense</code> 이므로 저장하면 <strong>같은 정보를 두 번 갖게 되고, 둘이 어긋날 수 있습니다</strong>. property 로 두면 언제 읽어도 일관됩니다.</p>
 <p>더 중요한 것은 <strong>계산 규칙의 소속</strong>입니다. 리팩터 전에는 서비스가 문자열 키 dict 를 만들어 <code>result["usage_pct"]</code> 를 채웠고, "예산이 없으면 N/A" 같은 해석을 CLI 가 했습니다. 지금은 서비스가 <strong>원자료만</strong> 담아 넘기고, 파생값은 모델이 계산하며, 프레젠터는 <code>None</code> 인지만 봅니다.</p>
-<p>budget_app/cli/presenter.py:85-92</p>
+<p>budget_app/cli/presenter.py:123-130</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_budget_lines</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="n">MonthlySummary</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="n">usage</span> <span class="o">=</span> <span class="n">summary</span><span class="o">.</span><span class="n">usage_pct</span>
     <span class="n">usage_str</span> <span class="o">=</span> <span class="p">(</span>
@@ -805,7 +805,7 @@ output.out_lines             ── stdout 으로 출력
 </code></pre></div>
 
 <p><strong>정렬은 본질적으로 전체를 "훑어야" 하는 연산</strong>입니다. 다만 훑는 것과 <strong>모으는 것</strong>은 다릅니다. <code>limit</code> 이 있으면 <code>heapq.nlargest</code> 가 크기 <code>limit</code> 짜리 힙 하나만 유지하며 스트림을 흘려보내므로 메모리 상한이 파일 크기가 아니라 <code>O(limit)</code> 이고, <code>limit</code> 이 없는 <code>search</code> 경로만 통과분 전체를 모읍니다(그때도 담기는 것은 "필터를 통과한 항목뿐"이라 조건이 좁을수록 줄어듭니다). 정렬이 끝난 뒤 다시 <code>yield from</code> 으로 내보내는 이유는 소비자가 <code>limit</code> 에 도달하면 <code>break</code> 할 수 있도록 <strong>출구를 다시 스트림 형태로 유지</strong>하기 위해서입니다.</p>
-<p>budget_app/cli/presenter.py:42-59</p>
+<p>budget_app/cli/presenter.py:71-97</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tx_table</span><span class="p">(</span><span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Transaction</span><span class="p">],</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.</span>
 
@@ -815,11 +815,20 @@ output.out_lines             ── stdout 으로 출력
 <span class="sd">    ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가</span>
 <span class="sd">    이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은</span>
 <span class="sd">    같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.</span>
+
+<span class="sd">    머리글은 **첫 행을 실제로 받은 뒤에** 낸다. 미리 내면 결과가 없을 때 머리글만</span>
+<span class="sd">    덩그러니 남아 "(데이터 없음)" 과 모순되는 화면이 되고, 표를 파이프로 넘겨 세는</span>
+<span class="sd">    쪽도 빈 결과와 한 건을 구분하지 못한다. 행을 하나도 못 받은 경우에만 안내 한 줄이</span>
+<span class="sd">    나가는 성질은 그대로다.</span>
 <span class="sd">    """</span>
     <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">tx</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">count</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
             <span class="k">break</span>
+        <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">header</span> <span class="o">=</span> <span class="n">_header_line</span><span class="p">()</span>
+            <span class="k">yield</span> <span class="n">header</span>
+            <span class="k">yield</span> <span class="n">_rule_line</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
         <span class="k">yield</span> <span class="n">tx_line</span><span class="p">(</span><span class="n">tx</span><span class="p">)</span>
         <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -907,7 +916,7 @@ output.out_lines             ── stdout 으로 출력
 
 <p><strong>설계 의도 정리.</strong> 거래가 10만 건이어도 <code>stream()</code> 이 동시에 들고 있는 것은 "현재 줄 하나 + 객체 하나" 뿐이므로 읽기 자체는 메모리 O(1)입니다.</p>
 <ul>
-<li><code>monthly_summary</code>(services/budgets.py:30-66)처럼 합계만 누적하는 소비자는 끝까지 O(1)</li>
+<li><code>monthly_summary</code>(services/budgets.py:50-86)처럼 합계만 누적하는 소비자는 끝까지 O(1)</li>
 <li><code>category_in_use</code>(storage/repositories.py:121-124)처럼 <code>any(tx.category == target for tx in self.stream())</code> 로 조기 종료하는 소비자는 지연 평가 덕분에 파일 뒷부분을 아예 읽지 않음</li>
 <li>한도 없는 전체 정렬(<code>search</code> 경로의 <code>stream_sorted</code>)만 예외적으로 필터 통과분을 모음 — <code>list --limit N</code> 은 <code>heapq.nlargest</code> 로 상위 N 만 유지</li>
 <li><code>rewrite</code> 는 재작성이 목적이라 줄들을 모을 수밖에 없지만, <strong>문자열 상태</strong>로만 들고 있습니다(객체가 아니라)</li>
@@ -968,7 +977,7 @@ output.out_lines             ── stdout 으로 출력
 <code>@functools.total_ordering</code> 이 나머지 비교 메서드를 채울 수 있으므로 <strong>아래에서 위로</strong>
 라는 규칙이 그대로 적용됩니다(§3.3). 커스텀 데코레이터 셋은 전부 단독 사용입니다 —
 서비스 메서드는 <code>@log_call</code> 셋(services/transactions.py:34, 52, 72)과 <code>@measure_time</code>
-하나(services/budgets.py:30)뿐이고, <code>@handle_errors</code> 도 <code>cli/app.py:61</code> 의
+하나(services/budgets.py:50)뿐이고, <code>@handle_errors</code> 도 <code>cli/app.py:63</code> 의
 <code>_dispatch</code> 한 곳에만 붙습니다. 그래서 이 프로젝트에서는 <strong>커스텀</strong> 데코레이터끼리
 순서를 고민할 필요가 없는데, <strong>그 자체가 설계 결과</strong>입니다 — 관측과 오류 처리를 서로
 다른 계층에 두었기 때문에 한 함수에 둘이 겹칠 일이 생기지 않았습니다(§4.4).
@@ -984,7 +993,7 @@ output.out_lines             ── stdout 으로 출력
 <p><code>@functools.wraps(func)</code> 는 <code>func</code> 의 <code>__name__</code>, <code>__doc__</code>, <code>__module__</code> 등을 wrapper 로 복사해 이 문제를 막습니다. 이 프로젝트에서 이것이 실질적으로 중요한 이유가 두 가지 있습니다.</p>
 <ol>
 <li><code>log_call</code> 과 <code>measure_time</code> 은 로그에 <code>func.__name__</code> 을 찍습니다. <code>wraps</code> 가 없으면 로그가 전부 <code>wrapper</code> 로 찍혀 무의미해집니다.</li>
-<li><code>handle_errors</code> 로 감싼 <code>_dispatch</code>(cli/app.py:61-81)도 <code>wraps</code> 덕분에 디버깅·트레이스에서 원래 이름으로 보입니다.</li>
+<li><code>handle_errors</code> 로 감싼 <code>_dispatch</code>(cli/app.py:63-83)도 <code>wraps</code> 덕분에 디버깅·트레이스에서 원래 이름으로 보입니다.</li>
 </ol>
 <blockquote class="callout internals"><p><strong>⚙️ 내부 동작 — <code>wraps</code> 가 정확히 무엇을 복사하나</strong> — <code>functools.wraps(f)</code> 는
 <code>functools.partial(update_wrapper, wrapped=f)</code> 이고, <code>update_wrapper</code> 가 하는 일은 셋입니다.
@@ -1023,14 +1032,14 @@ output.out_lines             ── stdout 으로 출력
 <td>decorators.py:50-66</td>
 <td>실행 시간 측정 로그</td>
 <td><code>try/finally</code></td>
-<td>서비스 1곳 (budgets.py:30)</td>
+<td>서비스 1곳 (budgets.py:50)</td>
 </tr>
 <tr>
 <td><code>handle_errors</code></td>
 <td><strong>cli/error_handler.py:20-128</strong></td>
 <td>예외 → 메시지 + 종료 코드</td>
 <td>다단 <code>except</code></td>
-<td>CLI 진입점 1곳 (app.py:61 <code>_dispatch</code>)</td>
+<td>CLI 진입점 1곳 (app.py:63 <code>_dispatch</code>)</td>
 </tr>
 </tbody>
 </table></div>
@@ -1806,7 +1815,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </table></div>
 <p>셋을 이 순서로 조합해야 "새 이름이 가리키는 파일에 완전한 내용이 들어 있다"가 성립합니다. 자세한 crash 시나리오 분석은 <a href="10-advanced-design.html">10. 고급 설계 주제</a>에 있습니다.</p>
 <h3 id="88-osdup2-osdevnull-brokenpipe-공식-레시피">8.8 os.dup2 / os.devnull — BrokenPipe 공식 레시피</h3>
-<p>budget_app/cli/app.py:50-58</p>
+<p>budget_app/cli/app.py:52-60</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_silence_broken_pipe</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,</span>
 <span class="sd">    인터프리터 종료 시 BrokenPipeError 재발과 'Exception ignored' 출력을 막는다</span>
@@ -1819,7 +1828,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 </code></pre></div>
 
 <p><code>os.devnull</code> 은 OS 별 "블랙홀" 장치 경로(Windows <code>nul</code>, Unix <code>/dev/null</code>)이고, <code>os.dup2(a, b)</code> 는 파일 디스크립터 b 가 a 와 같은 곳을 가리키게 복제합니다. 즉 <strong>stdout 을 블랙홀로 갈아끼워</strong> 인터프리터 종료 시 남은 버퍼를 비우다 BrokenPipeError 가 재발하는 것을 막습니다.</p>
-<p><code>handle_errors</code> 가 BrokenPipeError 만은 <code>raise</code> 로 위로 넘기고(§5.3), <code>main</code>(cli/app.py:84-94)이 이 함수를 호출한 뒤 <code>EXIT_OK</code> 를 반환하는 협업 구조입니다. 전말은 <a href="09-cli.html">09. CLI 계층</a>에서 상세히 다룹니다.</p>
+<p><code>handle_errors</code> 가 BrokenPipeError 만은 <code>raise</code> 로 위로 넘기고(§5.3), <code>main</code>(cli/app.py:86-96)이 이 함수를 호출한 뒤 <code>EXIT_OK</code> 를 반환하는 협업 구조입니다. 전말은 <a href="09-cli.html">09. CLI 계층</a>에서 상세히 다룹니다.</p>
 <hr>
 <h2 id="9-콜러블을-값으로-전달하는-패턴">9. 콜러블을 값으로 전달하는 패턴</h2>
 <p>함수를 값으로 다루는 능력(일급 객체)은 4장의 데코레이터 외에도 이 코드에서 세 군데 더 핵심적으로 쓰입니다.</p>
@@ -1887,7 +1896,7 @@ f-string 이 <strong>인자로 넘기기 전에</strong> 이미 결합되므로 
 <div class="codehilite"><pre><span></span><code><span class="n">Handler</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">AppContext</span><span class="p">,</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">],</span> <span class="nb">int</span><span class="p">]</span>
 </code></pre></div>
 
-<p>budget_app/cli/app.py:81</p>
+<p>budget_app/cli/app.py:83</p>
 <div class="codehilite"><pre><span></span><code>    <span class="k">return</span> <span class="n">HANDLERS</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">handler</span><span class="p">](</span><span class="n">ctx</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
 </code></pre></div>
 

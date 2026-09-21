@@ -145,7 +145,7 @@ def _add_summary(sub) -> None:
 
 
 def _add_budget(sub) -> None:
-    p = sub.add_parser("budget", help="예산 설정")
+    p = sub.add_parser("budget", help="예산 설정/조회")
     _add_shared_options(p)
     bud = p.add_subparsers(dest="budget_cmd", required=True)
     p_set = bud.add_parser("set", help="월 예산 설정")
@@ -153,6 +153,15 @@ def _add_budget(sub) -> None:
     p_set.add_argument("--month", required=True, help="대상 월 YYYY-MM")
     p_set.add_argument("--amount", required=True, type=int, help="예산 금액(양수)")
     p_set.set_defaults(handler="budget.set")
+
+    p_get = bud.add_parser("get", help="월 예산 조회")
+    _add_shared_options(p_get)
+    p_get.add_argument("--month", required=True, help="대상 월 YYYY-MM")
+    p_get.set_defaults(handler="budget.get")
+
+    p_list = bud.add_parser("list", help="설정된 월 예산 목록")
+    _add_shared_options(p_list)
+    p_list.set_defaults(handler="budget.list")
 
 
 def _add_category(sub) -> None:

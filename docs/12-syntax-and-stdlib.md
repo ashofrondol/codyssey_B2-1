@@ -219,7 +219,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-budget_app/cli/app.py:97-98
+budget_app/cli/app.py:99-100
 ```python
 if __name__ == "__main__":
     sys.exit(main())
@@ -677,13 +677,20 @@ f-string 은 그 줄을 만나는 순간 문자열이 **완성**되고, `str.for
 평가되므로 상수가 될 수 없습니다. 이 프로젝트가 `str.format` 을 버리지 않은 유일하고
 결정적인 이유입니다.
 
-budget_app/cli/messages.py:42-43
+budget_app/cli/messages.py:42-50
 ```python
 MSG_NO_DATA = "(데이터 없음)"
-FMT_TX_LINE = "{id} | {date} | {type:<7} | {category} | {amount} | {memo}"
+#: 거래 표의 한 줄 — **열 폭을 정하는 유일한 자리**다.
+#:
+#: ``{id}`` 만 폭 지정이 없다. ``TransactionId`` 는 ``__format__`` 을 정의하지 않아
+#: ``{id:<9}`` 가 TypeError 로 막히고, 값이 ``TX-`` + 6자리라 길이가 이미 고정이다.
+#: 나머지는 폭을 박아 둔다 — 없으면 ``| rent | 150000 |`` 과 ``| salary | 3000000 |``
+#: 의 파이프 위치가 어긋나 표가 표로 보이지 않는다. 금액만 우측 정렬(``>``)인데,
+#: 자릿수를 눈으로 비교하려면 일의 자리가 같은 칸에 있어야 하기 때문이다.
+FMT_TX_LINE = "{id} | {date:<10} | {type:<7} | {category:<12} | {amount:>12} | {memo}"
 ```
 
-budget_app/cli/presenter.py:31-39
+budget_app/cli/presenter.py:60-68
 ```python
 def tx_line(tx: Transaction) -> str:
     return messages.FMT_TX_LINE.format(
@@ -845,9 +852,9 @@ budget_app/domain/tx_id.py:83-89
 **`{:<7}`** — `<` 는 왼쪽 정렬, `7` 은 최소 폭입니다. 문자열은 원래 왼쪽 정렬이
 기본이지만, 여기서는 **폭 7 을 주기 위해** 정렬 기호를 명시했습니다.
 
-budget_app/cli/messages.py:43-43
+budget_app/cli/messages.py:50-50
 ```python
-FMT_TX_LINE = "{id} | {date} | {type:<7} | {category} | {amount} | {memo}"
+FMT_TX_LINE = "{id} | {date:<10} | {type:<7} | {category:<12} | {amount:>12} | {memo}"
 ```
 
 값이 `"income"`(6자) 아니면 `"expense"`(7자)뿐이므로, 폭 7 이면 `income` 뒤에 공백 하나가
@@ -884,7 +891,7 @@ budget_app/domain/specs.py:181-182
 거래 목록 한 줄이 이렇게 나옵니다. 3.13.1 에서 확인한 결과입니다.
 
 ```
-TransactionId(value='TX-000001') | 2024-01-05 | expense | food | 12000 |
+TransactionId(value='TX-000001') | 2024-01-05 | expense | food         |        12000 |
 ```
 
 `@dataclass` 가 만들어 주는 것은 `__repr__` 뿐이고 `__str__` 은 만들지 않습니다.
@@ -977,7 +984,7 @@ budget_app/cli/prompts.py:104-107
 ```
 
 **참고 — `startswith` 는 지금 이 소스에 없습니다.** 두 docstring 에만 흔적으로
-남아 있습니다(services/budgets.py:35, domain/periods.py:4). 이전에는 "이 달에 속하는가"를
+남아 있습니다(services/budgets.py:55, domain/periods.py:4). 이전에는 "이 달에 속하는가"를
 `date.startswith(month + "-")` 로 판정했는데, 같은 개념이 CLI 와 서비스에 서로 다른
 알고리즘으로 구현돼 있어서 `domain/periods.month_range` 하나로 합쳤습니다.
 
@@ -2058,7 +2065,7 @@ budget_app/storage/jsonl.py:215-225
                 logger.warning(messages.LOG_CORRUPT_LINE, self.path.name, raw.lineno, raw.error)
 ```
 
-budget_app/cli/presenter.py:42-59
+budget_app/cli/presenter.py:71-97
 ```python
 def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[str]:
     """거래 표를 줄 단위로 yield 한다 — 비어 있으면 안내 한 줄.
@@ -2069,11 +2076,20 @@ def tx_table(rows: Iterable[Transaction], limit: int | None = None) -> Iterator[
     ``limit`` 은 **표시 한도**일 뿐 메모리 한도가 아니다. 여기서 ``break`` 해도 상류가
     이미 만들어 둔 것은 줄지 않는다(정렬은 전부 훑어야 끝난다). 메모리를 잡는 것은
     같은 ``limit`` 을 받은 ``TransactionService.stream_sorted`` 쪽이다.
+
+    머리글은 **첫 행을 실제로 받은 뒤에** 낸다. 미리 내면 결과가 없을 때 머리글만
+    덩그러니 남아 "(데이터 없음)" 과 모순되는 화면이 되고, 표를 파이프로 넘겨 세는
+    쪽도 빈 결과와 한 건을 구분하지 못한다. 행을 하나도 못 받은 경우에만 안내 한 줄이
+    나가는 성질은 그대로다.
     """
     count = 0
     for tx in rows:
         if limit is not None and count >= limit:
             break
+        if count == 0:
+            header = _header_line()
+            yield header
+            yield _rule_line(header)
         yield tx_line(tx)
         count += 1
     if count == 0:
@@ -2696,7 +2712,7 @@ budget_app/cli/error_handler.py:57-60
 그냥 절을 지우면 아래의 `except OSError` 가 잡아 오류 메시지를 찍어 버립니다.
 즉 이 절은 **아무 일도 하지 않기 위해 존재**합니다. 그리고 진짜 처리는 여기 있습니다.
 
-budget_app/cli/app.py:84-94
+budget_app/cli/app.py:86-96
 ```python
 def main(argv: list[str] | None = None) -> int:
     try:
@@ -2770,7 +2786,7 @@ def measure_time(func: Callable[..., Any]) -> Callable[..., Any]:
 `return func(...)` 과 `finally` 의 조합이 이 함수의 전부입니다. 성공하면 반환값을
 계산한 뒤 시간을 찍고 반환하며, 실패하면 예외가 올라가기 **직전에** 시간을 찍고
 예외는 그대로 전파됩니다. 즉 `measure_time` 은 예외를 **삼키지 않습니다**.
-`@measure_time` 이 붙은 곳은 `BudgetService.monthly_summary`(budgets.py:30) 한 곳입니다.
+`@measure_time` 이 붙은 곳은 `BudgetService.monthly_summary`(budgets.py:50) 한 곳입니다.
 
 **주의 — `finally` 안의 `return` 은 예외를 삼킵니다.** 이것은 일반론 예시이며
 이 소스에는 없습니다.
@@ -4779,7 +4795,7 @@ def parse_args(self, args=None, namespace=None):
 
 **이 소스에서**
 
-budget_app/cli/app.py:84-90
+budget_app/cli/app.py:86-92
 ```python
 def main(argv: list[str] | None = None) -> int:
     try:
@@ -4839,7 +4855,7 @@ budget_app/cli/parser.py:91-92
     sub = parser.add_subparsers(dest="command", required=True)
 ```
 
-budget_app/cli/parser.py:161-166
+budget_app/cli/parser.py:170-175
 ```python
     cat = p.add_subparsers(dest="cat_cmd", required=True)
 
@@ -4933,7 +4949,7 @@ plain     ['list', '--data-dir', 'Y']                -> data_dir='Y' debug=False
 
 `plain` 의 첫 줄이 버그입니다. 사용자가 분명히 `--data-dir X --debug` 를 줬는데 하위 파서의 기본값이 `./data` 와 `False` 로 되돌려 놓았고, **경고 한 줄 없이** 그렇게 됩니다. `--data-dir` 은 이 프로그램에서 "어느 폴더의 데이터를 읽고 쓸 것인가"이므로, 이 조용한 되돌림은 **엉뚱한 폴더에 거래를 저장하는 결과**로 이어집니다. `parser.py:66-69` 의 docstring 이 "여기에 `default=DEFAULT_DATA_DIR` 를 주면 하위 파서가 앞에서 읽어 둔 값을 기본값으로 되돌려 버린다"고 적은 것이 정확히 이 출력입니다.
 
-**없으면 어떻게 되나** — 대안은 하위 파서에서 옵션을 아예 빼는 것인데, 그러면 `budget_app list --data-dir X`(옵션을 뒤에 쓰는, 더 자연스러운 순서)가 "unrecognized arguments" 로 거절됩니다. 두 순서를 모두 받으면서 값을 잃지 않는 방법이 SUPPRESS 입니다. `app.py:89` 의 `getattr(args, "debug", False)` 도 이 설계의 짝입니다 — 어느 파서도 값을 넣지 않았으면 `args.debug` 속성 자체가 없기 때문입니다.
+**없으면 어떻게 되나** — 대안은 하위 파서에서 옵션을 아예 빼는 것인데, 그러면 `budget_app list --data-dir X`(옵션을 뒤에 쓰는, 더 자연스러운 순서)가 "unrecognized arguments" 로 거절됩니다. 두 순서를 모두 받으면서 값을 잃지 않는 방법이 SUPPRESS 입니다. `app.py:91` 의 `getattr(args, "debug", False)` 도 이 설계의 짝입니다 — 어느 파서도 값을 넣지 않았으면 `args.debug` 속성 자체가 없기 때문입니다.
 
 ---
 
@@ -4965,7 +4981,7 @@ budget_app/cli/parser.py:110-111
     p.set_defaults(handler="add")
 ```
 
-budget_app/cli/parser.py:251-252
+budget_app/cli/parser.py:260-261
 ```python
     # 백업은 기존 폴더를 읽기만 한다 — 없으면 만들지 말고 오류로 알려야 한다.
     p.set_defaults(handler="backup", needs_storage=False)
@@ -4983,7 +4999,7 @@ HANDLERS: dict[str, Handler] = {
     "budget.set": handlers.cmd_budget_set,
 ```
 
-budget_app/cli/app.py:78-81
+budget_app/cli/app.py:80-83
 ```python
     ctx = AppContext(Path(args.data_dir))
     if args.needs_storage:
@@ -4991,9 +5007,9 @@ budget_app/cli/app.py:78-81
     return HANDLERS[args.handler](ctx, args)
 ```
 
-둘째는 **최상위에서 켜고 말단에서 끄는 플래그**입니다. `parser.py:91` 이 `needs_storage=True` 를 최상위 `_defaults` 에 넣고, `parser.py:252` 이 `backup` 서브파서에서만 `False` 로 덮습니다. 여기서는 SUPPRESS 와 반대 방향으로 `vars(subnamespace)` 복사를 **이용합니다** — 하위 파서의 `_defaults` 가 상위 값을 덮는 성질이 이 경우에는 정확히 원하는 동작입니다.
+둘째는 **최상위에서 켜고 말단에서 끄는 플래그**입니다. `parser.py:91` 이 `needs_storage=True` 를 최상위 `_defaults` 에 넣고, `parser.py:261` 이 `backup` 서브파서에서만 `False` 로 덮습니다. 여기서는 SUPPRESS 와 반대 방향으로 `vars(subnamespace)` 복사를 **이용합니다** — 하위 파서의 `_defaults` 가 상위 값을 덮는 성질이 이 경우에는 정확히 원하는 동작입니다.
 
-셋째는 `parser.py:214` 의 `p.set_defaults(handler="export", include_id=True)` 로, `action="store_false"` 옵션의 기본값을 뒤에서 정하는 용법입니다(다음 항목).
+셋째는 `parser.py:223` 의 `p.set_defaults(handler="export", include_id=True)` 로, `action="store_false"` 옵션의 기본값을 뒤에서 정하는 용법입니다(다음 항목).
 
 **없으면 어떻게 되나** — `set_defaults` 가 없다면 "어떤 명령이 선택됐는가"를 `args.command` 와 `args.cat_cmd` 두 문자열을 조합해 판정해야 합니다. `parser.py:17-21` 의 docstring 이 회고하는 옛 구조(`if sub == "add" ... elif ...`)가 정확히 그 모습이고, 하위 명령이 늘 때마다 분기가 늘어납니다. 지금은 파서에 한 줄, `HANDLERS` 에 한 줄이면 끝이고 `main` 은 변하지 않습니다.
 
@@ -5038,7 +5054,7 @@ budget_app/cli/parser.py:49-55
     return value
 ```
 
-`ERR_ARG_NOT_INT` 와 `ERR_ARG_NOT_POSITIVE` 는 `cli/messages.py:68-69` 의 한국어 문장(`"정수여야 합니다: {value}"`, `"1 이상이어야 합니다: {value}"`)입니다. 실제 출력이 이렇습니다.
+`ERR_ARG_NOT_INT` 와 `ERR_ARG_NOT_POSITIVE` 는 `cli/messages.py:98-99` 의 한국어 문장(`"정수여야 합니다: {value}"`, `"1 이상이어야 합니다: {value}"`)입니다. 실제 출력이 이렇습니다.
 
 ```
 $ python -m budget_app list --limit 0
@@ -5066,7 +5082,7 @@ $ echo $?
 
 **이 소스에서** — 셋이 한 자리에서 만나는 곳이 `--no-id` 입니다.
 
-budget_app/cli/parser.py:208-214
+budget_app/cli/parser.py:217-223
 ```python
     p.add_argument(
         "--no-id",
@@ -5077,18 +5093,18 @@ budget_app/cli/parser.py:208-214
     p.set_defaults(handler="export", include_id=True)
 ```
 
-읽는 순서는 이렇습니다. 사용자가 보는 이름은 **부정형** `--no-id` 이고, 코드가 보는 이름은 **긍정형** `args.include_id` 입니다. `store_false` 가 그 뒤집기를 담당하고, `set_defaults(include_id=True)` 가 "주지 않았으면 포함"을 정합니다(`store_false` 의 기본 `default=True` 와 같은 값이지만, 명시해 두면 `parser.py:214` 한 줄만 읽어도 기본이 무엇인지 압니다).
+읽는 순서는 이렇습니다. 사용자가 보는 이름은 **부정형** `--no-id` 이고, 코드가 보는 이름은 **긍정형** `args.include_id` 입니다. `store_false` 가 그 뒤집기를 담당하고, `set_defaults(include_id=True)` 가 "주지 않았으면 포함"을 정합니다(`store_false` 의 기본 `default=True` 와 같은 값이지만, 명시해 두면 `parser.py:223` 한 줄만 읽어도 기본이 무엇인지 압니다).
 
-budget_app/cli/handlers.py:159-159
+budget_app/cli/handlers.py:174-174
 ```python
     count = ctx.io_service.export_csv(Path(args.out), flt, include_id=args.include_id)
 ```
 
 핸들러 코드에 `not args.no_id` 같은 **이중 부정이 한 번도 나오지 않는 것**이 이 조합의 목적입니다.
 
-`choices` 는 세 곳입니다 — `parser.py:130` 과 `parser.py:186` 의 `choices=list(domain_config.VALID_TYPES)`, 그리고 `parser.py:229` 의 `choices=list(services_config.ON_DUPLICATE_CHOICES)`. 세 값 모두 **다른 계층이 소유한 상수**에서 옵니다(`domain/config.py:15`, `services/config.py:12`). CLI 는 허용 값 목록을 직접 적지 않고 빌려다 씁니다.
+`choices` 는 세 곳입니다 — `parser.py:130` 과 `parser.py:195` 의 `choices=list(domain_config.VALID_TYPES)`, 그리고 `parser.py:238` 의 `choices=list(services_config.ON_DUPLICATE_CHOICES)`. 세 값 모두 **다른 계층이 소유한 상수**에서 옵니다(`domain/config.py:15`, `services/config.py:12`). CLI 는 허용 값 목록을 직접 적지 않고 빌려다 씁니다.
 
-`store_true` 는 `--debug`(`parser.py:76`, `:85`)와 `--atomic`(`parser.py:222-225`)입니다.
+`store_true` 는 `--debug`(`parser.py:76`, `:85`)와 `--atomic`(`parser.py:231-234`)입니다.
 
 **없으면 어떻게 되나** — `choices` 를 빼면 `--type incom`(오타)이 파서를 통과해 도메인의 `parse_type` 까지 내려가서야 걸립니다. 종료 코드가 2(인자 오류) 대신 2(검증 오류)로 — 이 소스는 마침 둘 다 2 입니다만 — 오류를 발견하는 **계층**이 달라지고, 무엇보다 usage 에 선택지가 표시되지 않아 사용자가 무엇을 써야 하는지 알 수 없습니다.
 
@@ -5123,7 +5139,7 @@ def error(self, message):
 
 **이 소스에서** — `main` 의 구조를 다시 보면 argparse 오류가 어디로 빠져나가는지 보입니다.
 
-budget_app/cli/app.py:84-94
+budget_app/cli/app.py:86-96
 ```python
 def main(argv: list[str] | None = None) -> int:
     try:
@@ -5138,7 +5154,7 @@ def main(argv: list[str] | None = None) -> int:
         return config.EXIT_OK
 ```
 
-`@handle_errors` 는 `_dispatch` 에 붙어 있는데(`app.py:61`), argparse 는 그 **한 줄 위**에서 `SystemExit` 을 던집니다. 그러므로 인자 오류는 `handle_errors` 를 **지나지 않습니다.** 설령 그 자리를 감싸더라도 `except Exception` 은 `SystemExit` 을 잡지 못합니다.
+`@handle_errors` 는 `_dispatch` 에 붙어 있는데(`app.py:63`), argparse 는 그 **한 줄 위**에서 `SystemExit` 을 던집니다. 그러므로 인자 오류는 `handle_errors` 를 **지나지 않습니다.** 설령 그 자리를 감싸더라도 `except Exception` 은 `SystemExit` 을 잡지 못합니다.
 
 그래서 종료 코드 표를 정직하게 읽으면 두 출처가 섞여 있습니다.
 
@@ -5193,7 +5209,7 @@ WindowsPath data\a.jsonl
 
 **이 소스에서** — 경계에서 문자열을 받아 즉시 `Path` 로 바꾸고, 안쪽은 전부 `Path` 로 다닙니다.
 
-budget_app/cli/app.py:78-78
+budget_app/cli/app.py:80-80
 ```python
     ctx = AppContext(Path(args.data_dir))
 ```
@@ -6028,7 +6044,7 @@ type(OSError(errno.EPIPE, 'x')).__name__  ->  BrokenPipeError
 
 **이 소스에서** —
 
-budget_app/cli/app.py:50-58
+budget_app/cli/app.py:52-60
 ```python
 def _silence_broken_pipe() -> None:
     """하류 파이프(``list | head``)가 먼저 닫혔을 때 남은 출력을 os.devnull 로 돌려,
@@ -6043,7 +6059,7 @@ def _silence_broken_pipe() -> None:
 
 호출 지점은 `main` 의 최상위 한 곳입니다.
 
-budget_app/cli/app.py:91-94
+budget_app/cli/app.py:93-96
 ```python
     except BrokenPipeError:
         # 예: `budget_app list | head` — head 가 먼저 닫음. 오류가 아니므로 조용히 종료.

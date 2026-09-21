@@ -27,6 +27,26 @@ class BudgetService:
     def set_budget(self, month: str, amount: int) -> Budget:
         return self.budgets.set(month, amount)
 
+    def get_budget(self, month: str) -> Budget | None:
+        """그 달의 예산 — 설정된 적이 없으면 ``None``.
+
+        ``monthly_summary`` 가 이미 쓰던 조회를 그대로 밖으로 연다. 조회 경로가
+        하나뿐이어야 ``budget get`` 과 ``summary`` 가 서로 다른 답을 낼 수 없다.
+        """
+        return self.budgets.get(month)
+
+    def list_budgets(self) -> list[Budget]:
+        """설정된 모든 월 예산 — 월 오름차순.
+
+        같은 달이 두 줄 이상 남아 있으면(손으로 고친 파일) **마지막 줄**을 유효값으로
+        본다. ``BudgetStore.get`` 이 쓰는 규칙과 같은 것이며, 다르게 고르면 같은
+        파일을 두고 ``budget get`` 과 ``budget list`` 가 서로를 반박하게 된다.
+        """
+        latest: dict[str, Budget] = {}
+        for budget in self.budgets.stream():
+            latest[budget.month] = budget
+        return [latest[month] for month in sorted(latest)]
+
     @measure_time
     def monthly_summary(self, month: str, top_n: int = config.DEFAULT_TOP_N) -> MonthlySummary:
         """월별 요약을 계산해 ``MonthlySummary`` 로 돌려준다.

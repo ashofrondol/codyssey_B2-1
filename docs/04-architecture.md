@@ -51,7 +51,7 @@ budget_app 은 일을 네 구역으로 나눠 두었습니다 — 명령을 받�
 ┌──────────────────────────────────────────────────────────────┐
 │  cli/               CLI 계층                                   │
 │    app.py           HANDLERS 레지스트리 + main                  │
-│    handlers.py      cmd_* 13개 (오케스트레이션만)               │
+│    handlers.py      cmd_* 15개 (오케스트레이션만)               │
 │    parser.py        argparse 문법 정의                          │
 │    prompts.py       대화형 입력 (재입력 루프 / EOF)             │
 │    presenter.py     도메인 → 화면 문자열 (반환만, 출력 안 함)    │
@@ -635,7 +635,7 @@ python -m budget_app add
 
 **2단계 — 파싱·준비·디스패치.** 디스패치는 명령 이름에 맞는 함수를 골라 일을 넘기는 것을 말합니다.
 
-budget_app/cli/app.py:84-94
+budget_app/cli/app.py:86-96
 
 ```python
 def main(argv: list[str] | None = None) -> int:
@@ -662,11 +662,11 @@ def _add_add(sub) -> None:
     p.set_defaults(handler="add")
 ```
 
-> **⚙️ 내부 동작** — `set_defaults(handler="add")` 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 `Namespace` 에 **그냥 꽂아 넣을 값**을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 `_defaults` 를 상위 `Namespace` 에 합칩니다. 그래서 `args.handler` 는 사용자가 입력한 적 없는데도 값이 들어 있고, `--data-dir` 처럼 실제 옵션이 아니라서 `--help` 에도 나오지 않습니다. `needs_storage` 도 같은 통로로 들어옵니다 — 최상위에서 `set_defaults(needs_storage=True)`, `backup` 하위 파서만 `False` 로 덮습니다(`cli/parser.py:91`, `cli/parser.py:252`). → [12 §2-B](./12-syntax-and-stdlib.md)
+> **⚙️ 내부 동작** — `set_defaults(handler="add")` 는 인자를 정의하는 것이 아니라, 이 파서가 선택됐을 때 결과 `Namespace` 에 **그냥 꽂아 넣을 값**을 등록하는 것입니다. argparse 는 하위 명령을 만나면 그 하위 파서로 파싱을 위임하고, 하위 파서의 `_defaults` 를 상위 `Namespace` 에 합칩니다. 그래서 `args.handler` 는 사용자가 입력한 적 없는데도 값이 들어 있고, `--data-dir` 처럼 실제 옵션이 아니라서 `--help` 에도 나오지 않습니다. `needs_storage` 도 같은 통로로 들어옵니다 — 최상위에서 `set_defaults(needs_storage=True)`, `backup` 하위 파서만 `False` 로 덮습니다(`cli/parser.py:91`, `cli/parser.py:261`). → [12 §2-B](./12-syntax-and-stdlib.md)
 
 **3단계 — 컨텍스트 조립과 핸들러 실행.** `@handle_errors` 는 개별 핸들러가 아니라 **`_dispatch` 한 곳에만** 붙습니다.
 
-budget_app/cli/app.py:61-81
+budget_app/cli/app.py:63-83
 
 ```python
 @handle_errors
@@ -823,7 +823,7 @@ python -m budget_app summary --month 2024-01
       → output.out_lines(...)                                  stdout
 ```
 
-budget_app/services/budgets.py:30-66
+budget_app/services/budgets.py:50-86
 
 ```python
     @measure_time
@@ -877,7 +877,7 @@ budget_app/services/budgets.py:30-66
 
 프레젠터는 그 결과를 읽기만 합니다.
 
-budget_app/cli/presenter.py:67-92
+budget_app/cli/presenter.py:105-130
 
 ```python
 def summary_lines(summary: MonthlySummary) -> Iterator[str]:
@@ -1105,9 +1105,9 @@ def test_app_context_does_not_expose_repositories():
 | `ensure_ready()` | 폴더·파일 생성 | `prepare()` 안에서 |
 | `seed_defaults()` | 기본 카테고리 심기 | `prepare()` 안에서 |
 
-그리고 진입점(`cli/app.py:78-80` 의 `_dispatch`)이 **한 번만** `prepare()` 를 호출하되, 필요 없는 명령은 건너뜁니다. 건너뛸지 여부는 파서가 남긴 `needs_storage` 플래그가 정합니다.
+그리고 진입점(`cli/app.py:80-82` 의 `_dispatch`)이 **한 번만** `prepare()` 를 호출하되, 필요 없는 명령은 건너뜁니다. 건너뛸지 여부는 파서가 남긴 `needs_storage` 플래그가 정합니다.
 
-budget_app/cli/parser.py:248-252
+budget_app/cli/parser.py:257-261
 
 ```python
 def _add_backup(sub) -> None:
@@ -1168,7 +1168,7 @@ storage.csv_io.read_rows()   ── AppError ─────────┤
 context._require_usable_...  ── NotADirectoryError┤
                                                   ▼
                         @handle_errors  (cli/error_handler.py:20-128)
-                                    ↑ 붙는 자리는 cli/app.py:61 의 _dispatch 하나
+                                    ↑ 붙는 자리는 cli/app.py:63 의 _dispatch 하나
                                                   │
                      ┌────────────────────────────┼────────────────────────┐
                      ▼                            ▼                        ▼
@@ -1226,7 +1226,7 @@ python -m budget_app import --from nope.csv 1>/dev/null     # 결과만 버림 �
 
 `import` 는 한 명령이 두 채널을 모두 쓰는 예입니다.
 
-budget_app/cli/handlers.py:180-191
+budget_app/cli/handlers.py:195-206
 
 ```python
 def cmd_import(ctx: AppContext, args: argparse.Namespace) -> int:

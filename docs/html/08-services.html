@@ -113,7 +113,7 @@
 </tr>
 <tr>
 <td><code>BudgetService</code></td>
-<td><code>services/budgets.py:20-66</code></td>
+<td><code>services/budgets.py:20-86</code></td>
 <td>예산 설정 + 월별 요약</td>
 </tr>
 <tr>
@@ -275,7 +275,7 @@
 <p><code>list</code> 와 <code>search</code> 가 이 하나를 공유합니다 — <code>list</code> 는 <code>flt=None</code> 에 <code>limit</code> 을 넘기고, <code>search</code> 는 조건을 넘깁니다. 정렬 규칙(최신순)이 한 곳에만 있습니다.</p>
 <hr>
 <h2 id="3-budgetservice-단일-패스-집계">3. <code>BudgetService</code> — 단일 패스 집계</h2>
-<p>budget_app/services/budgets.py:30-66</p>
+<p>budget_app/services/budgets.py:50-86</p>
 <div class="codehilite"><pre><span></span><code>    <span class="nd">@measure_time</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">monthly_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">month</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">top_n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">DEFAULT_TOP_N</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MonthlySummary</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""월별 요약을 계산해 ``MonthlySummary`` 로 돌려준다.</span>
@@ -899,7 +899,7 @@ ValueError: mutable default &lt;class 'list'&gt; for field items is not allowed:
 </code></pre></div>
 
 <p>프레젠터도 둘을 구분해 보여 줍니다.</p>
-<p>budget_app/cli/presenter.py:122-153</p>
+<p>budget_app/cli/presenter.py:189-220</p>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">import_problem_lines</span><span class="p">(</span><span class="n">report</span><span class="p">:</span> <span class="n">ImportReport</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""건너뛴 줄의 사유 — 결과가 아니라 진단이므로 호출자가 stderr 로 보낸다.</span>
 <span class="sd">    ...</span>
@@ -930,7 +930,7 @@ ValueError: mutable default &lt;class 'list'&gt; for field items is not allowed:
 
 <p>맨 앞의 <code>report.new_categories</code> 분기가 <strong><code>--auto-category</code> 로 늘어난 마스터 데이터</strong>를 알립니다 — 부수 효과는 조용히 일어나면 안 되기 때문입니다. 여기 <code>lines.extend(... for e in report.errors)</code> 는 §5.2 와 같은 제너레이터 표현식입니다 — 인자가 하나뿐일 때는 함수 호출 괄호가 제너레이터 식의 괄호를 겸하므로 <code>extend((...))</code> 처럼 겹쳐 쓰지 않아도 되고, <code>list.extend</code> 가 그것을 순회하며 밀어 넣으므로 중간 리스트가 생기지 않습니다.</p>
 <p>중복 목록 뒤에는 <strong>"고칠 필요 없다"는 안내</strong>가 붙습니다.</p>
-<p>budget_app/cli/messages.py:99-101</p>
+<p>budget_app/cli/messages.py:129-131</p>
 <div class="codehilite"><pre><span></span><code><span class="n">MSG_IMPORT_DUPLICATE_HINT</span> <span class="o">=</span> <span class="p">(</span>
     <span class="s2">"[힌트] 중복은 이미 저장된 거래입니다. 다시 넣으려면 `--on-duplicate new-id` 를 쓰세요."</span>
 <span class="p">)</span>

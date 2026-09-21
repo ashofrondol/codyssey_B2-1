@@ -195,7 +195,7 @@
 </tbody>
 </table></div>
 <p>여기에 CSV 경계 어댑터 <code>storage/csv_io.py</code> 가 같은 폴더에 있습니다(§8). <strong>내장 <code>open()</code> 을 부르는 곳은 <code>storage/jsonl.py</code>(4곳: 61·174·234·258)와 <code>storage/csv_io.py</code>(2곳: 82·142) 뿐입니다.</strong></p>
-<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — "<code>open()</code> 이 두 파일에만 있다"는 말에는 작은 예외가 있습니다. <code>storage/ids.py:60</code> 의 <code>Path.read_text</code> 와 <code>storage/backup.py:32</code> 의 <code>Path.read_bytes</code>/<code>Path.write_bytes</code> 는 내부에서 <code>io.open</code> 을 부르는 <strong>얇은 래퍼</strong>입니다(CPython <code>Lib/pathlib</code> 구현이 <code>with self.open(...) as f: return f.read()</code> 형태). 계층 규칙("파일을 여는 코드는 저장소 계층 안에만")은 그대로 지켜지는 셈입니다. 또 <code>cli/app.py:55</code> 의 <code>os.open(os.devnull, ...)</code> 은 내장 <code>open()</code> 이 아니라 <strong>파일 디스크립터를 직접 여는 저수준 시스템 호출</strong>이라 성격이 다릅니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
+<blockquote class="callout internals"><p><strong>⚙️ 내부 동작</strong> — "<code>open()</code> 이 두 파일에만 있다"는 말에는 작은 예외가 있습니다. <code>storage/ids.py:60</code> 의 <code>Path.read_text</code> 와 <code>storage/backup.py:32</code> 의 <code>Path.read_bytes</code>/<code>Path.write_bytes</code> 는 내부에서 <code>io.open</code> 을 부르는 <strong>얇은 래퍼</strong>입니다(CPython <code>Lib/pathlib</code> 구현이 <code>with self.open(...) as f: return f.read()</code> 형태). 계층 규칙("파일을 여는 코드는 저장소 계층 안에만")은 그대로 지켜지는 셈입니다. 또 <code>cli/app.py:57</code> 의 <code>os.open(os.devnull, ...)</code> 은 내장 <code>open()</code> 이 아니라 <strong>파일 디스크립터를 직접 여는 저수준 시스템 호출</strong>이라 성격이 다릅니다. → <a href="12-syntax-and-stdlib.html">12 §3</a></p>
 </blockquote>
 <hr>
 <h2 id="2-이-문서의-핵심-읽기-경로가-왜-둘인가">2. 이 문서의 핵심 — 읽기 경로가 왜 둘인가</h2>

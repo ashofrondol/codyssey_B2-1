@@ -196,7 +196,7 @@
 
 CLI 핸들러(명령 하나를 실제로 처리하는 함수) 13개가 각자 `try/except` 를 갖는 것을 막기 위해서입니다. 만약 각 핸들러가 예외를 직접 처리했다면 같은 11단 except 체인이 13번 복사됩니다. 그러면 정책이 바뀔 때마다 13곳을 똑같이 고쳐야 하고, 한 곳을 빠뜨리면 그 명령만 다르게 동작합니다.
 
-**지금은 그 방패가 한 곳에만 붙어 있습니다** — `cli/app.py:61` 의 `_dispatch` 입니다. 핸들러 13개에 각각 붙이는 대신 "핸들러를 부르는 자리"를 한 겹 감쌌기 때문에, 컨텍스트 조립(`AppContext.prepare()`)에서 나는 오류까지 같은 방패 안에 들어옵니다.
+**지금은 그 방패가 한 곳에만 붙어 있습니다** — `cli/app.py:63` 의 `_dispatch` 입니다. 핸들러 13개에 각각 붙이는 대신 "핸들러를 부르는 자리"를 한 겹 감쌌기 때문에, 컨텍스트 조립(`AppContext.prepare()`)에서 나는 오류까지 같은 방패 안에 들어옵니다.
 
 > **💡 쉽게 말하면** — 방 열세 개에 소화기를 하나씩 두고 사용법을 열세 번 붙여 두는
 > 대신, 모든 방이 통하는 복도 한 곳에 스프링클러를 답니다. 어느 방에서 불이 나도 같은
@@ -576,7 +576,7 @@ printf '2024-01-15\nexpense\n' | python -m budget_app add
 대응이 세 단계로 나뉩니다.
 
 1. `handle_errors` 는 **처리하지 않고 `raise`**(`cli/error_handler.py:57-60`) — 여기서 출력하면 또 파이프가 깨지는 2차 사고
-2. `main` 이 잡아 `os.dup2` 로 stdout 을 `/dev/null` 로 갈아끼움(`cli/app.py:50-58`) — 인터프리터 종료 시 `Exception ignored` 방지
+2. `main` 이 잡아 `os.dup2` 로 stdout 을 `/dev/null` 로 갈아끼움(`cli/app.py:52-60`) — 인터프리터 종료 시 `Exception ignored` 방지
 3. 종료 코드는 **0**
 
 > **🔎 문법의 출처** — 닫힌 파이프에 쓰면 유닉스는 프로세스에 **SIGPIPE 시그널**을 보내
@@ -643,7 +643,7 @@ cli.py → parser.py (파서 호출)     cli.py: HANDLERS = {"add": cmd_add}
 > **⚙️ 내부 동작** — 문자열 키를 실어 나르는 장치는 argparse 의
 > `set_defaults(handler="add")`(`cli/parser.py:111`)입니다. 서브파서가 선택되면
 > argparse 가 그 파서의 기본값들을 결과 `Namespace` 에 채워 넣으므로, `args.handler` 에
-> `"add"` 가 담긴 채로 돌아옵니다. 받는 쪽 `cli/app.py:28-42` 의 `HANDLERS` 는 그냥
+> `"add"` 가 담긴 채로 돌아옵니다. 받는 쪽 `cli/app.py:28-44` 의 `HANDLERS` 는 그냥
 > dict 이고, `HANDLERS[args.handler](ctx, args)` 한 줄이 `if/elif` 13단을 대신합니다.
 > 키가 `"category.add"` 처럼 점을 포함하는 것은 하위 명령까지 **평평한 문자열 하나**로
 > 눌러 담기 위해서입니다. **dict 조회는
@@ -768,7 +768,7 @@ $ python -m budget_app import --from rt.csv
 
 **덕 타이핑(duck typing)** — *(쉬운 뜻: 족보를 따지지 않고, 시킨 일을 할 줄 알면 같은 것으로 취급하는 태도)* 공통 조상 없이도 "같은 메서드를 갖고 있으면 같게 다룬다"는 파이썬의 다형성. 출처: "오리처럼 걷고 운다면 오리다"라는 속담에서 온 말로, 파이썬 커뮤니티에서는 Alex Martelli 가 2000년 무렵 뉴스그룹 글에서 쓴 것이 널리 인용됩니다. 위치: `storage/jsonl.py:209` — `self.entity_cls.from_dict(data)` 가 `Transaction`/`Category`/`Budget` 셋 모두에 동작합니다. 셋은 공통 부모 클래스가 **없고**, `from_dict` 라는 이름의 classmethod 를 각자 갖고 있을 뿐입니다.
 
-**데코레이터(decorator)** — *(쉬운 뜻: 선물 포장처럼, 안의 물건은 그대로 두고 겉에 공통의 무언가만 덧입히는 것)* `@이름` 문법으로 기존 함수를 감싸 공통 동작을 덧입히는 기법. 출처: **PEP 318**(파이썬 2.4)이 `@` 표기를 도입했습니다. GoF 의 Decorator 디자인 패턴과 이름은 같지만 다른 것으로, 파이썬 쪽은 "함수를 함수로 감싸 재대입한다"는 문법 장치입니다. 위치: `decorators.py`(관측), `error_handler.py`(표현), 적용부는 `services/transactions.py:34, 52, 72`(`@log_call`)와 `cli/app.py:61`(`@handle_errors`).
+**데코레이터(decorator)** — *(쉬운 뜻: 선물 포장처럼, 안의 물건은 그대로 두고 겉에 공통의 무언가만 덧입히는 것)* `@이름` 문법으로 기존 함수를 감싸 공통 동작을 덧입히는 기법. 출처: **PEP 318**(파이썬 2.4)이 `@` 표기를 도입했습니다. GoF 의 Decorator 디자인 패턴과 이름은 같지만 다른 것으로, 파이썬 쪽은 "함수를 함수로 감싸 재대입한다"는 문법 장치입니다. 위치: `decorators.py`(관측), `error_handler.py`(표현), 적용부는 `services/transactions.py:34, 52, 72`(`@log_call`)와 `cli/app.py:63`(`@handle_errors`).
 
 **동시성(concurrency)** — *(쉬운 뜻: 한 파일을 여럿이 동시에 건드릴 때 서로 덮어써 버리는 문제)* 여러 프로세스가 같은 자원에 동시에 접근하는 상황. 이 프로젝트는 단일 사용자 CLI 전제라 파일 잠금이 없습니다. 위치: [10 §6](./10-advanced-design.md).
 
@@ -802,11 +802,11 @@ $ python -m budget_app import --from rt.csv
 
 **전수 롤백(all-or-nothing rollback)** — *(쉬운 뜻: 한 건이라도 잘못되면 나머지가 멀쩡해도 전부 없던 일로 되돌리는 정책)* 하나라도 실패하면 전체를 없던 일로 되돌리는 정책. `import --atomic` 의 동작입니다. 위치: `services/importexport.py:243-261`(`_commit_atomic`), [10 §3](./10-advanced-design.md).
 
-**제너레이터(generator)** — *(쉬운 뜻: 결과를 한꺼번에 다 만들어 주지 않고, 달라고 할 때마다 하나씩 내어 주는 함수)* `yield` 로 값을 하나씩 내어 주다가 다음 요청 때 이어서 실행되는 함수. 출처: **PEP 255**(파이썬 2.2)가 `yield` 를 도입했고, 괄호로 쓰는 제너레이터 식(`(tx for tx in ...)`)은 **PEP 289**(2.4), 하위 제너레이터에 위임하는 `yield from` 은 **PEP 380**(3.3)입니다. 세 가지가 이 소스에 모두 나옵니다. 위치: `storage/jsonl.py:162`(`iter_raw`), `services/transactions.py:86-108`(`stream_sorted` + `yield from`), `services/importexport.py:83`(제너레이터 식), `cli/presenter.py:42-59`.
+**제너레이터(generator)** — *(쉬운 뜻: 결과를 한꺼번에 다 만들어 주지 않고, 달라고 할 때마다 하나씩 내어 주는 함수)* `yield` 로 값을 하나씩 내어 주다가 다음 요청 때 이어서 실행되는 함수. 출처: **PEP 255**(파이썬 2.2)가 `yield` 를 도입했고, 괄호로 쓰는 제너레이터 식(`(tx for tx in ...)`)은 **PEP 289**(2.4), 하위 제너레이터에 위임하는 `yield from` 은 **PEP 380**(3.3)입니다. 세 가지가 이 소스에 모두 나옵니다. 위치: `storage/jsonl.py:162`(`iter_raw`), `services/transactions.py:86-108`(`stream_sorted` + `yield from`), `services/importexport.py:83`(제너레이터 식), `cli/presenter.py:71-97`.
 
 **제네릭(generic)** — *(쉬운 뜻: "무엇을 담을지"만 나중에 정하면 되도록 속을 비워 둔 틀. 서랍장은 하나, 안에 넣는 것은 그때그때)* 타입을 매개변수로 받는 클래스/함수. `TypeVar` 로 자리표시자를 만들고 `Generic[T]` 로 선언합니다. 출처: **PEP 484**(3.5)가 `typing.TypeVar`/`Generic` 을 들여왔고, `list[str]` 처럼 내장 자료형을 바로 첨자화하는 표기는 **PEP 585**(3.9)입니다. **런타임에는 지워지므로**(type erasure) 실제 클래스는 별도로 지정해야 합니다 — 그것이 `entity_cls` 클래스 속성의 존재 이유입니다. 위치: `storage/jsonl.py:35`(`T = TypeVar("T")`)·`131`(`class JsonlStore(Generic[T])`), 실제 타입 지정은 `storage/repositories.py:30, 220, 286`(`entity_cls = Transaction` 등), [03 §6](./03-python-advanced.md).
 
-**종료 코드(exit code)** — *(쉬운 뜻: 프로그램이 끝나며 남기는 번호. 사람이 아니라 다음 프로그램이 읽습니다)* 프로세스가 OS 에 반환하는 정수. 0 은 성공, 나머지는 실패 종류. 출처: 유닉스/POSIX 의 프로세스 규약이며, "128 + 시그널 번호"(130 = 128 + SIGINT) 는 셸의 관례입니다. 위치: `cli/config.py:22-29`, 반환 경로는 `cli/error_handler.py` → `cli/app.py:61`(`_dispatch`) → `cli/app.py:84-94`(`main`) → `__main__.py:8`(`sys.exit`)(Q10).
+**종료 코드(exit code)** — *(쉬운 뜻: 프로그램이 끝나며 남기는 번호. 사람이 아니라 다음 프로그램이 읽습니다)* 프로세스가 OS 에 반환하는 정수. 0 은 성공, 나머지는 실패 종류. 출처: 유닉스/POSIX 의 프로세스 규약이며, "128 + 시그널 번호"(130 = 128 + SIGINT) 는 셸의 관례입니다. 위치: `cli/config.py:22-29`, 반환 경로는 `cli/error_handler.py` → `cli/app.py:63`(`_dispatch`) → `cli/app.py:86-96`(`main`) → `__main__.py:8`(`sys.exit`)(Q10).
 
 **지연 평가(lazy evaluation)** — *(쉬운 뜻: 쓰게 될지 안 될지 모르는 계산은 정말 필요해질 때까지 미뤄 두는 것)* 값이 실제로 필요해질 때까지 계산을 미루는 방식. 출처: 함수형 언어(Haskell 계열)에서 온 개념이며, 파이썬은 언어 전체가 아니라 **제너레이터·`range`·`logging` 처럼 자리를 골라** 도입했습니다. 위치: `storage/jsonl.py:215-225`(제너레이터), `decorators.py:42, 44`(%-스타일 로깅)(Q19).
 
@@ -816,9 +816,9 @@ $ python -m budget_app import --from rt.csv
 
 **클로저(closure)** — *(쉬운 뜻: 만들어질 때 곁에 있던 값을 기억한 채로 돌아다니는 함수)* 자신이 만들어질 때의 바깥 변수를 기억하는 내부 함수. 출처: Peter Landin 이 1964년에 만든 용어로, 함수 본문과 그것이 참조하는 환경을 "닫아서" 한 덩어리로 본다는 뜻입니다. 위치: `cli/prompts.py:77-109`(`registered_category_validator` 가 `cat_service` 를 캡처), `storage/repositories.py:163-168`(`_drop` 이 `found` 를 `nonlocal` 로 갱신).
 
-**콜러블(callable)** — *(쉬운 뜻: 이름 뒤에 괄호를 붙여 "실행해 달라"고 할 수 있는 것 전부)* `f(...)` 처럼 호출 가능한 모든 객체. 함수뿐 아니라 클래스와 `__call__` 을 가진 인스턴스도 포함됩니다. 타입 힌트로는 `collections.abc.Callable[[인자], 반환]` 로 씁니다. 위치: `cli/prompts.py:100-107`(검증기 전달), `storage/jsonl.py:335-351`(`transform` 콜백), `cli/app.py:28-42`(`HANDLERS` 값이 전부 함수 객체).
+**콜러블(callable)** — *(쉬운 뜻: 이름 뒤에 괄호를 붙여 "실행해 달라"고 할 수 있는 것 전부)* `f(...)` 처럼 호출 가능한 모든 객체. 함수뿐 아니라 클래스와 `__call__` 을 가진 인스턴스도 포함됩니다. 타입 힌트로는 `collections.abc.Callable[[인자], 반환]` 로 씁니다. 위치: `cli/prompts.py:100-107`(검증기 전달), `storage/jsonl.py:335-351`(`transform` 콜백), `cli/app.py:28-44`(`HANDLERS` 값이 전부 함수 객체).
 
-**파이프(|)와 BrokenPipe** — *(쉬운 뜻: 앞 명령의 출력을 뒤 명령에 그대로 흘려 넣는 연결과, 받던 쪽이 먼저 자리를 뜬 상황)* 한 프로세스의 stdout 을 다른 프로세스의 stdin 에 연결하는 셸 기능과, 읽는 쪽이 먼저 닫혔을 때 발생하는 예외. 출처: 파이프는 Douglas McIlroy 의 제안으로 1973년 유닉스에 들어왔고, 닫힌 파이프에 쓸 때의 `SIGPIPE`/`EPIPE` 는 POSIX 규약입니다. 위치: `cli/error_handler.py:57-60`(잡지 않고 그대로 올림), `cli/app.py:50-58`(`os.dup2` 로 마무리)(Q23).
+**파이프(|)와 BrokenPipe** — *(쉬운 뜻: 앞 명령의 출력을 뒤 명령에 그대로 흘려 넣는 연결과, 받던 쪽이 먼저 자리를 뜬 상황)* 한 프로세스의 stdout 을 다른 프로세스의 stdin 에 연결하는 셸 기능과, 읽는 쪽이 먼저 닫혔을 때 발생하는 예외. 출처: 파이프는 Douglas McIlroy 의 제안으로 1973년 유닉스에 들어왔고, 닫힌 파이프에 쓸 때의 `SIGPIPE`/`EPIPE` 는 POSIX 규약입니다. 위치: `cli/error_handler.py:57-60`(잡지 않고 그대로 올림), `cli/app.py:52-60`(`os.dup2` 로 마무리)(Q23).
 
 **표준 입출력(stdin/stdout/stderr)** — *(쉬운 뜻: 프로그램에 기본으로 뚫려 있는 세 통로 — 입력받는 곳, 결과를 내보내는 곳, 오류를 알리는 곳)* 프로세스에 기본 연결되는 세 통로(파일 디스크립터 0·1·2). 결과는 stdout, 진단은 stderr 로 나눕니다. 출처: 유닉스의 설계이며, stderr 가 따로 있는 이유가 정확히 이 프로젝트의 규칙과 같습니다 — stdout 을 파일이나 다음 명령으로 넘겨도 오류 메시지는 화면에 남아야 하기 때문입니다. 위치: `cli/output.py:1-30`(모듈 docstring 이 이 규칙을 설명)([09 §5](./09-cli.md)).
 

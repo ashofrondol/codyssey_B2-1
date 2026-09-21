@@ -62,15 +62,15 @@
 
 ## Phase 3 — CLI 정확성
 
-- [x] 3-1. **`ctx.prepare()`를 오류 방패 안으로** — `cli/app.py:61-75`
+- [x] 3-1. **`ctx.prepare()`를 오류 방패 안으로** — `cli/app.py:63-77`
   AppContext 생성+prepare가 `@handle_errors` 밖이라 `--data-dir` 오류가 원시 트레이스백(exit 1)으로 터진다. prepare 이후 로직을 handle_errors와 동일 정책으로 감싸 EXIT_IO 경로로 수렴시키기.
-- [x] 3-2. **`--limit`/`--top` 양수 검증** — `cli/parser.py`, `cli/presenter.py:51`
+- [x] 3-2. **`--limit`/`--top` 양수 검증** — `cli/parser.py`, `cli/presenter.py:85`
   argparse type에서 양수만 허용 (limit 0/음수 → "(데이터 없음)" 거짓 출력 제거). summary `--top` 가드와 일관되게.
-- [x] 3-3. **export 기간 옵션 조합 방어** — `cli/handlers.py:153`
+- [x] 3-3. **export 기간 옵션 조합 방어** — `cli/handlers.py:168`
   `--month`와 `--from/--to` 동시 지정 시 조용히 무시하지 말고 오류로 차단.
 - [x] 3-4. **`--data-dir` 위치 규칙 정합화** — `cli/parser.py:68`
   `--debug`처럼 최상위에서도 받거나, 오도하는 오류 메시지를 정정.
-- [x] 3-5. **update의 tags 타입 계약** — `cli/handlers.py:124`
+- [x] 3-5. **update의 tags 타입 계약** — `cli/handlers.py:139`
   쉼표 문자열을 `Optional[List[str]]`로 선언된 `TransactionPatch.tags`에 그대로 넣는다. 핸들러에서 `validators.parse_tags`를 통과시켜 전달.
 - [x] 3-6. **예기치 못한 예외 로깅 레벨** — `cli/error_handler.py:105`
   스택트레이스가 DEBUG로만 남아 기본 실행에서 증발한다. logger.exception(ERROR)로 격상.

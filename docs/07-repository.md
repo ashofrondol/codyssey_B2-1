@@ -91,7 +91,7 @@ budget_app/storage/__init__.py:1-17
 
 여기에 CSV 경계 어댑터 `storage/csv_io.py` 가 같은 폴더에 있습니다(§8). **내장 `open()` 을 부르는 곳은 `storage/jsonl.py`(4곳: 61·174·234·258)와 `storage/csv_io.py`(2곳: 82·142) 뿐입니다.**
 
-> **⚙️ 내부 동작** — "`open()` 이 두 파일에만 있다"는 말에는 작은 예외가 있습니다. `storage/ids.py:60` 의 `Path.read_text` 와 `storage/backup.py:32` 의 `Path.read_bytes`/`Path.write_bytes` 는 내부에서 `io.open` 을 부르는 **얇은 래퍼**입니다(CPython `Lib/pathlib` 구현이 `with self.open(...) as f: return f.read()` 형태). 계층 규칙("파일을 여는 코드는 저장소 계층 안에만")은 그대로 지켜지는 셈입니다. 또 `cli/app.py:55` 의 `os.open(os.devnull, ...)` 은 내장 `open()` 이 아니라 **파일 디스크립터를 직접 여는 저수준 시스템 호출**이라 성격이 다릅니다. → [12 §3](./12-syntax-and-stdlib.md)
+> **⚙️ 내부 동작** — "`open()` 이 두 파일에만 있다"는 말에는 작은 예외가 있습니다. `storage/ids.py:60` 의 `Path.read_text` 와 `storage/backup.py:32` 의 `Path.read_bytes`/`Path.write_bytes` 는 내부에서 `io.open` 을 부르는 **얇은 래퍼**입니다(CPython `Lib/pathlib` 구현이 `with self.open(...) as f: return f.read()` 형태). 계층 규칙("파일을 여는 코드는 저장소 계층 안에만")은 그대로 지켜지는 셈입니다. 또 `cli/app.py:57` 의 `os.open(os.devnull, ...)` 은 내장 `open()` 이 아니라 **파일 디스크립터를 직접 여는 저수준 시스템 호출**이라 성격이 다릅니다. → [12 §3](./12-syntax-and-stdlib.md)
 
 ---
 
