@@ -440,11 +440,11 @@ $ python -m budget_app add
 | R2-2 | dataclass 또는 준하는 구조 | ✅ 충족 | `entities.py:27`(Transaction), `:127`(TransactionPatch), `:157`(Budget), `:176`(Category) — 전부 `@dataclass(frozen=True)` + `__post_init__` 검증 |
 | R2-3 | 최소 2개 이상의 클래스 | ✅ 충족 | AST 집계 **클래스 42개 / 모듈 43개**. 예: `storage/repositories.py:27 TransactionRepository`, `:217 CategoryStore`, `:283 BudgetStore`, `services/transactions.py:27 TransactionService`, `services/budgets.py:20 BudgetService`, `domain/tx_id.py:53 TransactionId` |
 | R2-4 | 입력 검증(날짜/금액/타입/카테고리) | ✅ 충족 | `budget_app/domain/validators.py:63-195` (`parse_amount`/`parse_type`/`parse_date`/`parse_month`/`parse_category`/`parse_tags`), 재입력 루프는 `cli/prompts.py:60-74`. 실행 확인: `2024-13-40`→재입력, `-5`/`0`/`abc` 금액→재입력, 미등록 카테고리→재입력 |
-| R3-1 | 저장 포맷 JSONL 또는 CSV 중 1개 | ✅ 충족 | JSONL 단일 선택 — `storage/config.py:17-19`, 공통 처리 `storage/jsonl.py:131-351`. CSV 는 저장이 아니라 R11 이 요구한 **교환 경로 전용**(`storage/csv_io.py`). 선택 근거는 README.md:322-342 |
+| R3-1 | 저장 포맷 JSONL 또는 CSV 중 1개 | ✅ 충족 | JSONL 단일 선택 — `storage/config.py:17-19`, 공통 처리 `storage/jsonl.py:131-351`. CSV 는 저장이 아니라 R11 이 요구한 **교환 경로 전용**(`storage/csv_io.py`). 선택 근거는 README.md:864-342 |
 | R3-2 | 저장 파일 3개 이상 분리 | ✅ 충족 | `storage/config.py:17-19` — `transactions.jsonl` / `categories.jsonl` / `budgets.jsonl`. 실행 후 생성 확인. 추가로 `id_counter`(:21, 숫자 한 줄)가 ID 워터마크로 생성됨 — 레코드 저장소가 아니라 카운터라 "포맷 혼용"에 해당하지 않음 |
 | R3-3 | 기본 `./data`, 옵션으로 변경 가능 | ✅ 충족 | `cli/config.py:13` (`DEFAULT_DATA_DIR="./data"`), `parser.py:86-88` (`--data-dir`), 하위 파서까지 전파 `parser.py:58-76`. 실행 확인: `list --data-dir <경로>`, `--data-dir` 를 명령 앞/뒤 어느 자리에 둬도 동작 |
 | R3-4 | 초기 실행 시 파일 자동 생성 또는 안내 | ✅ 충족 | `budget_app/context.py:59-65` `prepare()` → `storage/jsonl.py:150-154` `ensure_ready()` (mkdir + touch). 실행 확인: 빈 폴더에 `add` 1회로 4개 파일 생성 |
-| R3-5 | 카테고리 파일이 비었을 때 동작을 명확히 (안 A/안 B) | ✅ 충족 | **안 A 채택** — `storage/repositories.py:226-235 seed_defaults()` + `storage/config.py:14 DEFAULT_CATEGORIES=("food","transport","rent","salary","etc")`. 문서 고정: README.md:53. 실행 확인: 빈 `categories.jsonl` 로 `add` 실행 시 기본 5종이 시딩됨. (시딩조차 실패한 극단 상황의 2차 방어로 안내 후 차단 경로도 있음 — `cli/handlers.py:34-37`, 종료 코드 5, README.md:458 에 문서화) |
+| R3-5 | 카테고리 파일이 비었을 때 동작을 명확히 (안 A/안 B) | ✅ 충족 | **안 A 채택** — `storage/repositories.py:226-235 seed_defaults()` + `storage/config.py:14 DEFAULT_CATEGORIES=("food","transport","rent","salary","etc")`. 문서 고정: README.md:595. 실행 확인: 빈 `categories.jsonl` 로 `add` 실행 시 기본 5종이 시딩됨. (시딩조차 실패한 극단 상황의 2차 방어로 안내 후 차단 경로도 있음 — `cli/handlers.py:34-37`, 종료 코드 5, README.md:1000 에 문서화) |
 | R4-1 | add 는 대화형으로 필드 입력 | ✅ 충족 | `cli/handlers.py:39-48`, `cli/prompts.py:112-127`. 실행 확인 |
 | R4-2 | category 는 등록된 목록에 존재해야 함 | ✅ 충족 | 대화형: `cli/prompts.py:100-107` (미등록이면 `ValidationError`→재입력, 사용 가능 목록 표시). 서비스: `services/transactions.py:44, 110-112`. 실행 확인 |
 | R4-3 | 저장 완료 시 생성된 id 출력 | ✅ 충족 | `cli/handlers.py:49` + `cli/messages.py:48` `"[저장 완료] id={id}"`. 실행 확인: `[저장 완료] id=TX-000001` |
@@ -453,11 +453,11 @@ $ python -m budget_app add
 | R5-3 | 제너레이터 기반 스트리밍 (전체 로드 금지) | ✅ 충족 | 읽기 진입점이 `yield` 기반 — `storage/jsonl.py:162-182 iter_raw()`, `:215-225 stream()`. `list --limit N` 은 `services/transactions.py:104-107` 에서 `heapq.nlargest` 로 **크기 N 힙만 유지**(메모리 O(limit), 파일 크기 무관). `json.load()` 로 파일 전체를 올리는 코드는 저장소 전체에 없음 |
 | R6-1 | `delete --id <id>` | ✅ 충족 | `parser.py:194-198`, `cli/handlers.py:151-154`, `storage/repositories.py:150-171`. 실행 확인 |
 | R6-2 | 없는 id 는 "없는 데이터"로 처리 + 메시지 | ✅ 충족 | `services/transactions.py:80-84`(delete), `:69-73`(update) → `AppError`; 문구 `services/messages.py:14-15`. 실행 확인: `[오류] 해당 id 의 거래를 찾을 수 없습니다: TX-999999` / `[힌트] list 로 id 를 확인하세요.` rc=4 (일관) |
-| R6-3 | update 방식을 하나로 고정 + 문서 명시 | ✅ 충족 | **옵션 기반(안 A) 고정** — `parser.py:181-191` (`--id` 필수 + 6개 필드 옵션), 대화형 경로 없음. 문서 고정: README.md:99, 179-186 |
+| R6-3 | update 방식을 하나로 고정 + 문서 명시 | ✅ 충족 | **옵션 기반(안 A) 고정** — `parser.py:181-191` (`--id` 필수 + 6개 필드 옵션), 대화형 경로 없음. 문서 고정: README.md:641, 179-186 |
 | R6-4 | update/delete 안정성(임시 파일/원자적 교체) | ✅ 충족 | `storage/jsonl.py:48-72 stage_lines()`(tmp + flush + `os.fsync`), `:75-77 commit_staged()`(`os.replace`), `:335-351 rewrite()`. 해석 실패 줄은 원문 보존(`:311-313`). append 경로도 fsync (`:242-269`) |
 | R7-1 | `--from/--to/--category/--type/--q/--tag` 검색 | ✅ 충족 | `parser.py:124-133` 6종 전부. 조건 조립 `domain/queries.py:58-73`, 판정 `domain/specs.py:173-243`. 실행 확인: 기간+카테고리, `--q`, `--tag`, `--type` 각각 동작 |
 | R7-2 | 검색 결과 최신순 | ✅ 충족 | `cli/handlers.py:72` → `services/transactions.py:108 sorted(..., reverse=True)`. 실행 확인 |
-| R7-3 | 검색도 스트리밍 유지 | ✅ 충족 | 읽기·필터가 제너레이터 — `services/transactions.py:104` 제너레이터 식 + `storage/jsonl.py:215 stream()`. 비고: `search` 는 `--limit` 이 없어 "최신순" 보장을 위해 **필터 통과분**만 정렬 버퍼에 모은다(메모리 O(일치 건수), 파일 크기 아님). 이 한계를 README.md:434 가 명시하고 있어 은폐가 아님 |
+| R7-3 | 검색도 스트리밍 유지 | ✅ 충족 | 읽기·필터가 제너레이터 — `services/transactions.py:104` 제너레이터 식 + `storage/jsonl.py:215 stream()`. 비고: `search` 는 `--limit` 이 없어 "최신순" 보장을 위해 **필터 통과분**만 정렬 버퍼에 모은다(메모리 O(일치 건수), 파일 크기 아님). 이 한계를 README.md:976 가 명시하고 있어 은폐가 아님 |
 | R8-1 | `summary --month YYYY-MM` | ✅ 충족 | `parser.py:136-144`(`--month` required), `services/budgets.py:31-66`. 실행 확인 |
 | R8-2 | 총수입/총지출/잔액 + 카테고리 지출 TOP N(`--top`) | ✅ 충족 | 집계 `services/budgets.py:41-58`, 잔액 `domain/results.py:38-40`, 출력 `cli/presenter.py:72-83`. `--top` 기본 5 (`parser.py:140-143`, `services/config.py:17`). 실행 확인: 총수입/총지출/잔액/`지출 TOP N` 출력 |
 | R8-3 | 데이터 없는 달은 "데이터 없음" 명시 | ✅ 충족 | `domain/results.py:52-55 is_empty`, `cli/presenter.py:68-70`. 실행 확인: `summary --month 2030-05` → `2030-05: 데이터 없음` rc=0 |
@@ -469,23 +469,23 @@ $ python -m budget_app add
 | R11-1 | `import --from <csv>` 일괄 등록 | ✅ 충족 | `parser.py:217-245`, `services/importexport.py:88-149`. 보고 형식 `[완료] mode=..., imported=N, duplicated=N, skipped=N` (`cli/messages.py:92-94`). 실행 확인: 정상/깨진 행 혼합 CSV → `imported=1, skipped=1` + 줄별 사유 출력 |
 | R11-2 | `export --out <csv>` | ✅ 충족 | `parser.py:201-214`, `cli/handlers.py:157-161`, `storage/csv_io.py:145-186`. 실행 확인: `[완료] out.csv (2 records)` |
 | R11-3 | export 는 `--month` 또는 `--from`+`--to` 필수 | ✅ 충족 | `cli/handlers.py:164-177` — 조건 없으면 `AppError`, `--month` 와 범위 동시 지정도 충돌로 차단. 실행 확인: 조건 없는 `export` rc=4, `--from` 만 줘도 거절 |
-| R11-4 | CSV 최소 스키마 고정 (UTF-8, 헤더 포함) | ✅ 충족 | `storage/config.py:42-44` — 필수 `date,type,category,amount` + 선택 `memo,tags`(+왕복용 선택 `id`), 헤더 검증 `csv_io.py:104-118`, 쓰기 시 헤더 포함 `:170-172`. 인코딩: 쓰기 `utf-8`(BOM 없음), 읽기 `utf-8-sig`(엑셀 BOM 흡수) — `storage/config.py:39-40`. 문서: README.md:212-256. **실행 확인: 쉼표 포함 태그·메모가 `"tag1,tag2"` 로 인용돼 export→import 왕복 후 바이트 동일(diff 일치)** |
+| R11-4 | CSV 최소 스키마 고정 (UTF-8, 헤더 포함) | ✅ 충족 | `storage/config.py:42-44` — 필수 `date,type,category,amount` + 선택 `memo,tags`(+왕복용 선택 `id`), 헤더 검증 `csv_io.py:104-118`, 쓰기 시 헤더 포함 `:170-172`. 인코딩: 쓰기 `utf-8`(BOM 없음), 읽기 `utf-8-sig`(엑셀 BOM 흡수) — `storage/config.py:39-40`. 문서: README.md:754-256. **실행 확인: 쉼표 포함 태그·메모가 `"tag1,tag2"` 로 인용돼 export→import 왕복 후 바이트 동일(diff 일치)** |
 | R12-1 | 공통 관심사 데코레이터 1개 이상 구현·적용 | ✅ 충족 | 3개 구현 — `budget_app/decorators.py:37-47 @log_call`, `:50-66 @measure_time`, `cli/error_handler.py:20-128 @handle_errors`. 실제 적용: `services/transactions.py:34,59,79`, `services/budgets.py:30`, `cli/app.py:61`. 전부 `functools.wraps` 사용. **실행 확인: `--debug add` → `call add`/`done add`, `--debug summary` → `monthly_summary took 1.45ms`** |
 | R13-1 | 스택트레이스 대신 원인 + 해결 힌트 | ✅ 충족 | `cli/error_handler.py:47-126` 4부류 분류 + `[오류]`/`[힌트]` 2줄 출력(`cli/messages.py:30-31, 107-126`), 최후 방어선도 트레이스백은 `--debug` 일 때만(`:113-125`). 오류 방패가 `AppContext` 생성까지 감쌈(`cli/app.py:61-81`). **실행 확인: `--data-dir <파일경로>` 로 실행 시 트레이스백 0줄, `[오류] 디렉터리가 아닙니다` + `[힌트]` rc=3** |
 | R13-2 | 정상 0 / 오류 0 아님 | ✅ 충족 | `cli/config.py:22-29` (0/1/2/3/4/5/6/130), `__main__.py:8 sys.exit(main())`. **실행 확인: 정상 0, 검증 실패 2, 파일 없음 3, 앱 오류(없는 id·export 조건 누락·카테고리 사용 중) 4, argparse 오류 2. 예산 초과 경고는 0 유지** |
 | R14-1 | 최소 3개 이상 모듈로 분리 | ✅ 충족 | **43개 모듈**(AST 집계). 패키지 4계층 `domain/`(10) `storage/`(9) `services/`(8) `cli/`(11) + 루트 5 |
-| R14-2 | CLI/서비스/저장소/모델 책임 분리 (권장) | ✅ 충족 | 구조 README.md:368-417. **AST 로 직접 검증**(`tests/test_architecture.py` 로직을 별도 스크립트로 재실행): 상향 import 0건, `cli → storage` 직접 참조 0건, domain 이 상위 계층 참조 0건, `AppContext` 공개 속성에 저장소 노출 없음(`backup_service/budget_service/cat_service/data_dir/io_service/tx_service`), 핸들러 13개 전원 `HANDLERS` 등록 |
+| R14-2 | CLI/서비스/저장소/모델 책임 분리 (권장) | ✅ 충족 | 구조 README.md:910-417. **AST 로 직접 검증**(`tests/test_architecture.py` 로직을 별도 스크립트로 재실행): 상향 import 0건, `cli → storage` 직접 참조 0건, domain 이 상위 계층 참조 0건, `AppContext` 공개 속성에 저장소 노출 없음(`backup_service/budget_service/cat_service/data_dir/io_service/tx_service`), 핸들러 13개 전원 `HANDLERS` 등록 |
 | R15-1 | 데이터 3개 이상 파일 영구 저장 | ✅ 충족 | R3-2 와 동일 근거. `data/transactions.jsonl`, `data/categories.jsonl`, `data/budgets.jsonl` 커밋돼 있음 |
-| R15-2 | README 에 실행 방법/저장 위치·형식/명령 예시/CSV 스키마 | ✅ 충족 | 실행 방법 README.md:26-40, 저장 파일 위치·형식 :42-81, 주요 명령 예시 :103-210, import/export CSV 스키마 :212-256. 추가로 update 방식 고정(:99)·빈 카테고리 동작(:53)·종료 코드 표(:449-460)까지 명시 |
+| R15-2 | README 에 실행 방법/저장 위치·형식/명령 예시/CSV 스키마 | ✅ 충족 | 실행 방법 README.md:568-40, 저장 파일 위치·형식 :42-81, 주요 명령 예시 :103-210, import/export CSV 스키마 :212-256. 추가로 update 방식 고정(:99)·빈 카테고리 동작(:53)·종료 코드 표(:449-460)까지 명시 |
 
 #### 보너스 과제
 
 | ID | 요구사항 (요약) | 판정 | 근거 / 비고 |
 | --- | --- | --- | --- |
-| B1 | `backup` — 타임스탬프 포함 백업 생성 | ✅ 충족 | `storage/backup.py:17-47` (`backup_YYYYMMDD_HHMMSS/`), `services/maintenance.py:29-37`, `parser.py:248-252`. 확장자 없는 `id_counter` 까지 복사(`:36-47`). **실행 확인: `backup_20260919_132233/` 에 jsonl 3개 + id_counter 복사됨.** 문서 README.md:485-491 |
+| B1 | `backup` — 타임스탬프 포함 백업 생성 | ✅ 충족 | `storage/backup.py:17-47` (`backup_YYYYMMDD_HHMMSS/`), `services/maintenance.py:29-37`, `parser.py:248-252`. 확장자 없는 `id_counter` 까지 복사(`:36-47`). **실행 확인: `backup_20260919_132233/` 에 jsonl 3개 + id_counter 복사됨.** 문서 README.md:1027-491 |
 | B2 | 반복 내역(월급/월세)을 특정 월에 자동 생성 | ❌ 미충족 | `grep -rniE 'recurring\|반복 내역\|recur' budget_app/ README.md` 결과 0건. 관련 명령·서비스·저장 파일 없음. README 도 이 기능을 주장하지 않음(과대 주장은 아님) |
 | B3 | 출력 포맷 테이블 정렬 (외부 라이브러리 없이) | 🟡 부분 충족 | `cli/messages.py:43 FMT_TX_LINE = "{id} \| {date} \| {type:<7} \| {category} \| {amount} \| {memo}"` — **정렬 폭이 지정된 필드는 `type` 하나뿐**. `id`·`date` 는 고정 길이라 우연히 맞지만 `category`·`amount` 는 폭 지정이 없어 실행 출력에서 열이 어긋난다(`\| rent \| 150000 \|` vs `\| salary \| 3000000 \|`). 헤더 행·구분선도 없음 |
-| B4 | update/delete 시 임시 파일 + rename 원자 교체 | ✅ 충족 | `storage/jsonl.py:48-87`(stage/commit 분리, fsync 후 `os.replace`), `:335-351 rewrite()`, CSV 내보내기도 동일 규칙(`storage/csv_io.py:167-186`). 다중 파일 커밋은 `storage/unit_of_work.py:73-181` (`--atomic` import). 한계(rename 2회 사이 창)를 `unit_of_work.py:38-42` 와 README.md:63 이 정직하게 명시 |
+| B4 | update/delete 시 임시 파일 + rename 원자 교체 | ✅ 충족 | `storage/jsonl.py:48-87`(stage/commit 분리, fsync 후 `os.replace`), `:335-351 rewrite()`, CSV 내보내기도 동일 규칙(`storage/csv_io.py:167-186`). 다중 파일 커밋은 `storage/unit_of_work.py:73-181` (`--atomic` import). 한계(rename 2회 사이 창)를 `unit_of_work.py:38-42` 와 README.md:605 이 정직하게 명시 |
 
 #### 🔍 발견된 격차와 보완 제안
 
@@ -506,7 +506,7 @@ $ python -m budget_app add
    - 보완안: `budget list`(전 월 목록) / `budget get --month YYYY-MM` 를 추가한다. `storage/repositories.py:292-298 BudgetStore.get()` 과 `stream()` 이 이미 있어 핸들러 한 개와 파서 5줄이면 끝난다.
 
 4. **(관찰) 저장 폴더에 4번째 파일 `id_counter` 가 생긴다**
-   - 결함은 아니다. 레코드 저장소가 아니라 "발급한 적 있는 최대 번호" 워터마크(숫자 한 줄, `storage/ids.py:26-78`)이며, 삭제된 id 재사용으로 인한 조용한 데이터 손실을 막는 안전장치다. README.md:51,55 에 위치·형식·역할이 문서화돼 있어 "포맷 혼용 금지" 제약 위반으로 읽힐 여지도 막아 두었다. 제출 시 심사자가 오해하지 않도록 이 한 줄 설명을 README 3장 표 바로 아래에 유지할 것.
+   - 결함은 아니다. 레코드 저장소가 아니라 "발급한 적 있는 최대 번호" 워터마크(숫자 한 줄, `storage/ids.py:26-78`)이며, 삭제된 id 재사용으로 인한 조용한 데이터 손실을 막는 안전장치다. README.md:593,55 에 위치·형식·역할이 문서화돼 있어 "포맷 혼용 금지" 제약 위반으로 읽힐 여지도 막아 두었다. 제출 시 심사자가 오해하지 않도록 이 한 줄 설명을 README 3장 표 바로 아래에 유지할 것.
 
 5. **(관찰, 요구사항 외) 저자성 표기**
    - `docs/00-INDEX.md:3` 이 "이 프로젝트는 과제 명세에 따라 AI 가 생성한 코드"라고 스스로 밝히고 있다. 명세의 과제 목표 G1~G5 는 "수료 후 **스스로 설명할 수 있어야** 한다"를 요구하므로, 제출·방어 시에는 `docs/` 12편과 `docs/budget-app-atlas.html` 로 실제 설명 가능 상태를 만들어 두는 것이 이 항목의 실질 충족 조건이다. 코드 자체의 요구사항 충족 판정에는 영향을 주지 않는다.
