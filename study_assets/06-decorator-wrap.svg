@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="516" viewBox="0 0 860 516" role="img" aria-labelledby="title desc">
+<title id="title">데코레이터 — 원래 함수를 감싸는 포장지</title>
+<desc id="desc">@log_call 을 붙이면 add 는 log_call 이 만든 wrapper 로 바뀌고, wrapper 는 원래 add 를 부르기 전후에 call add, done add 로그를 남긴다. 아래 표는 이 저장소의 데코레이터 3개(@log_call, @measure_time, @handle_errors)가 붙은 곳과 실제 실행에서 본 출력을 정리한다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="860" height="516"/>
+<text class="th" x="24" y="34">데코레이터 — 원래 함수를 감싸는 포장지</text>
+<text class="ts" x="24" y="56">파란 상자 = 포장지(wrapper)가 하는 일, 위에서 아래로 실행 · 회색 상자 = 원래 함수 본문</text>
+<text class="tb" x="24" y="100">코드에 이렇게 쓰면</text>
+<rect class="box" x="24" y="112" width="188" height="80" rx="10"/>
+<text class="mono c-blue" x="40" y="138" xml:space="preserve">@log_call</text>
+<text class="mono" x="40" y="158" xml:space="preserve">def add(self, …):</text>
+<text class="mono" x="40" y="178" xml:space="preserve">    ...</text>
+<text x="24" y="222">⇒ 같은 뜻</text>
+<rect class="box" x="24" y="234" width="188" height="36" rx="10"/>
+<text class="mono" x="118" y="257" text-anchor="middle">add = log_call(add)</text>
+<line class="ln ln-blue" x1="216" y1="252" x2="244" y2="252" marker-end="url(#arrow-blue)"/>
+<rect class="blue" x="248" y="80" width="332" height="200" rx="12"/>
+<text class="tb c-blue" x="414" y="106" text-anchor="middle">wrapper (log_call 이 만든 포장지)</text>
+<text x="414" y="146" text-anchor="middle"><tspan class="tb c-blue">①</tspan> <tspan class="mono">logger.debug(&quot;call %s&quot;, &quot;add&quot;)</tspan></text>
+<line class="ln ln-blue" x1="414" y1="154" x2="414" y2="172" marker-end="url(#arrow-blue)"/>
+<rect class="box" x="268" y="176" width="292" height="40" rx="10"/>
+<text x="414" y="201" text-anchor="middle"><tspan class="tb">②</tspan> 원래 add() — 거래 저장</text>
+<line class="ln ln-blue" x1="414" y1="220" x2="414" y2="238" marker-end="url(#arrow-blue)"/>
+<text x="414" y="258" text-anchor="middle"><tspan class="tb c-blue">③</tspan> <tspan class="mono">logger.debug(&quot;done %s&quot;, &quot;add&quot;)</tspan></text>
+<text class="ts" x="414" y="304" text-anchor="middle">functools.wraps → __name__ 은 여전히 "add"</text>
+<text class="ts" x="620" y="106">--debug 로 실행하면 찍히는 줄</text>
+<line class="ln ln-blue" x1="584" y1="141" x2="616" y2="141" marker-end="url(#arrow-blue)"/>
+<rect class="box" x="620" y="124" width="120" height="34" rx="8"/>
+<text class="mono" x="680" y="146" text-anchor="middle">call add</text>
+<line class="ln ln-blue" x1="584" y1="253" x2="616" y2="253" marker-end="url(#arrow-blue)"/>
+<rect class="box" x="620" y="236" width="120" height="34" rx="8"/>
+<text class="mono" x="680" y="258" text-anchor="middle">done add</text>
+<text class="ts" x="620" y="198">원래 함수 본문은</text>
+<text class="ts" x="620" y="216">한 줄도 안 바뀐다</text>
+<text class="tb" x="24" y="344">이 저장소의 데코레이터 3개</text>
+<rect class="box" x="24" y="358" width="812" height="38" rx="6"/>
+<text class="tb" x="36" y="383">데코레이터</text>
+<text class="tb" x="188" y="383">붙은 곳</text>
+<text class="tb" x="500" y="383">실측 출력</text>
+<text x="36" y="421"><tspan class="mono c-blue">@log_call</tspan></text>
+<text x="188" y="421"><tspan class="mono">TransactionService.add/update/delete</tspan></text>
+<text x="500" y="421"><tspan class="mono">call add / done add</tspan></text>
+<line class="ln" x1="24" y1="434" x2="836" y2="434"/>
+<text x="36" y="459"><tspan class="mono">@measure_time</tspan></text>
+<text x="188" y="459"><tspan class="mono">BudgetService.monthly_summary</tspan></text>
+<text x="500" y="459"><tspan class="mono">monthly_summary took 1.65ms</tspan></text>
+<line class="ln" x1="24" y1="472" x2="836" y2="472"/>
+<text x="36" y="497"><tspan class="mono">@handle_errors</tspan></text>
+<text x="188" y="497"><tspan class="mono">app._dispatch</tspan> <tspan class="ts">(1곳 — 15개 명령 전부)</tspan></text>
+<text x="500" y="497">[오류]/[힌트] + 종료 코드</text>
+<line class="ln" x1="24" y1="510" x2="836" y2="510"/>
+</svg>

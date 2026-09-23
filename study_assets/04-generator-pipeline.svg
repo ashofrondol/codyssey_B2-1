@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="448" viewBox="0 0 880 448" role="img" aria-labelledby="title desc">
+<title id="title">list --limit 3 — 한 줄씩 흘러가는 제너레이터 파이프라인</title>
+<desc id="desc">list --limit 3 을 실행하면 transactions.jsonl 을 한 줄씩 읽어 iter_raw, stream, 필터 제너레이터 식을 거쳐 한 건씩 흘려보내고, heapq.nlargest(3) 가 힙 3칸만 쥔 채 최신 3건을 골라 tx_table 이 표를 한 줄씩 stdout 으로 낸다. 아래 막대는 10만 건(12.9MB) 파일에서 잰 최대 메모리로, 힙 20칸만 쥐는 기본 list 는 18.6MB 로 아무것도 안 하는 --help(18.0MB)와 거의 같고 전부 모아 정렬하는 search 는 77.8MB 이다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="448"/>
+<text x="24" y="34" class="mono tb">python -m budget_app list --limit 3</text>
+<text x="292" y="34" class="ts">— ①부터 ⑥까지 번호 순서대로, 한 건씩 흘러간다</text>
+
+<!-- 1행: ① ~ ④ -->
+<rect class="purple" x="24" y="52" width="164" height="60" rx="10"/>
+<text x="106" y="77" text-anchor="middle">① <tspan class="mono">transactions.jsonl</tspan></text>
+<text x="106" y="98" text-anchor="middle" class="ts">한 줄씩 읽기</text>
+
+<rect class="box" x="260" y="52" width="124" height="60" rx="10"/>
+<text x="322" y="77" text-anchor="middle">② <tspan class="mono">iter_raw()</tspan></text>
+<text x="322" y="98" text-anchor="middle" class="ts">yield RawLine</text>
+
+<rect class="box" x="456" y="52" width="136" height="60" rx="10"/>
+<text x="524" y="77" text-anchor="middle">③ <tspan class="mono">stream()</tspan></text>
+<text x="524" y="98" text-anchor="middle" class="ts">yield Transaction</text>
+
+<rect class="box" x="664" y="52" width="192" height="60" rx="10"/>
+<text x="760" y="77" text-anchor="middle">④ <tspan class="mono">(tx for tx in … if …)</tspan></text>
+<text x="760" y="98" text-anchor="middle" class="ts">필터(제너레이터 식)</text>
+
+<line class="ln ln-blue" x1="188" y1="82" x2="256" y2="82" marker-end="url(#arrow-blue)"/>
+<text x="222" y="75" text-anchor="middle" class="ts c-blue">1건씩</text>
+<line class="ln ln-blue" x1="384" y1="82" x2="452" y2="82" marker-end="url(#arrow-blue)"/>
+<text x="418" y="75" text-anchor="middle" class="ts c-blue">1건씩</text>
+<line class="ln ln-blue" x1="592" y1="82" x2="660" y2="82" marker-end="url(#arrow-blue)"/>
+<text x="626" y="75" text-anchor="middle" class="ts c-blue">1건씩</text>
+
+<!-- ④ → ⑤ 줄바꿈 -->
+<path class="ln ln-blue" d="M760,112 L760,138 L109,138 L109,160" marker-end="url(#arrow-blue)"/>
+<rect class="bg" x="400" y="125" width="64" height="26"/>
+<text x="432" y="143" text-anchor="middle" class="ts c-blue">1건씩</text>
+
+<!-- 2행: ⑤ ⑥ stdout -->
+<rect class="blue" x="24" y="164" width="170" height="60" rx="10"/>
+<text x="109" y="189" text-anchor="middle" class="c-blue">⑤ <tspan class="mono">heapq.nlargest(3)</tspan></text>
+<text x="109" y="210" text-anchor="middle" class="ts tb c-blue">힙 3칸만 유지</text>
+
+<rect class="box" x="266" y="164" width="140" height="60" rx="10"/>
+<text x="336" y="189" text-anchor="middle">⑥ <tspan class="mono">tx_table()</tspan></text>
+<text x="336" y="210" text-anchor="middle" class="ts">yield 표 한 줄</text>
+
+<rect class="green" x="478" y="164" width="180" height="60" rx="10"/>
+<text x="568" y="189" text-anchor="middle" class="mono tb c-green">stdout</text>
+<text x="568" y="210" text-anchor="middle" class="ts">머리글 + 구분선 + 3행</text>
+
+<line class="ln ln-blue" x1="194" y1="194" x2="262" y2="194" marker-end="url(#arrow-blue)"/>
+<text x="228" y="187" text-anchor="middle" class="ts c-blue">3건</text>
+<line class="ln ln-green" x1="406" y1="194" x2="474" y2="194" marker-end="url(#arrow-green)"/>
+<text x="440" y="187" text-anchor="middle" class="ts c-green">한 줄씩</text>
+
+<text x="682" y="189" class="tb c-blue">모이는 곳은</text>
+<text x="682" y="210" class="tb c-blue">⑤ 힙 3칸뿐</text>
+
+<!-- 구분선 -->
+<line class="ln" x1="24" y1="252" x2="856" y2="252" stroke-dasharray="2 4"/>
+
+<!-- 메모리 막대 -->
+<text x="24" y="282" class="th">메모리 실측 — 10만 건 · 12.9MB 파일</text>
+<text x="24" y="302" class="ts">명령 하나를 실행하는 동안 가장 많이 쓴 메모리(최대 RSS). 막대 길이 = 값에 비례(0MB 부터)</text>
+
+<text x="252" y="335" text-anchor="end" class="ts"><tspan class="mono">--help</tspan> (아무것도 안 함)</text>
+<rect class="box" x="264" y="318" width="111" height="24" rx="3"/>
+<text x="385" y="335" class="mono">18.0MB</text>
+<text x="440" y="335" class="ts">기준선</text>
+
+<text x="252" y="371" text-anchor="end" class="ts"><tspan class="mono">list</tspan> (기본 20건)</text>
+<rect class="green" x="264" y="354" width="115" height="24" rx="3"/>
+<text x="389" y="371" class="mono c-green">18.6MB</text>
+<text x="444" y="371" class="ts">기준선 +0.6MB — 힙 20칸만 쥐고 흘려보냄</text>
+
+<text x="252" y="407" text-anchor="end" class="ts"><tspan class="mono">search</tspan> (조건 없음·전부 정렬)</text>
+<rect class="orange" x="264" y="390" width="480" height="24" rx="3"/>
+<text x="754" y="407" class="mono c-orange">77.8MB</text>
+
+<text x="24" y="438" class="ts">스트리밍은 메모리를 잡는다 · 시간은 여전히 전부 읽음(수 초)  ·  <tspan class="mono">search</tspan> 는 통과한 거래를 <tspan class="mono">sorted()</tspan> 로 전부 모은다</text>
+</svg>

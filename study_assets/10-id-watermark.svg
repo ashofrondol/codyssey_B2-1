@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="380" viewBox="0 0 820 380" role="img" aria-labelledby="title desc">
+<title id="title">지운 번호는 다시 쓰지 않는다 — id_counter 워터마크</title>
+<desc id="desc">TX-000006 까지 저장한 뒤 TX-000006 을 지우면 transactions.jsonl 의 최대 번호는 5로 줄지만 id_counter 는 6에 남는다. 다음 add 는 max(5, 6) + 1 = 7 로 TX-000007 을 발급한다. 워터마크가 없었다면 TX-000006 이 재발급되어 예전에 내보낸 CSV 의 같은 번호 거래가 다시 가져올 때 이미 저장된 중복으로 오판돼 건너뛰어진다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="820" height="380"/>
+<text class="th" x="24" y="34">지운 번호는 다시 쓰지 않는다 — id_counter 워터마크</text>
+<text class="ts" x="24" y="56">보라 = 저장된 상태 · 노랑 = 줄어든 값 · 초록 = 새 번호 · 빨간 점선 = 워터마크가 없었다면(나쁜 경로)</text>
+<text class="tb" x="112" y="92" text-anchor="middle">① TX-000006 까지 저장</text>
+<text class="tb" x="410" y="92" text-anchor="middle">② 마지막 거래 삭제</text>
+<text class="tb" x="708" y="92" text-anchor="middle">③ 새 거래 추가</text>
+<rect class="purple" x="24" y="108" width="176" height="52" rx="10"/>
+<text class="mono" x="112" y="130" text-anchor="middle">transactions.jsonl</text>
+<text class="tb c-purple" x="112" y="149" text-anchor="middle">최대 번호 6</text>
+<rect class="purple" x="24" y="176" width="176" height="52" rx="10"/>
+<text class="mono tb c-purple" x="112" y="198" text-anchor="middle">id_counter = 6</text>
+<text class="ts" x="112" y="217" text-anchor="middle">발급한 적 있는 최대</text>
+<rect class="yellow" x="322" y="108" width="176" height="52" rx="10"/>
+<text class="mono" x="410" y="130" text-anchor="middle">transactions.jsonl</text>
+<text class="tb" x="410" y="149" text-anchor="middle">최대 번호 5 (줄어듦)</text>
+<rect class="purple" x="322" y="176" width="176" height="52" rx="10"/>
+<text class="mono tb c-purple" x="410" y="198" text-anchor="middle">id_counter = 6</text>
+<text class="ts" x="410" y="217" text-anchor="middle">그대로 (줄지 않음)</text>
+<line class="ln" x1="200" y1="168" x2="318" y2="168" marker-end="url(#arrow)"/>
+<text class="mono" x="261" y="140" text-anchor="middle">delete</text>
+<text class="mono" x="261" y="158" text-anchor="middle">--id TX-000006</text>
+<line class="ln" x1="498" y1="168" x2="616" y2="168" marker-end="url(#arrow)"/>
+<text class="mono" x="557" y="158" text-anchor="middle">add</text>
+<rect class="box" x="620" y="104" width="176" height="52" rx="10"/>
+<text class="mono" x="708" y="126" text-anchor="middle">max(5, 6) + 1 = 7</text>
+<text class="ts" x="708" y="145" text-anchor="middle">파일 최대 vs 워터마크</text>
+<line class="ln ln-green" x1="708" y1="156" x2="708" y2="172" marker-end="url(#arrow-green)"/>
+<rect class="green" x="620" y="176" width="176" height="52" rx="10"/>
+<text class="mono c-green" x="708" y="198" text-anchor="middle">[저장 완료]</text>
+<text class="mono tb c-green" x="708" y="217" text-anchor="middle">id=TX-000007</text>
+<text class="ts" x="708" y="250" text-anchor="middle">(이후 id_counter = 7)</text>
+<rect class="red dash" x="24" y="272" width="772" height="60" rx="10"/>
+<text class="c-red tb" x="40" y="296">워터마크가 없었다면: 파일 최대 5 + 1 → <tspan class="mono">TX-000006</tspan> 재발급</text>
+<text class="c-red" x="40" y="319">→ 예전에 내보낸 CSV 의 <tspan class="mono">TX-000006</tspan>(다른 거래)이 다시 가져올 때 '중복'으로 오판돼 건너뜀</text>
+<text class="ts" x="24" y="360">워터마크는 쓰기 전에 올린다 — 실패해도 번호가 비는 것뿐 (재사용은 없음)</text>
+
+</svg>

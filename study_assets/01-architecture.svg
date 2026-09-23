@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="736" viewBox="0 0 880 736" role="img" aria-labelledby="title desc">
+<title id="title">budget_app 전체 구조 — 네 계층과 저장 파일</title>
+<desc id="desc">사용자 명령은 cli, services, storage, domain 네 계층을 위에서 아래로만 내려가며 처리된다. 파일을 여는 코드는 storage 계층에만 있고, storage 가 data 폴더의 JSONL 파일 3개와 id_counter, 그리고 가져오기·내보내기용 CSV 파일을 읽고 쓴다. 결과는 stdout 으로, 오류와 힌트는 stderr 로 사용자에게 돌아간다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="736"/>
+<!-- 사용자 -->
+<rect class="box" x="200" y="24" width="380" height="60" rx="10"/>
+<text x="390" y="49" text-anchor="middle" class="tb">사용자(터미널)</text>
+<text x="390" y="71" text-anchor="middle" class="mono">python -m budget_app add</text>
+
+<!-- 패키지 zone -->
+<rect class="zone" x="24" y="132" width="612" height="540" rx="12"/>
+<text x="40" y="152" class="ts">budget_app 패키지</text>
+
+<!-- (1) cli 띠 -->
+<rect class="blue" x="36" y="162" width="588" height="112" rx="8"/>
+<text x="48" y="192" class="th c-blue">cli/</text>
+<text x="48" y="214" class="ts">사람과 만나는 곳</text>
+<rect class="box" x="152" y="170" width="107" height="44" rx="6"/>
+<text x="205.5" y="190" text-anchor="middle" class="mono">parser.py</text>
+<text x="205.5" y="206" text-anchor="middle" class="ts">명령 문법</text>
+<rect class="box" x="271" y="170" width="107" height="44" rx="6"/>
+<text x="324.5" y="190" text-anchor="middle" class="mono">prompts.py</text>
+<text x="324.5" y="206" text-anchor="middle" class="ts">대화형 입력</text>
+<rect class="box" x="390" y="170" width="107" height="44" rx="6"/>
+<text x="443.5" y="190" text-anchor="middle" class="mono">handlers.py</text>
+<text x="443.5" y="206" text-anchor="middle" class="ts">cmd_* 15개</text>
+<rect class="box" x="509" y="170" width="107" height="44" rx="6"/>
+<text x="562.5" y="190" text-anchor="middle" class="mono">output.py</text>
+<text x="562.5" y="206" text-anchor="middle" class="ts">stdout/stderr</text>
+<rect class="box" x="152" y="222" width="146" height="44" rx="6"/>
+<text x="225" y="242" text-anchor="middle" class="mono">app.py</text>
+<text x="225" y="258" text-anchor="middle" class="ts">HANDLERS·main</text>
+<rect class="box" x="311" y="222" width="146" height="44" rx="6"/>
+<text x="384" y="242" text-anchor="middle" class="mono">presenter.py</text>
+<text x="384" y="258" text-anchor="middle" class="ts">화면에 쓸 문자열</text>
+<rect class="box" x="470" y="222" width="146" height="44" rx="6"/>
+<text x="543" y="242" text-anchor="middle" class="mono">error_handler.py</text>
+<text x="543" y="258" text-anchor="middle" class="ts">@handle_errors</text>
+
+<!-- 사용자 <-> cli 화살표 -->
+<line class="ln ln-blue" x1="250" y1="84" x2="250" y2="158" marker-end="url(#arrow-blue)"/>
+<text x="260" y="118" class="ts c-blue">명령·input()</text>
+<line class="ln ln-green" x1="430" y1="162" x2="430" y2="88" marker-end="url(#arrow-green)"/>
+<text x="440" y="118" class="ts c-green">stdout: 결과</text>
+<line class="ln ln-red dash" x1="530" y1="162" x2="530" y2="88" marker-end="url(#arrow-red)"/>
+<text x="540" y="118" class="ts c-red">stderr: [오류] [힌트]</text>
+
+<!-- 띠 사이 화살표 1 -->
+<line class="ln" x1="94" y1="274" x2="94" y2="298" marker-end="url(#arrow)"/>
+<text x="106" y="293" class="ts">의존은 아래로만</text>
+
+<!-- (2) services 띠 -->
+<rect class="box" x="36" y="302" width="588" height="92" rx="8"/>
+<text x="48" y="332" class="th">services/</text>
+<text x="48" y="354" class="ts">판단 (무엇을 할지)</text>
+<rect class="box" x="152" y="312" width="176" height="32" rx="6"/>
+<text x="240" y="333" text-anchor="middle" class="mono">TransactionService</text>
+<rect class="box" x="340" y="312" width="144" height="32" rx="6"/>
+<text x="412" y="333" text-anchor="middle" class="mono">CategoryService</text>
+<rect class="box" x="496" y="312" width="120" height="32" rx="6"/>
+<text x="556" y="333" text-anchor="middle" class="mono">BudgetService</text>
+<rect class="box" x="152" y="352" width="186" height="32" rx="6"/>
+<text x="245" y="373" text-anchor="middle" class="mono">ImportExportService</text>
+<rect class="box" x="350" y="352" width="134" height="32" rx="6"/>
+<text x="417" y="373" text-anchor="middle" class="mono">BackupService</text>
+
+<!-- 띠 사이 화살표 2 -->
+<line class="ln" x1="94" y1="394" x2="94" y2="418" marker-end="url(#arrow)"/>
+
+<!-- (3) storage 띠 -->
+<rect class="box" x="36" y="422" width="588" height="122" rx="8"/>
+<text x="48" y="452" class="th">storage/</text>
+<text x="48" y="474" class="ts">파일 읽기·쓰기</text>
+<text x="48" y="496" class="ts"><tspan class="mono">open()</tspan> 은</text>
+<text x="48" y="514" class="ts">여기에만 있다</text>
+<rect class="box" x="152" y="432" width="300" height="32" rx="6"/>
+<text x="272" y="453" text-anchor="middle" class="mono">JsonlStore[T]</text>
+<text x="334" y="453" class="ts">공통 뼈대</text>
+<rect class="box" x="152" y="472" width="300" height="28" rx="6"/>
+<text x="302" y="491" text-anchor="middle" class="mono">TransactionRepository</text>
+<rect class="box" x="152" y="506" width="146" height="28" rx="6"/>
+<text x="225" y="525" text-anchor="middle" class="mono">CategoryStore</text>
+<rect class="box" x="306" y="506" width="146" height="28" rx="6"/>
+<text x="379" y="525" text-anchor="middle" class="mono">BudgetStore</text>
+<rect class="box" x="472" y="432" width="144" height="28" rx="6"/>
+<text x="544" y="451" text-anchor="middle" class="mono">UnitOfWork</text>
+<rect class="box" x="472" y="469" width="144" height="28" rx="6"/>
+<text x="544" y="488" text-anchor="middle" class="mono">IdAllocator</text>
+<rect class="box" x="472" y="506" width="144" height="28" rx="6"/>
+<text x="544" y="525" text-anchor="middle" class="mono">csv_io.py</text>
+
+<!-- 띠 사이 화살표 3 -->
+<line class="ln" x1="94" y1="544" x2="94" y2="568" marker-end="url(#arrow)"/>
+
+<!-- (4) domain 띠 -->
+<rect class="box" x="36" y="572" width="588" height="88" rx="8"/>
+<text x="48" y="600" class="th">domain/</text>
+<text x="48" y="621" class="ts">규칙</text>
+<text x="48" y="640" class="ts">(파일·화면 모름)</text>
+<rect class="box" x="152" y="582" width="116" height="30" rx="6"/>
+<text x="210" y="602" text-anchor="middle" class="mono">Transaction</text>
+<rect class="box" x="280" y="582" width="80" height="30" rx="6"/>
+<text x="320" y="602" text-anchor="middle" class="mono">Budget</text>
+<rect class="box" x="372" y="582" width="96" height="30" rx="6"/>
+<text x="420" y="602" text-anchor="middle" class="mono">Category</text>
+<rect class="box" x="480" y="582" width="136" height="30" rx="6"/>
+<text x="548" y="602" text-anchor="middle" class="mono">TransactionId</text>
+<rect class="box" x="152" y="620" width="130" height="30" rx="6"/>
+<text x="217" y="640" text-anchor="middle" class="mono">validators.py</text>
+<rect class="box" x="294" y="620" width="176" height="30" rx="6"/>
+<text x="382" y="640" text-anchor="middle" class="mono">SearchFilter · specs</text>
+<rect class="box" x="482" y="620" width="134" height="30" rx="6"/>
+<text x="549" y="640" text-anchor="middle" class="mono">MonthlySummary</text>
+
+<!-- 계층 밖 루트 -->
+<rect class="zone" x="672" y="132" width="184" height="262" rx="12"/>
+<text x="684" y="152" class="ts">계층 밖 루트</text>
+<rect class="box" x="682" y="162" width="164" height="66" rx="8"/>
+<text x="764" y="182" text-anchor="middle" class="mono tb">context.py</text>
+<text x="764" y="201" text-anchor="middle" class="mono">AppContext</text>
+<text x="764" y="219" text-anchor="middle" class="ts">부품 조립</text>
+<rect class="box" x="682" y="238" width="164" height="66" rx="8"/>
+<text x="764" y="258" text-anchor="middle" class="mono tb">decorators.py</text>
+<text x="764" y="277" text-anchor="middle" class="mono">@log_call</text>
+<text x="764" y="295" text-anchor="middle" class="mono">@measure_time</text>
+<rect class="box" x="682" y="314" width="164" height="66" rx="8"/>
+<text x="764" y="334" text-anchor="middle" class="mono tb">errors.py</text>
+<text x="764" y="353" text-anchor="middle" class="mono">ValidationError</text>
+<text x="764" y="371" text-anchor="middle" class="mono">AppError</text>
+
+<!-- data 폴더 -->
+<rect class="zone" x="672" y="422" width="184" height="200" rx="12"/>
+<line class="ln ln-purple" x1="628" y1="446" x2="668" y2="446" marker-start="url(#arrow-purple)" marker-end="url(#arrow-purple)"/>
+<text x="682" y="442" class="ts c-purple">yield 로 읽기 /</text>
+<text x="682" y="459" class="ts c-purple">원자적 쓰기</text>
+<text x="682" y="479" class="mono tb">data/</text>
+<rect class="purple" x="682" y="486" width="164" height="30" rx="6"/>
+<text x="764" y="507" text-anchor="middle" class="mono">transactions.jsonl</text>
+<rect class="purple" x="682" y="518" width="164" height="30" rx="6"/>
+<text x="764" y="539" text-anchor="middle" class="mono">categories.jsonl</text>
+<rect class="purple" x="682" y="550" width="164" height="30" rx="6"/>
+<text x="764" y="571" text-anchor="middle" class="mono">budgets.jsonl</text>
+<rect class="purple" x="682" y="582" width="164" height="30" rx="6"/>
+<text x="764" y="603" text-anchor="middle" class="mono">id_counter</text>
+
+<!-- CSV -->
+<path class="ln ln-purple" d="M620,520 L652,520 L652,656 L668,656" marker-start="url(#arrow-purple)" marker-end="url(#arrow-purple)"/>
+<rect class="purple" x="672" y="632" width="184" height="48" rx="8"/>
+<text x="764" y="653" text-anchor="middle" class="mono">*.csv</text>
+<text x="764" y="671" text-anchor="middle" class="ts">data 밖 · import/export</text>
+
+<!-- 범례 -->
+<rect class="blue" x="24" y="698" width="18" height="14" rx="3"/>
+<text x="50" y="710" class="ts">입력 계층(cli)</text>
+<rect class="purple" x="158" y="698" width="18" height="14" rx="3"/>
+<text x="184" y="710" class="ts">디스크 파일</text>
+<line class="ln" x1="278" y1="705" x2="310" y2="705" marker-end="url(#arrow)"/>
+<text x="318" y="710" class="ts">의존 방향(아래로만)</text>
+<line class="ln ln-green" x1="456" y1="705" x2="488" y2="705" marker-end="url(#arrow-green)"/>
+<text x="496" y="710" class="ts">결과 출력(stdout)</text>
+<line class="ln ln-red dash" x1="626" y1="705" x2="658" y2="705" marker-end="url(#arrow-red)"/>
+<text x="666" y="710" class="ts">점선 = 진단 출력(stderr)</text>
+</svg>

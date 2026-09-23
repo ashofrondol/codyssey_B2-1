@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="692" viewBox="0 0 880 692" role="img" aria-labelledby="title desc">
+<title id="title">예외가 종료 코드가 되기까지 — @handle_errors 의 except 순서</title>
+<desc id="desc">_dispatch() 에서 난 예외는 @handle_errors 의 except 절을 위에서부터 차례로 만나 처음 맞는 칸에서 처리된다. 칸은 종료 신호, 입력 오류, 환경 상태, 최후 방어선 네 부류이고 칸마다 [오류]/[힌트] 문구와 종료 코드(0, 130, 2, 4, 3, 6, 1)가 정해져 있다. 아래에는 없는 id 를 지울 때 실제로 stderr 에 나온 두 줄과 종료 코드 4 를 보여 준다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="692"/>
+<text class="th" x="24" y="34">예외가 종료 코드가 되기까지 — @handle_errors 의 except 순서</text>
+<text class="ts" x="24" y="56">budget_app/cli/error_handler.py:56-126 순서 그대로 · 주황 = 사용자가 고칠 오류 · 빨강 = 예상 못 한 버그 · 초록 = 정상</text>
+<rect class="box" x="300" y="72" width="296" height="40" rx="10"/>
+<text x="448" y="98" text-anchor="middle"><tspan class="tb">명령 실행 중 예외 발생</tspan>  <tspan class="mono">_dispatch()</tspan></text>
+<line class="ln" x1="448" y1="116" x2="448" y2="146" marker-end="url(#arrow)"/>
+<text class="ts" x="798" y="140" text-anchor="middle">종료 코드</text>
+<text class="ts" x="24" y="170">위에서부터</text>
+<text class="ts" x="24" y="188">처음 맞는</text>
+<text class="ts" x="24" y="206">칸에서 멈춤</text>
+<line class="ln" x1="56" y1="218" x2="56" y2="528" marker-end="url(#arrow)"/>
+<rect class="zone" x="112" y="152" width="744" height="84" rx="12"/>
+<text class="tb " x="128" y="191">① 종료 신호</text>
+<text class="ts" x="128" y="210">오류가 아니다</text>
+<text x="300" y="182"><tspan class="mono">BrokenPipeError</tspan><tspan class="ts">  다시 던짐 → main 이 조용히 끝냄</tspan></text>
+<line class="ln" x1="600" y1="177" x2="764" y2="177" marker-end="url(#arrow)"/>
+<rect class="box" x="768" y="163" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="182" text-anchor="middle">0</text>
+<text x="300" y="216"><tspan class="mono">KeyboardInterrupt</tspan><tspan class="ts">  Ctrl+C → [중단] 안내</tspan></text>
+<line class="ln" x1="600" y1="211" x2="764" y2="211" marker-end="url(#arrow)"/>
+<rect class="box" x="768" y="197" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="216" text-anchor="middle">130</text>
+<rect class="orange" x="112" y="248" width="744" height="84" rx="12"/>
+<text class="tb c-orange" x="128" y="287">② 입력 오류</text>
+<text class="ts" x="128" y="306">사용자가 값을 고치면 해결</text>
+<text x="300" y="278"><tspan class="mono">ValidationError</tspan><tspan class="ts">  입력값 규칙 위반 (예: 13월)</tspan></text>
+<line class="ln ln-orange" x1="600" y1="273" x2="764" y2="273" marker-end="url(#arrow-orange)"/>
+<rect class="box" x="768" y="259" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="278" text-anchor="middle">2</text>
+<text x="300" y="312"><tspan class="mono">AppError</tspan><tspan class="ts">  없는 id · 사용 중 · 헤더 없는 CSV 등</tspan></text>
+<line class="ln ln-orange" x1="600" y1="307" x2="764" y2="307" marker-end="url(#arrow-orange)"/>
+<rect class="box" x="768" y="293" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="312" text-anchor="middle">4</text>
+<rect class="zone" x="112" y="344" width="744" height="132" rx="12"/>
+<text class="tb " x="128" y="407">③ 환경 상태</text>
+<text class="ts" x="128" y="426">파일·권한·인코딩</text>
+<text class="mono" x="300" y="371">FileNotFoundError · IsADirectoryError ·</text>
+<text class="mono" x="300" y="391">NotADirectoryError · PermissionError</text>
+<line class="ln" x1="600" y1="380" x2="764" y2="380" marker-end="url(#arrow)"/>
+<rect class="box" x="768" y="366" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="385" text-anchor="middle">3</text>
+<text x="300" y="428"><tspan class="mono">UnicodeDecodeError · UnicodeEncodeError</tspan></text>
+<line class="ln" x1="600" y1="423" x2="764" y2="423" marker-end="url(#arrow)"/>
+<rect class="box" x="768" y="409" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="428" text-anchor="middle">6</text>
+<text x="300" y="462"><tspan class="mono">OSError</tspan><tspan class="ts">  나머지 (디스크 가득 참 등)</tspan></text>
+<line class="ln" x1="600" y1="457" x2="764" y2="457" marker-end="url(#arrow)"/>
+<rect class="box" x="768" y="443" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="462" text-anchor="middle">3</text>
+<rect class="red" x="112" y="488" width="744" height="52" rx="12"/>
+<text class="tb c-red" x="128" y="511">④ 최후 방어선</text>
+<text class="ts" x="128" y="530">분류 밖 버그</text>
+<text x="300" y="520"><tspan class="mono">Exception</tspan><tspan class="ts">  트레이스백은 --debug 일 때만</tspan></text>
+<line class="ln ln-red" x1="600" y1="515" x2="764" y2="515" marker-end="url(#arrow-red)"/>
+<rect class="box" x="768" y="501" width="60" height="28" rx="8"/>
+<text class="mono tb" x="798" y="520" text-anchor="middle">1</text>
+<rect class="box" x="112" y="560" width="744" height="84" rx="10"/>
+<text class="ts" x="128" y="582">stderr 로 나가는 2줄 (실측 예: 없는 id 삭제 → ② AppError)</text>
+<text class="mono" x="128" y="606">[오류] 해당 id 의 거래를 찾을 수 없습니다: TX-999999</text>
+<text class="mono" x="128" y="628">[힌트] `list` 로 id 를 확인하세요.</text>
+<text class="mono" x="840" y="628" text-anchor="end">echo $? → 4</text>
+<text class="ts" x="24" y="672">예외를 거치지 않는 종료: argparse 인자 오류 → 2 (방패 밖) · 카테고리 0개 add → 5 (반환값) · <tspan class="c-green">정상 → 0</tspan></text>
+</svg>

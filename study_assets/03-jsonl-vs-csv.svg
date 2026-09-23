@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="744" height="372" viewBox="0 0 744 372" role="img" aria-labelledby="title desc">
+<title id="title">같은 거래 한 건 — JSONL 한 줄 vs CSV 한 행</title>
+<desc id="desc">거래 TX-000005 한 건을 저장 파일 transactions.jsonl 에 쓴 모습과 export 로 만든 out.csv 에 쓴 모습을 위아래로 비교한다. JSONL 은 금액을 정수로, 태그를 배열로 그대로 담고, CSV 는 쉼표가 든 태그 칸을 큰따옴표로 감싸 한 칸으로 지킨다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="744" height="372"/>
+<!-- JSONL 상자 -->
+<rect class="purple" x="24" y="24" width="456" height="112" rx="10"/>
+<text x="40" y="50" class="tb c-purple">transactions.jsonl — 저장(한 줄 = 한 거래)</text>
+<text x="40" y="80" class="mono">{"id": "TX-000005", "type": "expense", "date": "2024-01-22",</text>
+<text x="40" y="100" class="mono"> "amount": 30000, "category": "food", "memo": "회식",</text>
+<text x="40" y="120" class="mono"> "tags": ["company", "dinner"]}</text>
+<text x="464" y="50" text-anchor="end" class="ts">(실제 파일에선 한 줄)</text>
+
+<!-- JSONL 주석 -->
+<line class="ln" x1="508" y1="96" x2="396" y2="96" marker-end="url(#arrow)"/>
+<text x="516" y="101" class="ts"><tspan class="mono">"amount": 30000</tspan> 정수 그대로</text>
+<line class="ln" x1="508" y1="116" x2="250" y2="116" marker-end="url(#arrow)"/>
+<text x="516" y="121" class="ts"><tspan class="mono">tags</tspan> 는 배열(목록) 그대로</text>
+
+<!-- 두 상자 사이 -->
+<line class="ln ln-purple" x1="120" y1="140" x2="120" y2="192" marker-end="url(#arrow-purple)"/>
+<text x="132" y="170" class="mono c-purple">export --month 2024-01</text>
+<line class="ln ln-purple" x1="320" y1="192" x2="320" y2="140" marker-end="url(#arrow-purple)"/>
+<text x="332" y="170" class="mono c-purple">import --from out.csv</text>
+
+<!-- CSV 상자 -->
+<rect class="box" x="24" y="196" width="456" height="100" rx="10"/>
+<text x="40" y="222" class="tb">out.csv — 교환(엑셀로 열림)</text>
+<rect class="yellow" x="340" y="260" width="114" height="24" rx="4"/>
+<text x="40" y="252" class="mono">id,date,type,category,amount,memo,tags</text>
+<text x="40" y="277" class="mono">TX-000005,2024-01-22,expense,food,30000,회식,"company,dinner"</text>
+
+<!-- CSV 주석 -->
+<line class="ln" x1="508" y1="248" x2="304" y2="248" marker-end="url(#arrow)"/>
+<text x="516" y="253" class="ts">헤더 1행 (칸 이름)</text>
+<line class="ln" x1="508" y1="272" x2="460" y2="272" marker-end="url(#arrow)"/>
+<text x="516" y="277" class="ts tb">쉼표가 든 칸은 따옴표로 감싼다</text>
+
+<!-- 아래 설명 -->
+<text x="24" y="328" class="ts">CSV: UTF-8(BOM 없음) · 줄 끝 <tspan class="mono">\r\n</tspan> · 값은 모두 글자 → 읽을 때 다시 숫자로  |  JSONL 한 줄 평균 약 129바이트(10만 건 12.9MB)</text>
+
+<!-- 범례 -->
+<rect class="purple" x="24" y="344" width="18" height="14" rx="3"/>
+<text x="50" y="356" class="ts">저장 파일(JSONL)</text>
+<rect class="box" x="176" y="344" width="18" height="14" rx="3"/>
+<text x="202" y="356" class="ts">교환 파일(CSV)</text>
+<rect class="yellow" x="318" y="344" width="18" height="14" rx="3"/>
+<text x="344" y="356" class="ts">주목: 따옴표로 감싼 칸</text>
+</svg>

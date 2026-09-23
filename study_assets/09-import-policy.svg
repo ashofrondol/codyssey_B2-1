@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="804" viewBox="0 0 880 804" role="img" aria-labelledby="title desc">
+<title id="title">CSV 한 행이 거치는 판정 — 준비 단계에선 파일을 건드리지 않는다</title>
+<desc id="desc">CSV 의 각 행은 형식 검증, 카테고리 등록 여부, id 결정을 차례로 거쳐 메모리의 batch 에 담기고, 파일은 모든 행을 판정한 뒤 커밋 단계에서 처음 바뀐다. --atomic 이면 한 행만 틀려도 AppError(rc=4)로 전부 취소되고, 기본 모드는 틀린 행만 skipped 로 건너뛴다. 실측: mixed.csv 7행에서 기본 imported=2, skipped=5 / --atomic rc=4 / --auto-category imported=3, skipped=4.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="804"/>
+<text class="th" x="24" y="34">CSV 한 행이 거치는 판정 — 준비 단계에선 파일을 건드리지 않는다</text>
+<text class="ts" x="24" y="56">위→아래가 정상 흐름 · 파랑 = 정상 진행 · 주황 = 그 행만 건너뜀 · 빨강 = 전부 취소(롤백) · 보라 = 파일에 반영</text>
+<rect class="zone" x="24" y="72" width="832" height="580" rx="12"/>
+<text class="tb c-muted" x="40" y="96">준비 단계 (파일 무변경)</text>
+<rect class="box" x="32" y="108" width="176" height="50" rx="10"/>
+<text class="" x="120" y="130" text-anchor="middle">① <tspan class="mono">csv_io.read_rows</tspan></text>
+<text class="ts" x="120" y="148" text-anchor="middle">(줄번호, 행) 하나씩</text>
+<line class="ln ln-blue" x1="120" y1="158" x2="120" y2="176" marker-end="url(#arrow-blue)"/>
+<rect class="box" x="32" y="180" width="176" height="50" rx="24"/>
+<text class="tb" x="120" y="202" text-anchor="middle">② 형식 검증 통과?</text>
+<text class="mono" x="120" y="220" text-anchor="middle">parse_row</text>
+<line class="ln" x1="208" y1="205" x2="248" y2="205" marker-end="url(#arrow)"/>
+<text class="ts" x="228" y="198" text-anchor="middle">아니오</text>
+<rect class="box" x="252" y="184" width="164" height="42" rx="21"/>
+<text class="mono" x="334" y="210" text-anchor="middle">--atomic?</text>
+<line class="ln ln-red" x1="416" y1="205" x2="456" y2="205" marker-end="url(#arrow-red)"/>
+<text class="ts" x="438" y="198" text-anchor="middle">예</text>
+<rect class="red" x="460" y="180" width="160" height="50" rx="10"/>
+<text class="mono c-red" x="540" y="202" text-anchor="middle">AppError · rc=4</text>
+<text class="ts" x="540" y="220" text-anchor="middle">반영된 항목 없음</text>
+<line class="ln ln-orange" x1="334" y1="226" x2="334" y2="248" marker-end="url(#arrow-orange)"/>
+<text class="ts" x="342" y="242" text-anchor="start">아니오</text>
+<rect class="orange" x="254" y="252" width="160" height="50" rx="10"/>
+<text class="mono c-orange" x="334" y="274" text-anchor="middle">skipped +1</text>
+<text class="ts" x="334" y="292" text-anchor="middle">사유 기록 (최대 5개)</text>
+<line class="ln ln-blue" x1="120" y1="230" x2="120" y2="320" marker-end="url(#arrow-blue)"/>
+<text class="ts" x="128" y="280" text-anchor="start">예</text>
+<rect class="box" x="32" y="324" width="176" height="50" rx="24"/>
+<text class="tb" x="120" y="346" text-anchor="middle">③ 카테고리 등록됨?</text>
+<text class="ts" x="120" y="364" text-anchor="middle">categories.jsonl 에?</text>
+<line class="ln" x1="208" y1="349" x2="248" y2="349" marker-end="url(#arrow)"/>
+<text class="ts" x="228" y="342" text-anchor="middle">아니오</text>
+<rect class="box" x="252" y="328" width="164" height="42" rx="21"/>
+<text class="mono" x="334" y="354" text-anchor="middle">--auto-category?</text>
+<line class="ln ln-orange" x1="416" y1="349" x2="456" y2="349" marker-end="url(#arrow-orange)"/>
+<text class="ts" x="438" y="342" text-anchor="middle">아니오</text>
+<rect class="orange" x="460" y="324" width="160" height="50" rx="10"/>
+<text class="mono c-orange" x="540" y="346" text-anchor="middle">skipped +1</text>
+<text class="ts c-red" x="540" y="364" text-anchor="middle">(--atomic 이면 롤백)</text>
+<line class="ln ln-blue" x1="334" y1="370" x2="334" y2="392" marker-end="url(#arrow-blue)"/>
+<text class="ts" x="342" y="386" text-anchor="start">예</text>
+<rect class="box" x="252" y="396" width="164" height="50" rx="10"/>
+<text class="" x="334" y="418" text-anchor="middle">새 카테고리 목록에</text>
+<text class="ts" x="334" y="436" text-anchor="middle">추가 (아직 메모리)</text>
+<line class="ln ln-blue" x1="252" y1="421" x2="124" y2="421" marker-end="url(#arrow-blue)"/>
+<text class="ts" x="186" y="413" text-anchor="middle">다시 본류로</text>
+<line class="ln ln-blue" x1="120" y1="374" x2="120" y2="464" marker-end="url(#arrow-blue)"/>
+<text class="ts" x="128" y="396" text-anchor="start">예</text>
+<rect class="box" x="32" y="468" width="176" height="50" rx="24"/>
+<text class="tb" x="120" y="490" text-anchor="middle">④ id 칸은?</text>
+<text class="ts" x="120" y="508" text-anchor="middle">CSV 의 id 열</text>
+<line class="ln" x1="208" y1="493" x2="240" y2="493"/>
+<line class="ln" x1="240" y1="470" x2="240" y2="596"/>
+<line class="ln" x1="240" y1="470" x2="352" y2="470" marker-end="url(#arrow)"/>
+<text class="ts" x="296" y="463" text-anchor="middle">비었음</text>
+<line class="ln" x1="240" y1="532" x2="352" y2="532" marker-end="url(#arrow)"/>
+<text class="ts" x="296" y="525" text-anchor="middle">있음 · 처음</text>
+<line class="ln" x1="240" y1="596" x2="352" y2="596" marker-end="url(#arrow)"/>
+<text class="ts" x="296" y="589" text-anchor="middle">있음 · 이미 있음</text>
+<rect class="box" x="356" y="454" width="160" height="32" rx="10"/>
+<text class="mono" x="436" y="475" text-anchor="middle">allocator.next()</text>
+<text class="ts" x="524" y="475" text-anchor="start">→ 다음 새 번호</text>
+<rect class="box" x="356" y="516" width="196" height="32" rx="10"/>
+<text class="" x="454" y="537" text-anchor="middle">그 id 복원 (왕복 무손실)</text>
+<rect class="box" x="356" y="580" width="144" height="32" rx="10"/>
+<text class="mono" x="428" y="601" text-anchor="middle">--on-duplicate</text>
+<line class="ln" x1="500" y1="596" x2="528" y2="596"/>
+<line class="ln" x1="528" y1="564" x2="528" y2="628"/>
+<line class="ln" x1="528" y1="564" x2="560" y2="564" marker-end="url(#arrow)"/>
+<rect class="box" x="564" y="550" width="236" height="28" rx="6"/>
+<text class="mono " x="578" y="569">skip → duplicated +1</text>
+<line class="ln" x1="528" y1="596" x2="560" y2="596" marker-end="url(#arrow)"/>
+<rect class="box" x="564" y="582" width="236" height="28" rx="6"/>
+<text class="mono " x="578" y="601">new-id → 새 번호 발급</text>
+<line class="ln" x1="528" y1="628" x2="560" y2="628" marker-end="url(#arrow)"/>
+<rect class="red" x="564" y="614" width="236" height="28" rx="6"/>
+<text class="mono c-red" x="578" y="633">error → AppError rc=4</text>
+<line class="ln ln-blue" x1="120" y1="518" x2="120" y2="536" marker-end="url(#arrow-blue)"/>
+<rect class="blue" x="32" y="540" width="176" height="50" rx="10"/>
+<text class="tb c-blue" x="120" y="562" text-anchor="middle">⑤ batch 에 담기</text>
+<text class="ts" x="120" y="580" text-anchor="middle">완성된 Transaction</text>
+<rect class="box" x="640" y="108" width="200" height="236" rx="10"/>
+<text class="tb" x="656" y="132">실측: mixed.csv 7행</text>
+<text class="ts" x="656" y="152">(정상 2행 · 불량 5행)</text>
+<text class="ts" x="656" y="184">기본</text>
+<text class="mono" x="656" y="204">imported=2, skipped=5</text>
+<text class="ts mono" x="656" y="240">--atomic</text>
+<text class="mono" x="656" y="260">rc=4, (데이터 없음)</text>
+<text class="ts mono" x="656" y="296">--auto-category</text>
+<text class="mono" x="656" y="316">imported=3, skipped=4</text>
+<text class="ts" x="656" y="336">(새 카테고리 fod 등록)</text>
+<rect class="zone" x="24" y="676" width="832" height="104" rx="12"/>
+<line class="ln ln-purple" x1="120" y1="590" x2="120" y2="712" marker-end="url(#arrow-purple)"/>
+<path class="ln ln-purple" d="M120,662 L648,662 L648,712" marker-end="url(#arrow-purple)"/>
+<text class="ts" x="128" y="620">기본</text>
+<text class="ts mono" x="656" y="700">--atomic</text>
+<text class="tb c-muted" x="148" y="698">커밋 단계 (여기서 처음 파일 변경)</text>
+<rect class="purple" x="40" y="716" width="400" height="48" rx="10"/>
+<text class="tb c-purple" x="240" y="738" text-anchor="middle">부분 성공 — 이어 쓰기</text>
+<text class="mono" x="240" y="756" text-anchor="middle">cats.add_many + txs.append_many</text>
+<rect class="purple" x="456" y="716" width="384" height="48" rx="10"/>
+<text class="tb c-purple" x="648" y="738" text-anchor="middle"><tspan class="mono">--atomic</tspan>: UnitOfWork</text>
+<text class="ts" x="648" y="756" text-anchor="middle">.tmp 준비(새 카테고리면 2개) → os.replace</text>
+
+</svg>

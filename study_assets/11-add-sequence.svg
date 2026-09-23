@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="966" viewBox="0 0 880 966" role="img" aria-labelledby="title desc">
+<title id="title">add 한 번의 여정 — 입력부터 [저장 완료]까지</title>
+<desc id="desc">사용자가 python -m budget_app add 를 치면 cli 가 인자를 해석하고 storage 의 저장소들을 시켜 데이터 폴더를 준비한 뒤 여섯 값을 묻는다. services 는 카테고리 등록 여부와 다음 번호(TX-000001)를 storage 에 확인하고, domain 의 Transaction 이 값을 검증한다. storage 가 id_counter 를 먼저 원자적으로 바꾸고 transactions.jsonl 끝에 한 줄을 붙인 뒤, cli 가 [저장 완료] id=TX-000001 을 출력하고 종료 코드 0 으로 끝난다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="966"/>
+<line class="ln" x1="112" y1="128" x2="112" y2="938" opacity="0.45"/>
+<line class="ln" x1="312" y1="128" x2="312" y2="938" opacity="0.45"/>
+<line class="ln" x1="464" y1="128" x2="464" y2="938" opacity="0.45"/>
+<line class="ln" x1="604" y1="128" x2="604" y2="938" opacity="0.45"/>
+<line class="ln" x1="728" y1="128" x2="728" y2="938" opacity="0.45"/>
+<line class="ln" x1="822" y1="128" x2="822" y2="938" opacity="0.45"/>
+<rect class="box" x="66" y="76" width="92" height="52" rx="8"/>
+<text x="112" y="98" text-anchor="middle" class="tb">사용자</text>
+<text x="112" y="118" text-anchor="middle" class="ts">터미널</text>
+<rect class="box" x="270" y="76" width="84" height="52" rx="8"/>
+<text x="312" y="98" text-anchor="middle" class="tb">cli</text>
+<text x="312" y="118" text-anchor="middle" class="mono">cli/</text>
+<rect class="box" x="412" y="76" width="104" height="52" rx="8"/>
+<text x="464" y="98" text-anchor="middle" class="tb">services</text>
+<text x="464" y="118" text-anchor="middle" class="mono">services/</text>
+<rect class="box" x="554" y="76" width="100" height="52" rx="8"/>
+<text x="604" y="98" text-anchor="middle" class="tb">storage</text>
+<text x="604" y="118" text-anchor="middle" class="mono">storage/</text>
+<rect class="box" x="684" y="76" width="88" height="52" rx="8"/>
+<text x="728" y="98" text-anchor="middle" class="tb">domain</text>
+<text x="728" y="118" text-anchor="middle" class="mono">domain/</text>
+<rect class="purple" x="790" y="76" width="64" height="52" rx="8"/>
+<text x="822" y="98" text-anchor="middle" class="tb c-purple">파일</text>
+<text x="822" y="118" text-anchor="middle" class="mono">data/</text>
+<text class="th" x="24" y="34">add 한 번의 여정 — 입력부터 [저장 완료]까지</text>
+<text class="ts" x="24" y="56">위에서 아래로 ①→⑨ · <tspan class="c-blue">파랑 = 명령·입력</tspan> · <tspan class="c-purple">보라 = 파일 읽기/쓰기</tspan> · <tspan class="c-green">초록 = 결과 출력</tspan> · 회색 = 계층 사이 호출</text>
+<text x="36" y="174" text-anchor="middle" class="th">①</text>
+<rect class="bg" x="114.9" y="137.0" width="194.2" height="26.0"/>
+<text x="212.0" y="156" text-anchor="middle" class="mono c-blue">python -m budget_app add</text>
+<line class="ln ln-blue" x1="112" y1="168" x2="309" y2="168" marker-end="url(#arrow-blue)"/>
+<text x="36" y="216" text-anchor="middle" class="th">②</text>
+<path class="ln" d="M312,202 L342,202 L342,220 L315,220" marker-end="url(#arrow)"/>
+<rect class="bg" x="346.0" y="197.0" width="311.7" height="26.0"/>
+<text x="352.0" y="216" text-anchor="start" class="mono">main() → parse_args() → setup_logging()</text>
+<text x="36" y="256" text-anchor="middle" class="th">③</text>
+<path class="ln" d="M312,242 L342,242 L342,260 L315,260" marker-end="url(#arrow)"/>
+<rect class="bg" x="346.0" y="237.0" width="101.1" height="26.0"/>
+<text x="352.0" y="256" text-anchor="start" class="mono">_dispatch()</text>
+<rect class="bg" x="451.1" y="237.5" width="356.5" height="25.5"/>
+<text x="457.1" y="256" text-anchor="start" class="ts">@handle_errors 방패 — 여기서부터 오류를 한 곳에서 잡음</text>
+<rect class="bg" x="459.8" y="269.0" width="214.5" height="26.0"/>
+<text x="567.0" y="288" text-anchor="middle" class="mono c-purple">AppContext(...).prepare()</text>
+<line class="ln" x1="312" y1="300" x2="601" y2="300" marker-end="url(#arrow)"/>
+<line class="ln ln-purple" x1="604" y1="300" x2="819" y2="300" marker-end="url(#arrow-purple)"/>
+<rect class="bg" x="388.0" y="301.5" width="358.0" height="25.5"/>
+<text x="567.0" y="320" text-anchor="middle" class="ts">storage 의 저장소들이 폴더·파일 생성, 기본 카테고리 5종 심기</text>
+<text x="36" y="372" text-anchor="middle" class="th">④</text>
+<rect class="bg" x="137.2" y="335.0" width="149.7" height="26.0"/>
+<text x="212.0" y="354" text-anchor="middle" class="mono c-blue">ask_transaction()</text>
+<line class="ln ln-blue" x1="309" y1="366" x2="115" y2="366" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+<rect class="bg" x="127.9" y="393.5" width="168.3" height="25.5"/>
+<text x="212.0" y="412" text-anchor="middle" class="ts">(틀리면 같은 질문을 다시)</text>
+<rect class="bg" x="100.4" y="367.5" width="223.2" height="25.5"/>
+<text x="212.0" y="386" text-anchor="middle" class="ts">날짜·타입·카테고리·금액·메모·태그</text>
+<text x="36" y="460" text-anchor="middle" class="th">⑤</text>
+<rect class="bg" x="305.1" y="423.0" width="165.9" height="26.0"/>
+<text x="388.0" y="442" text-anchor="middle" class="mono">tx_service.add(...)</text>
+<line class="ln" x1="312" y1="454" x2="461" y2="454" marker-end="url(#arrow)"/>
+<rect class="bg" x="310.9" y="455.5" width="154.2" height="25.5"/>
+<text x="388.0" y="474" text-anchor="middle" class="ts">@log_call 로 감싼 함수</text>
+<text x="36" y="544" text-anchor="middle" class="th">⑥</text>
+<rect class="bg" x="475.4" y="507.0" width="117.3" height="26.0"/>
+<text x="534.0" y="526" text-anchor="middle" class="mono">txs.next_id()</text>
+<rect class="bg" x="451.1" y="481.0" width="165.9" height="26.0"/>
+<text x="534.0" y="500" text-anchor="middle" class="mono">cats.exists("food")</text>
+<line class="ln" x1="464" y1="538" x2="601" y2="538" marker-end="url(#arrow)"/>
+<rect class="bg" x="620.2" y="535.5" width="185.7" height="25.5"/>
+<text x="713.0" y="554" text-anchor="middle" class="ts c-purple">전체 스캔 + id_counter 읽기</text>
+<line class="ln ln-purple" x1="604" y1="566" x2="819" y2="566" marker-end="url(#arrow-purple)"/>
+<rect class="bg" x="491.6" y="571.0" width="84.9" height="26.0"/>
+<text x="534.0" y="590" text-anchor="middle" class="mono">TX-000001</text>
+<line class="ln" x1="604" y1="602" x2="467" y2="602" marker-end="url(#arrow)"/>
+<rect class="bg" x="500.1" y="601.5" width="67.9" height="25.5"/>
+<text x="534.0" y="620" text-anchor="middle" class="ts">다음 번호</text>
+<text x="36" y="668" text-anchor="middle" class="th">⑦</text>
+<rect class="bg" x="525.2" y="631.0" width="141.6" height="26.0"/>
+<text x="596.0" y="650" text-anchor="middle" class="mono">Transaction(...)</text>
+<line class="ln" x1="464" y1="662" x2="725" y2="662" marker-end="url(#arrow)"/>
+<rect class="box" x="640" y="672" width="176" height="52" rx="6"/>
+<text x="728" y="694" text-anchor="middle" class="mono">__post_init__</text>
+<text x="728" y="714" text-anchor="middle" class="ts">7칸 검증·정규화 (frozen)</text>
+<text x="36" y="762" text-anchor="middle" class="th">⑧</text>
+<rect class="bg" x="471.3" y="725.0" width="125.4" height="26.0"/>
+<text x="534.0" y="744" text-anchor="middle" class="mono">txs.append(tx)</text>
+<line class="ln" x1="464" y1="756" x2="601" y2="756" marker-end="url(#arrow)"/>
+<rect class="bg" x="601.7" y="759.0" width="222.6" height="26.0"/>
+<text x="713.0" y="778" text-anchor="middle" class="mono c-purple">id_counter.tmp → os.replace</text>
+<line class="ln ln-purple" x1="604" y1="790" x2="819" y2="790" marker-end="url(#arrow-purple)"/>
+<rect class="bg" x="564.0" y="775.5" width="38.0" height="25.5"/>
+<text x="596.0" y="794" text-anchor="end" class="ts">먼저</text>
+<rect class="bg" x="634.1" y="797.0" width="157.8" height="26.0"/>
+<text x="713.0" y="816" text-anchor="middle" class="mono c-purple">transactions.jsonl</text>
+<line class="ln ln-purple" x1="604" y1="828" x2="819" y2="828" marker-end="url(#arrow-purple)"/>
+<rect class="bg" x="551.0" y="813.5" width="51.0" height="25.5"/>
+<text x="596.0" y="832" text-anchor="end" class="ts">그다음</text>
+<rect class="bg" x="651.4" y="829.5" width="123.3" height="25.5"/>
+<text x="713.0" y="848" text-anchor="middle" class="ts">끝에 한 줄 + fsync</text>
+<text x="36" y="904" text-anchor="middle" class="th">⑨</text>
+<rect class="bg" x="118.3" y="867.0" width="187.5" height="26.0"/>
+<text x="212.0" y="886" text-anchor="middle" class="mono c-green">[저장 완료] id=TX-000001</text>
+<line class="ln ln-green" x1="312" y1="898" x2="115" y2="898" marker-end="url(#arrow-green)"/>
+<rect class="bg" x="172.5" y="899.5" width="79.1" height="25.5"/>
+<text x="212.0" y="918" text-anchor="middle" class="ts c-green">종료 코드 0</text>
+</svg>

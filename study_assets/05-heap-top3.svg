@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="460" viewBox="0 0 880 460" role="img" aria-labelledby="title desc">
+<title id="title">heapq.nlargest(3) — 5건을 흘리며 의자 3개만 유지</title>
+<desc id="desc">거래 5건을 파일 순서대로 흘려보내며 heapq.nlargest(3) 이 크기 3짜리 최소 힙을 유지하는 과정을 보여 준다. 키는 (날짜, id) 이고 힙의 루트는 지금까지 뽑힌 3건 중 가장 오래된 거래다. 더 최신 거래가 오면 루트만 교체되고, 끝나면 최신순으로 정렬해 TX-000005, TX-000004, TX-000001 을 돌려준다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="460"/>
+<text class="th" x="24" y="34">heapq.nlargest(3) — 5건을 흘리며 의자 3개만 유지</text>
+<text class="ts" x="24" y="56">키 = (날짜, id) · 날짜가 늦을수록 큰 키 · 노랑 = 방금 들어온 거래 · 빨강 = 쫓겨난 거래 · 초록 = 최종 결과</text>
+<rect class="box" x="24" y="76" width="152" height="32" rx="8"/>
+<text class="mono" x="100" y="97" text-anchor="middle">TX-000001 01-15</text>
+<rect class="box" x="194" y="76" width="152" height="32" rx="8"/>
+<text class="mono" x="270" y="97" text-anchor="middle">TX-000002 01-14</text>
+<rect class="box" x="364" y="76" width="152" height="32" rx="8"/>
+<text class="mono" x="440" y="97" text-anchor="middle">TX-000003 01-12</text>
+<rect class="box" x="534" y="76" width="152" height="32" rx="8"/>
+<text class="mono" x="610" y="97" text-anchor="middle">TX-000004 01-20</text>
+<rect class="box" x="704" y="76" width="152" height="32" rx="8"/>
+<text class="mono" x="780" y="97" text-anchor="middle">TX-000005 01-22</text>
+<path class="ln" d="M28,114 L28,120 L512,120 L512,114"/>
+<text class="ts" x="270" y="138" text-anchor="middle">① 처음 3건 → 힙</text>
+<path class="ln" d="M538,114 L538,120 L682,120 L682,114"/>
+<text class="ts" x="610" y="138" text-anchor="middle">② 에서 도착</text>
+<path class="ln" d="M708,114 L708,120 L852,120 L852,114"/>
+<text class="ts" x="780" y="138" text-anchor="middle">③ 에서 도착</text>
+<text class="tb" x="130" y="178" text-anchor="middle">① 처음 3건으로 힙</text>
+<line class="ln" x1="118" y1="268" x2="75" y2="304"/>
+<line class="ln" x1="142" y1="268" x2="185" y2="304"/>
+<rect class="box" x="79" y="216" width="102" height="52" rx="10"/>
+<text class="mono" x="130" y="238" text-anchor="middle">01-12</text>
+<text class="mono" x="130" y="258" text-anchor="middle">TX-000003</text>
+<rect class="box" x="24" y="304" width="102" height="52" rx="10"/>
+<text class="mono" x="75" y="326" text-anchor="middle">01-14</text>
+<text class="mono" x="75" y="346" text-anchor="middle">TX-000002</text>
+<rect class="box" x="134" y="304" width="102" height="52" rx="10"/>
+<text class="mono" x="185" y="326" text-anchor="middle">01-15</text>
+<text class="mono" x="185" y="346" text-anchor="middle">TX-000001</text>
+<text class="ts" x="130" y="388" text-anchor="middle">루트(맨 위) = 셋 중 가장 오래됨</text>
+<text class="tb" x="362" y="178" text-anchor="middle">② TX-000004(01-20) 도착</text>
+<text x="362" y="198" text-anchor="middle">→ 루트보다 최신 → 교체</text>
+<line class="ln" x1="350" y1="268" x2="307" y2="304"/>
+<line class="ln" x1="374" y1="268" x2="417" y2="304"/>
+<rect class="box" x="311" y="216" width="102" height="52" rx="10"/>
+<text class="mono" x="362" y="238" text-anchor="middle">01-14</text>
+<text class="mono" x="362" y="258" text-anchor="middle">TX-000002</text>
+<rect class="yellow" x="256" y="304" width="102" height="52" rx="10"/>
+<text class="mono" x="307" y="326" text-anchor="middle">01-20</text>
+<text class="mono" x="307" y="346" text-anchor="middle">TX-000004</text>
+<rect class="box" x="366" y="304" width="102" height="52" rx="10"/>
+<text class="mono" x="417" y="326" text-anchor="middle">01-15</text>
+<text class="mono" x="417" y="346" text-anchor="middle">TX-000001</text>
+<rect class="red" x="292" y="372" width="140" height="30" rx="8"/>
+<text x="362" y="392" text-anchor="middle"><tspan class="tb c-red">탈락</tspan> <tspan class="mono">TX-000003</tspan></text>
+<text class="tb" x="594" y="178" text-anchor="middle">③ TX-000005(01-22) 도착</text>
+<text x="594" y="198" text-anchor="middle">→ 루트보다 최신 → 교체</text>
+<line class="ln" x1="582" y1="268" x2="539" y2="304"/>
+<line class="ln" x1="606" y1="268" x2="649" y2="304"/>
+<rect class="box" x="543" y="216" width="102" height="52" rx="10"/>
+<text class="mono" x="594" y="238" text-anchor="middle">01-15</text>
+<text class="mono" x="594" y="258" text-anchor="middle">TX-000001</text>
+<rect class="box" x="488" y="304" width="102" height="52" rx="10"/>
+<text class="mono" x="539" y="326" text-anchor="middle">01-20</text>
+<text class="mono" x="539" y="346" text-anchor="middle">TX-000004</text>
+<rect class="yellow" x="598" y="304" width="102" height="52" rx="10"/>
+<text class="mono" x="649" y="326" text-anchor="middle">01-22</text>
+<text class="mono" x="649" y="346" text-anchor="middle">TX-000005</text>
+<rect class="red" x="524" y="372" width="140" height="30" rx="8"/>
+<text x="594" y="392" text-anchor="middle"><tspan class="tb c-red">탈락</tspan> <tspan class="mono">TX-000002</tspan></text>
+<line class="ln" x1="185" y1="242" x2="307" y2="242" marker-end="url(#arrow)"/>
+<line class="ln" x1="417" y1="242" x2="539" y2="242" marker-end="url(#arrow)"/>
+<text class="tb" x="786" y="178" text-anchor="middle">④ 끝: 최신순 정렬</text>
+<rect class="green" x="728" y="216" width="116" height="32" rx="8"/>
+<text class="mono" x="786" y="237" text-anchor="middle">TX-000005</text>
+<rect class="green" x="728" y="256" width="116" height="32" rx="8"/>
+<text class="mono" x="786" y="277" text-anchor="middle">TX-000004</text>
+<rect class="green" x="728" y="296" width="116" height="32" rx="8"/>
+<text class="mono" x="786" y="317" text-anchor="middle">TX-000001</text>
+<text class="ts" x="786" y="372" text-anchor="middle">= 화면 출력</text>
+<text class="mono" x="786" y="392" text-anchor="middle">list --limit 3</text>
+<line class="ln ln-green" x1="649" y1="242" x2="724" y2="242" marker-end="url(#arrow-green)"/>
+<text class="ts" x="24" y="436">시간 O(M log N) · 메모리 O(N) — N=3(의자 수), M=파일 건수 · 파일은 끝까지 다 읽지만 손에 쥐는 것은 늘 3건</text>
+</svg>

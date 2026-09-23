@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" role="img" aria-labelledby="title desc">
+<title id="title">update 가 파일을 바꾸는 3단계 — 어디서 죽어도 반쪽 파일은 없다</title>
+<desc id="desc">① 새 줄 목록을 메모리에서 만들고, ② transactions.jsonl.tmp 에 전부 쓴 뒤 flush 와 os.fsync 로 디스크에 내리고, ③ os.replace 로 transactions.jsonl 이름표를 새 내용으로 한 번에 옮긴다. 어느 단계에서 멈춰도 파일은 옛 내용이거나 새 내용이며, open('w') 로 직접 덮어쓰면 반쪽 파일이 남을 수 있다.</desc>
+<style>
+  text{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;font-size:15px;fill:#1D1F23}
+  .bg{fill:#FFFFFF}
+  .ts{font-size:13px;fill:#5B6069}
+  .th{font-size:17px;font-weight:700}
+  .tb{font-weight:700}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK KR",monospace;font-size:13.5px}
+  .box{fill:#F4F3EF;stroke:#9A9CA3;stroke-width:1.5}
+  .zone{fill:#FAF9F6;stroke:#C9C6BE;stroke-width:1.2;stroke-dasharray:5 4}
+  .blue{fill:#E7EFF9;stroke:#1F5FAD;stroke-width:1.6}
+  .green{fill:#E6F4EC;stroke:#1B7F4B;stroke-width:1.6}
+  .orange{fill:#FCEFE0;stroke:#B25E09;stroke-width:1.6}
+  .red{fill:#FCEBEA;stroke:#B42318;stroke-width:1.6}
+  .purple{fill:#F1EAFB;stroke:#6E3FB0;stroke-width:1.6}
+  .yellow{fill:#FFF3C4;stroke:#A07800;stroke-width:1.6}
+  .c-blue{fill:#1F5FAD}.c-green{fill:#1B7F4B}.c-orange{fill:#B25E09}.c-red{fill:#B42318}.c-purple{fill:#6E3FB0}.c-muted{fill:#5B6069}
+  .ln{stroke:#6B7078;stroke-width:1.6;fill:none}
+  .ln-blue{stroke:#1F5FAD}.ln-green{stroke:#1B7F4B}.ln-red{stroke:#B42318}.ln-orange{stroke:#B25E09}.ln-purple{stroke:#6E3FB0}
+  .dash{stroke-dasharray:6 5}
+  .ah{fill:#6B7078}.ah-blue{fill:#1F5FAD}.ah-green{fill:#1B7F4B}.ah-red{fill:#B42318}.ah-orange{fill:#B25E09}.ah-purple{fill:#6E3FB0}
+  @media (prefers-color-scheme:dark){
+    text{fill:#E8E6E1}
+    .bg{fill:#1A1C20}
+    .ts{fill:#A9A69F}
+    .box{fill:#24262B;stroke:#6B6E76}
+    .zone{fill:#1F2125;stroke:#43464D}
+    .blue{fill:#1B2940;stroke:#7FB0F0}
+    .green{fill:#16281E;stroke:#5FC98E}
+    .orange{fill:#2E2215;stroke:#E8A05A}
+    .red{fill:#301A18;stroke:#F08A80}
+    .purple{fill:#251C33;stroke:#C3A0F0}
+    .yellow{fill:#2E2812;stroke:#E3C45C}
+    .c-blue{fill:#9CC4F5}.c-green{fill:#7ED3A3}.c-orange{fill:#EDB27A}.c-red{fill:#F4A39B}.c-purple{fill:#D2B8F4}.c-muted{fill:#A9A69F}
+    .ln{stroke:#8D9098}
+    .ln-blue{stroke:#7FB0F0}.ln-green{stroke:#5FC98E}.ln-red{stroke:#F08A80}.ln-orange{stroke:#E8A05A}.ln-purple{stroke:#C3A0F0}
+    .ah{fill:#8D9098}.ah-blue{fill:#7FB0F0}.ah-green{fill:#5FC98E}.ah-red{fill:#F08A80}.ah-orange{fill:#E8A05A}.ah-purple{fill:#C3A0F0}
+  }
+</style>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-red" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-green" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-orange" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-purple" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="880" height="520"/>
+<text class="th" x="24" y="34">update 가 파일을 바꾸는 3단계 — 어디서 죽어도 반쪽 파일은 없다</text>
+<text class="ts" x="24" y="56">보라 = 디스크의 실제 내용 · 노랑 = 방금 바뀐 연결 · 초록 = 안전한 결과 · 빨강 = 하면 안 되는 방식 · 점선 = 버려진 옛 내용</text>
+<rect class="zone" x="24" y="72" width="264" height="250" rx="12"/>
+<text class="th" x="156" y="98" text-anchor="middle">① 계획(메모리)</text>
+<rect class="box" x="69" y="110" width="174" height="32" rx="8"/>
+<text class="mono" x="156" y="131" text-anchor="middle">transactions.jsonl</text>
+<rect class="zone" x="308" y="72" width="264" height="250" rx="12"/>
+<text class="th" x="440" y="98" text-anchor="middle">② 준비(.tmp + fsync)</text>
+<rect class="box" x="353" y="110" width="174" height="32" rx="8"/>
+<text class="mono" x="440" y="131" text-anchor="middle">transactions.jsonl</text>
+<rect class="zone" x="592" y="72" width="264" height="250" rx="12"/>
+<text class="th" x="724" y="98" text-anchor="middle">③ 커밋(os.replace)</text>
+<rect class="box" x="637" y="110" width="174" height="32" rx="8"/>
+<text class="mono" x="724" y="131" text-anchor="middle">transactions.jsonl</text>
+<rect class="purple" x="32" y="172" width="120" height="60" rx="10"/>
+<text class="tb c-purple" x="92" y="197" text-anchor="middle">옛 내용 (A)</text>
+<text class="ts" x="92" y="219" text-anchor="middle">원본 파일</text>
+<rect class="box" x="160" y="172" width="120" height="60" rx="10"/>
+<text class="tb " x="220" y="197" text-anchor="middle">새 줄 목록</text>
+<text class="mono" x="220" y="219" text-anchor="middle">RewritePlan</text>
+<line class="ln" x1="92" y1="142" x2="92" y2="168" marker-end="url(#arrow)"/>
+<text class="ts" x="156" y="262" text-anchor="middle">디스크 파일은 아직 그대로</text>
+<rect class="purple" x="316" y="172" width="120" height="60" rx="10"/>
+<text class="tb c-purple" x="376" y="197" text-anchor="middle">옛 내용 (A)</text>
+<text class="ts" x="376" y="219" text-anchor="middle">원본 파일</text>
+<rect class="yellow" x="444" y="172" width="120" height="60" rx="10"/>
+<text class="tb " x="504" y="197" text-anchor="middle">새 내용 (B)</text>
+<text class="ts" x="504" y="219" text-anchor="middle">디스크에 내림</text>
+<line class="ln" x1="376" y1="142" x2="376" y2="168" marker-end="url(#arrow)"/>
+<rect class="box" x="337" y="256" width="206" height="32" rx="8"/>
+<text class="mono" x="440" y="277" text-anchor="middle">transactions.jsonl.tmp</text>
+<line class="ln" x1="504" y1="256" x2="504" y2="236" marker-end="url(#arrow)"/>
+<text class="ts mono" x="440" y="310" text-anchor="middle">flush() · os.fsync()</text>
+<rect class="box dash" x="600" y="172" width="120" height="60" rx="10"/>
+<text class="ts" x="660" y="197" text-anchor="middle">옛 내용 (A)</text>
+<text class="ts" x="660" y="219" text-anchor="middle">버려짐</text>
+<rect class="yellow" x="728" y="172" width="120" height="60" rx="10"/>
+<text class="tb " x="788" y="197" text-anchor="middle">새 내용 (B)</text>
+<text class="ts" x="788" y="219" text-anchor="middle">이제 이게 원본</text>
+<polygon class="yellow" points="783,143 793,143 793,155 799,155 788,168 777,155 783,155"/>
+<text class="ts" x="724" y="262" text-anchor="middle">이름표가 B 로 옮겨 붙음</text>
+<text class="ts" x="724" y="284" text-anchor="middle">(.tmp 이름은 사라짐)</text>
+<text class="tb" x="24" y="350">여기서 죽으면?</text>
+<rect class="green" x="24" y="362" width="264" height="40" rx="10"/>
+<text class="c-green" x="156" y="387" text-anchor="middle">원본 그대로</text>
+<rect class="green" x="308" y="362" width="264" height="40" rx="10"/>
+<text class="c-green" x="440" y="387" text-anchor="middle">원본 그대로 (.tmp 찌꺼기만)</text>
+<rect class="green" x="592" y="362" width="264" height="40" rx="10"/>
+<text class="c-green" x="724" y="387" text-anchor="middle">옛 것 또는 새 것 — 중간 없음</text>
+<rect class="red" x="130" y="418" width="620" height="36" rx="10"/>
+<text class="c-red" x="440" y="441" text-anchor="middle">직접 덮어쓰기 <tspan class="mono">open('w')</tspan> 였다면: 여는 순간 0바이트 → 쓰다 죽으면 반쪽 파일</text>
+<text class="ts" x="24" y="482">실측 (update 한 건):</text>
+<text class="ts mono" x="148" y="482">open(transactions.jsonl.tmp, 'w') → os.fsync(fd=3)</text>
+<text class="ts mono" x="148" y="502">→ os.replace(transactions.jsonl.tmp -&gt; transactions.jsonl)</text>
+
+</svg>
